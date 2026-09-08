@@ -1,5 +1,19 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { cookies } from 'next/headers';
+
+export const dynamic = 'force-dynamic';
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key',
+    },
+  });
+}
 
 export async function GET(req) {
   try {
@@ -58,12 +72,65 @@ export async function GET(req) {
 }
 
 export async function POST(req) {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key',
+  };
+
   try {
+    const apiKey = req.headers.get('x-api-key') || req.headers.get('authorization');
+    const EXPECTED_KEY = process.env.CRM_API_KEY || process.env.WORKFORCE_API_KEY;
+
+    // Check if authenticated via API key or internal user session
+    const cookieStore = await cookies();
+    const sessionUserId = cookieStore.get('userId')?.value;
+
+    if (EXPECTED_KEY && !sessionUserId) {
+      const isBearerMatch = apiKey === `Bearer ${EXPECTED_KEY}`;
+      const isKeyMatch = apiKey === EXPECTED_KEY;
+
+      if (!apiKey || (!isKeyMatch && !isBearerMatch)) {
+        return NextResponse.json(
+          { error: 'Unauthorized: Invalid or missing API Key' },
+          { status: 401, headers: corsHeaders }
+        );
+      }
+    }
+
     const body = await req.json();
-    const { clientName, phoneNumber, salesPersonId, notes, status, followUpDate, expectedValue, leadSource } = body;
+    let { clientName, phoneNumber, salesPersonId, notes, status, followUpDate, expectedValue, leadSource } = body;
+
+    // Fallback for name / phone variations
+    clientName = clientName || body.name || 'Website Lead';
+    phoneNumber = phoneNumber || body.phone || body.mobile || '';
+
+    // If salesPersonId not provided by external webhook/form, auto-assign to active sales person
+    if (!salesPersonId) {
+      if (sessionUserId) {
+        salesPersonId = parseInt(sessionUserId, 10);
+      } else {
+        let salesUser = await prisma.user.findFirst({
+          where: { email: 'jennifer@aidigital.com' }
+        });
+        if (!salesUser) {
+          salesUser = await prisma.user.findFirst({
+            where: { role: 'SALES', status: 'ACTIVE' }
+          }) || await prisma.user.findFirst({
+            where: { role: 'SALES' }
+          }) || await prisma.user.findFirst();
+        }
+        if (salesUser) {
+          salesPersonId = salesUser.id;
+        }
+      }
+    }
 
     if (!clientName || !phoneNumber || !salesPersonId) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Missing required fields (clientName, phoneNumber)' },
+        { status: 400, headers: corsHeaders }
+      );
     }
 
     const newCall = await prisma.callRecord.create({
@@ -75,13 +142,13 @@ export async function POST(req) {
         status: status || 'PENDING',
         followUpDate: followUpDate ? new Date(followUpDate) : null,
         expectedValue: expectedValue ? parseFloat(expectedValue) : null,
-        leadSource: leadSource || null
+        leadSource: leadSource || 'Website'
       }
     });
 
-    return NextResponse.json({ call: newCall }, { status: 201 });
+    return NextResponse.json({ call: newCall, success: true }, { status: 201, headers: corsHeaders });
   } catch (error) {
     console.error('Create call error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500, headers: corsHeaders });
   }
 }

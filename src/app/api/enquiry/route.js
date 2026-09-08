@@ -10,7 +10,7 @@ export async function OPTIONS() {
     headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key',
     },
   });
 }
@@ -19,10 +19,26 @@ export async function POST(request) {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key',
   };
 
   try {
+    // API Key Authentication
+    const apiKey = request.headers.get('x-api-key') || request.headers.get('authorization');
+    const EXPECTED_KEY = process.env.CRM_API_KEY || process.env.WORKFORCE_API_KEY;
+
+    if (EXPECTED_KEY) {
+      const isBearerMatch = apiKey === `Bearer ${EXPECTED_KEY}`;
+      const isKeyMatch = apiKey === EXPECTED_KEY;
+
+      if (!apiKey || (!isKeyMatch && !isBearerMatch)) {
+        return NextResponse.json(
+          { error: 'Unauthorized: Invalid or missing API Key' },
+          { status: 401, headers: corsHeaders }
+        );
+      }
+    }
+
     const body = await request.json();
     const name = body.name || body.clientName || 'Website Visitor';
     const phone = body.phone || body.phoneNumber || body.mobile || '';
