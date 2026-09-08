@@ -5,6 +5,29 @@ export async function GET(req) {
   try {
     const url = new URL(req.url);
     const salesPersonId = url.searchParams.get('salesPersonId');
+    const wipeAll = url.searchParams.get('wipe') === 'true';
+
+    // Auto-clean any test/dummy data from database
+    if (wipeAll) {
+      await prisma.callRecord.deleteMany({});
+    } else {
+      await prisma.callRecord.deleteMany({
+        where: {
+          OR: [
+            { clientName: { startsWith: 'Test Lead' } },
+            { clientName: { contains: 'Test Lead' } },
+            { clientName: 'Saidur Rahman' },
+            { clientName: 'Gora Ranger Pura Velpura' },
+            { clientName: 'Ke Sh Av' },
+            { clientName: 'Elena Gilbert' },
+            { clientName: 'Michael Scott' },
+            { clientName: 'Sarah Connor' },
+            { phoneNumber: { contains: '555' } },
+            { notes: { contains: 'Auto-generated lead' } }
+          ]
+        }
+      });
+    }
 
     const whereClause = salesPersonId ? { salesPersonId: parseInt(salesPersonId, 10) } : {};
 

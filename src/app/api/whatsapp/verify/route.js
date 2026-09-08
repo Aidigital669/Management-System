@@ -41,7 +41,7 @@ export async function GET(req) {
           headers: { 'Token': token }
         });
         const data = await res.json();
-        
+         
         return NextResponse.json({ 
           exists: data.exists === true, 
           reason: data.exists ? 'Verified via Wassenger' : 'Number not registered on WhatsApp' 

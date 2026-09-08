@@ -16,7 +16,8 @@ import {
   Mail,
   MessageCircle,
   FileText,
-  MessageSquare
+  MessageSquare,
+  Trash2
 } from 'lucide-react';
 
 export default function SalesDashboard() {
@@ -197,6 +198,23 @@ export default function SalesDashboard() {
     }
   };
 
+  const handleClearAllLeads = async () => {
+    if (!window.confirm('Are you sure you want to delete all test leads? This will reset your dashboard.')) return;
+    try {
+      const res = await fetch('/api/dev/clean-sales-data');
+      const data = await res.json();
+      if (res.ok) {
+        showToast(data.message || 'All test leads cleared successfully!');
+        setSelectedLeadId(null);
+        await refreshData(currentUser?.id);
+      } else {
+        showToast(data.error || 'Failed to clear leads', 'error');
+      }
+    } catch (err) {
+      showToast('Error clearing leads', 'error');
+    }
+  };
+
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/');
@@ -297,11 +315,11 @@ export default function SalesDashboard() {
 
   const getCampaign = (call) => {
     if (call.leadSource) return call.leadSource;
-    if (call.notes && call.notes.includes('[Campaign: Facebook Campaign]')) return 'Facebook Campaign';
-    if (call.notes && call.notes.includes('[Campaign: LinkedIn Campaign]')) return 'LinkedIn Campaign';
-    if (call.notes && call.notes.includes('[Campaign: Google Campaign]')) return 'Google Campaign';
-    const campaigns = ['Facebook Campaign', 'LinkedIn Campaign', 'Google Campaign'];
-    return campaigns[call.id % 3];
+    if (call.notes && call.notes.includes('[Campaign:')) {
+      const match = call.notes.match(/\[Campaign:\s*([^\]]+)\]/);
+      if (match && match[1]) return match[1].trim();
+    }
+    return 'Direct / Native Lead';
   };
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -1028,9 +1046,6 @@ export default function SalesDashboard() {
                     {campaigns.map(c => (
                       <option key={c.id} value={c.name}>{c.name}</option>
                     ))}
-                    <option value="Facebook Campaign">Facebook Campaign</option>
-                    <option value="LinkedIn Campaign">LinkedIn Campaign</option>
-                    <option value="Google Campaign">Google Campaign</option>
                   </select>
                 </div>
               </div>
@@ -1228,7 +1243,10 @@ export default function SalesDashboard() {
                             <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-white text-[8px]">▼</div>
                           </div>
                         </div>
-                        <button onClick={() => setShowCallModal(true)} className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-4 py-1.5 rounded flex items-center gap-1 justify-center transition">New <Plus className="w-3 h-3" /></button>
+                        <button onClick={() => setShowCallModal(true)} className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center gap-1 justify-center transition shadow-sm">New <Plus className="w-3 h-3" /></button>
+                        <button onClick={handleClearAllLeads} className="bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-300 text-xs font-bold px-2.5 py-1.5 rounded flex items-center gap-1 justify-center transition shadow-sm" title="Clear test leads">
+                          <Trash2 className="w-3 h-3 text-rose-400" /> Wipe Test Leads
+                        </button>
                       </div>
                     </div>
                     <div className="relative">

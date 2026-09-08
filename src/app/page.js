@@ -126,10 +126,13 @@ export default function LoginPage() {
           body: JSON.stringify({ name, email, password, department })
         });
 
-        const data = await res.json();
+        let regData = {};
+        try {
+          regData = await res.json();
+        } catch (e) {}
 
         if (!res.ok) {
-          setError(data.error || 'Registration failed.');
+          setError(regData.error || 'Registration failed.');
           setLoading(false);
           return;
         }
@@ -157,10 +160,15 @@ export default function LoginPage() {
           body: JSON.stringify({ email, password })
         });
 
-        const data = await res.json();
+        let loginData = {};
+        try {
+          loginData = await res.json();
+        } catch (jsonErr) {
+          console.error('Non-JSON response from login API:', jsonErr);
+        }
 
         if (!res.ok) {
-          setError(data.error || 'Invalid credentials.');
+          setError(loginData.error || `Login failed (${res.status}: ${res.statusText || 'Server Error'})`);
           setLoading(false);
           return;
         }
@@ -168,7 +176,8 @@ export default function LoginPage() {
         router.push('/dashboard');
       }
     } catch (err) {
-      setError('Failed to connect to the server.');
+      console.error('Login fetch exception:', err);
+      setError(`Connection error: ${err.message || 'Failed to reach server'}`);
       setLoading(false);
     }
   };
