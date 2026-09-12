@@ -526,11 +526,11 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
                   <DollarSign className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
-                  <h4 className="text-base font-extrabold text-slate-900 dark:text-white truncate">
+                  <h4 className="text-base font-extrabold text-slate-900 dark:text-white">
                     Revenue Breakdown
                   </h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5 truncate">
-                    Actual Collected vs Expected vs Pending • <span className="font-bold text-slate-700 dark:text-slate-300">{selectedRevenueMonth === 'all' && !revenueStartDate ? 'All Months' : (availableRevenueMonths.find(m => m.key === selectedRevenueMonth)?.label || selectedRevenueMonth)}</span>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Actual vs Expected vs Pending • <span className="font-bold text-slate-700 dark:text-slate-300">{selectedRevenueMonth === 'all' && !revenueStartDate ? 'All Months' : (availableRevenueMonths.find(m => m.key === selectedRevenueMonth)?.label || selectedRevenueMonth)}</span>
                   </p>
                 </div>
               </div>
@@ -571,8 +571,11 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
               </div>
             </div>
 
-            {/* Quick Month Filter Pills (Always single horizontal scrollable row, never vertically wrapping or truncated) */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-3 no-scrollbar flex-nowrap border-b border-slate-100 dark:border-slate-800">
+            {/* Quick Month Filter Pills (Single horizontal scrollable row with NO visible scrollbar) */}
+            <div 
+              className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-3 flex-nowrap border-b border-slate-100 dark:border-slate-800 [&::-webkit-scrollbar]:hidden"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
               <button
                 type="button"
                 onClick={() => { setSelectedRevenueMonth('all'); setRevenueStartDate(''); setRevenueEndDate(''); setShowCustomDate(false); }}
@@ -629,42 +632,44 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
               </button>
             </div>
 
-            {/* Expandable Custom Date Range Box (Dedicated row, full width, beautifully styled) */}
+            {/* Expandable Custom Date Range Box (Structured Grid, 100% responsive, NEVER overflows out of box) */}
             {(showCustomDate || selectedRevenueMonth === 'custom' || (revenueStartDate && selectedRevenueMonth !== 'all' && !availableRevenueMonths.some(m => selectedRevenueMonth === m.key))) && (
-              <div className="flex flex-wrap items-center justify-between gap-2.5 bg-slate-50 dark:bg-slate-850 p-3 rounded-xl border border-slate-200 dark:border-slate-700 mb-4 animate-fade-in text-xs">
-                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 shrink-0">Custom Range:</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-bold text-slate-500">From</span>
+              <div className="bg-slate-50 dark:bg-slate-850 p-3 rounded-xl border border-slate-200 dark:border-slate-700 mb-4 space-y-2.5 animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Custom Date Range
+                  </span>
+                  {(revenueStartDate || revenueEndDate) && (
+                    <button
+                      type="button"
+                      onClick={() => { setRevenueStartDate(''); setRevenueEndDate(''); setSelectedRevenueMonth('all'); setShowCustomDate(false); }}
+                      className="text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 transition cursor-pointer flex items-center gap-1"
+                    >
+                      <span>Clear Range</span>
+                      <span className="font-black">✕</span>
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 shadow-xs min-w-0">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase shrink-0 w-8">From</span>
                     <input
                       type="date"
                       value={revenueStartDate}
                       onChange={(e) => { setRevenueStartDate(e.target.value); setSelectedRevenueMonth('custom'); }}
-                      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer shadow-inner"
+                      className="w-full bg-transparent text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer min-w-0"
                     />
                   </div>
-                  <span className="text-slate-400 font-bold">-</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-bold text-slate-500">To</span>
+                  <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 shadow-xs min-w-0">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase shrink-0 w-8">To</span>
                     <input
                       type="date"
                       value={revenueEndDate}
                       onChange={(e) => { setRevenueEndDate(e.target.value); setSelectedRevenueMonth('custom'); }}
-                      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer shadow-inner"
+                      className="w-full bg-transparent text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer min-w-0"
                     />
                   </div>
                 </div>
-                {(revenueStartDate || revenueEndDate) && (
-                  <button
-                    type="button"
-                    onClick={() => { setRevenueStartDate(''); setRevenueEndDate(''); setSelectedRevenueMonth('all'); setShowCustomDate(false); }}
-                    className="px-2.5 py-1 text-[11px] font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition cursor-pointer flex items-center gap-1 shrink-0"
-                    title="Reset to All Months"
-                  >
-                    <span>Clear Range</span>
-                    <span className="font-black">✕</span>
-                  </button>
-                )}
               </div>
             )}
           </div>
