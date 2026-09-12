@@ -26,14 +26,34 @@ import {
   Send,
   CheckSquare,
   BarChart2,
-  RefreshCw
+  RefreshCw,
+  Menu,
+  X
 } from 'lucide-react';
+import {
+  parseDbDate as parsePlanDbDate,
+  formatDateToDb,
+  getPlanDurationDays,
+  getPlanDurationLabel,
+  getClientPlanInfo,
+  isClientActiveInMonth,
+  isClientExpiringInMonth,
+  isClientStartingInMonth,
+  getClientRevenueStream,
+  getClientMonthKey
+} from '@/lib/planUtils';
 
 export default function CeoDashboard() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState('overview'); // overview, users, audits, payroll
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const handleSelectTab = (tab) => {
+    setActiveTab(tab);
+    setMobileSidebarOpen(false);
+  };
 
   // Data states
   const [usersList, setUsersList] = useState([]);
@@ -66,8 +86,12 @@ export default function CeoDashboard() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [clientMonthFilter, setClientMonthFilter] = useState('all');
+  const [clientStartDate, setClientStartDate] = useState('');
+  const [clientEndDate, setClientEndDate] = useState('');
   const [clientPaymentFilter, setClientPaymentFilter] = useState('all');
   const [clientRevenueStreamFilter, setClientRevenueStreamFilter] = useState('all');
+  const [clientLifecycleFilter, setClientLifecycleFilter] = useState('all'); // 'all', 'active', 'expiring_soon', 'expired', 'renewable', 'inactive'
+  const [clientFilterScope, setClientFilterScope] = useState('all_clients'); // 'all_clients' (global) or 'month'
 
   // Form Fields - Client CRM
   const [showAddClientModal, setShowAddClientModal] = useState(false);
@@ -210,28 +234,42 @@ export default function CeoDashboard() {
     return isNaN(d.getTime()) ? null : d;
   };
 
-  const getClientPlanStatus = (client) => {
-    const start = parseDbDate(client.joiningDate || client.createdAt);
-    if (!start) return { status: 'Unknown', daysLeft: 0, daysPassed: 0 };
-    
-    const expiry = new Date(start);
-    expiry.setDate(expiry.getDate() + 30);
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    start.setHours(0, 0, 0, 0);
-    expiry.setHours(0, 0, 0, 0);
-    
-    const diffTime = expiry.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    const daysPassed = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (diffDays <= 0) {
-      return { status: 'Expired', daysLeft: diffDays, daysPassed };
-    } else if (daysPassed >= 22) {
-      return { status: 'Expiring Soon', daysLeft: diffDays, daysPassed };
+  const isDateInRange = (dateStr, startDateStr, endDateStr) => {
+    if (!startDateStr && !endDateStr) return true;
+    const d = parseDbDate(dateStr);
+    if (!d) return false;
+    const t = d.getTime();
+
+    if (startDateStr) {
+      const start = parseDbDate(startDateStr);
+      if (start && t < start.getTime()) return false;
     }
-    return { status: 'Active', daysLeft: diffDays, daysPassed };
+    if (endDateStr) {
+      const end = parseDbDate(endDateStr);
+      if (end && t > end.getTime()) return false;
+    }
+    return true;
+  };
+
+  const handleMonthRangeChange = (monthKey, setMonth, setStart, setEnd) => {
+    setMonth(monthKey);
+    if (monthKey === 'all' || !monthKey) {
+      setStart('');
+      setEnd('');
+    } else {
+      const [yyyy, mm] = monthKey.split('-');
+      const y = parseInt(yyyy, 10);
+      const m = parseInt(mm, 10);
+      const firstDay = `${y}-${String(m).padStart(2, '0')}-01`;
+      const lastDate = new Date(y, m, 0).getDate();
+      const lastDay = `${y}-${String(m).padStart(2, '0')}-${String(lastDate).padStart(2, '0')}`;
+      setStart(firstDay);
+      setEnd(lastDay);
+    }
+  };
+
+  const getClientPlanStatus = (client) => {
+    return getClientPlanInfo(client);
   };
 
   // Helper to determine revenue stream source (New Purchase vs Renewal vs Active Retainer)
@@ -880,22 +918,41 @@ export default function CeoDashboard() {
         </div>
       )}
 
-      {/* Sidebar Panel */}
-      <aside className="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between shrink-0">
-        <div>
+      {/* Mobile Backdrop Overlay */}
+      {mobileSidebarOpen && (
+        <div 
+          onClick={() => setMobileSidebarOpen(false)}
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40 lg:hidden transition-opacity duration-300"
+        />
+      )}
+
+      {/* Responsive Sidebar Panel */}
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between shrink-0 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static ${
+        mobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
+      }`}>
+        <div className="overflow-y-auto flex-1">
           {/* Header Brand */}
-          <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
-              <Building className="w-4 h-4 text-white" />
+          <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shrink-0 shadow-sm">
+                <Building className="w-4 h-4 text-white" />
+              </div>
+              <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+                WorkForce OS
+              </span>
             </div>
-            <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
-              WorkForce OS
-            </span>
+            <button 
+              onClick={() => setMobileSidebarOpen(false)}
+              className="lg:hidden p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-lg transition"
+              title="Close Menu"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           {/* User Sidebar Summary */}
           <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center gap-3 bg-slate-50/50 dark:bg-slate-800/20">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-white text-lg font-bold shadow-md">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-white text-lg font-bold shadow-md shrink-0">
               {currentUser.avatar || '👨‍💼'}
             </div>
             <div className="overflow-hidden">
@@ -907,9 +964,9 @@ export default function CeoDashboard() {
           </div>
 
           {/* Navigation Links */}
-          <nav className="p-4 flex flex-col gap-1">
+          <nav className="p-3 sm:p-4 flex flex-col gap-1">
             <button
-              onClick={() => setActiveTab('overview')}
+              onClick={() => handleSelectTab('overview')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'overview'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -921,7 +978,7 @@ export default function CeoDashboard() {
             </button>
             
             <button
-              onClick={() => setActiveTab('users')}
+              onClick={() => handleSelectTab('users')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'users'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -933,7 +990,7 @@ export default function CeoDashboard() {
             </button>
 
             <button
-              onClick={() => setActiveTab('clients')}
+              onClick={() => handleSelectTab('clients')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'clients'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -945,7 +1002,7 @@ export default function CeoDashboard() {
             </button>
 
             <button
-              onClick={() => setActiveTab('deliverables')}
+              onClick={() => handleSelectTab('deliverables')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'deliverables'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -957,7 +1014,7 @@ export default function CeoDashboard() {
             </button>
 
             <button
-              onClick={() => setActiveTab('campaign-deliveries')}
+              onClick={() => handleSelectTab('campaign-deliveries')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'campaign-deliveries'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -969,7 +1026,7 @@ export default function CeoDashboard() {
             </button>
 
             <button
-              onClick={() => setActiveTab('audits')}
+              onClick={() => handleSelectTab('audits')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'audits'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -981,7 +1038,7 @@ export default function CeoDashboard() {
             </button>
 
             <button
-              onClick={() => setActiveTab('payroll')}
+              onClick={() => handleSelectTab('payroll')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'payroll'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -995,7 +1052,7 @@ export default function CeoDashboard() {
         </div>
 
         {/* Sidebar Footer Logout */}
-        <div className="p-4 border-t border-slate-200 dark:border-slate-800">
+        <div className="p-4 border-t border-slate-200 dark:border-slate-800 shrink-0">
           <button
             onClick={handleLogout}
             className="w-full flex items-center justify-center gap-2 py-2.5 px-4 border border-slate-200 dark:border-slate-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 font-bold rounded-xl text-sm transition"
@@ -1010,40 +1067,51 @@ export default function CeoDashboard() {
       <main className="flex-grow flex flex-col min-w-0 overflow-y-auto h-screen">
         
         {/* Main Panel Header */}
-        <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-8 shrink-0 transition-colors duration-300">
-          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white capitalize">
-            {activeTab === 'overview' ? 'Executive Dashboard' : activeTab.replace('-', ' ')}
-          </h2>
+        <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-3 sm:px-6 lg:px-8 shrink-0 transition-colors duration-300">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            {/* Hamburger Button for Mobile/Tablet */}
+            <button
+              onClick={() => setMobileSidebarOpen(true)}
+              className="lg:hidden p-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition shrink-0"
+              title="Open Navigation Menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <h2 className="text-sm sm:text-base lg:text-xl font-bold tracking-tight text-slate-900 dark:text-white capitalize truncate">
+              {activeTab === 'overview' ? 'Executive Dashboard' : activeTab.replace('-', ' ')}
+            </h2>
+          </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Dark Mode toggle */}
             <button 
               onClick={toggleDarkMode}
-              className="px-3 py-1.5 border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur-md rounded-xl flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-xs hover:shadow-md transition-all duration-300 transform active:scale-95 cursor-pointer"
+              className="px-2.5 sm:px-3 py-1.5 border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur-md rounded-xl flex items-center gap-1.5 sm:gap-2 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-xs hover:shadow-md transition-all duration-300 transform active:scale-95 cursor-pointer"
               title="Toggle Dark / Light Mode"
             >
               {darkMode ? (
                 <>
                   <Sun className="w-4 h-4 text-amber-400 fill-amber-400/20" />
-                  <span className="text-[11px] font-semibold text-amber-300">Light Mode</span>
+                  <span className="hidden sm:inline text-[11px] font-semibold text-amber-300">Light</span>
                 </>
               ) : (
                 <>
                   <Moon className="w-4 h-4 text-slate-600 fill-slate-600/20" />
-                  <span className="text-[11px] font-semibold text-slate-600">Dark Mode</span>
+                  <span className="hidden sm:inline text-[11px] font-semibold text-slate-600">Dark</span>
                 </>
               )}
             </button>
 
-            <div className="text-sm font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
-              <Calendar className="w-4 h-4" />
-              <span>{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+            <div className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2.5 sm:px-3 py-1.5 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
+              <Calendar className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-blue-500 shrink-0" />
+              <span className="hidden md:inline">{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+              <span className="md:hidden">{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
             </div>
           </div>
         </header>
 
         {/* Panel Main Content Container */}
-        <div className="p-8 flex-grow">
+        <div className="p-3 sm:p-5 lg:p-8 flex-grow overflow-x-hidden">
           
           {/* TAB 1: OVERVIEW */}
           {activeTab === 'overview' && (
@@ -1265,7 +1333,7 @@ export default function CeoDashboard() {
 
               {/* Users Table */}
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
+                <table className="w-full min-w-[750px] text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800">
                       <th className="p-4 uppercase tracking-wider">Staff</th>
@@ -1361,7 +1429,7 @@ export default function CeoDashboard() {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
+                <table className="w-full min-w-[650px] text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800">
                       <th className="p-4 uppercase tracking-wider">Timestamp</th>
@@ -1497,7 +1565,7 @@ export default function CeoDashboard() {
               {/* Global Deliverables Table */}
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
+                  <table className="w-full min-w-[850px] text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase tracking-wider">
                         <th className="p-4">Date & ID</th>
@@ -1638,7 +1706,7 @@ export default function CeoDashboard() {
               {/* Global Deliveries Table */}
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
+                  <table className="w-full min-w-[800px] text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase tracking-wider">
                         <th className="p-4">Date & Task ID</th>
@@ -1734,23 +1802,52 @@ export default function CeoDashboard() {
           {/* TAB 5: CLIENT CRM */}
           {activeTab === 'clients' && (() => {
             const availableClientMonths = (() => {
-              const monthMap = new Map();
+              const monthKeys = new Set();
+              const now = new Date();
+              const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+              monthKeys.add(curKey);
+
               clientsList.forEach(c => {
-                const mk = parseClientMonthKey(c);
-                if (mk && mk.length >= 7) {
-                  if (!monthMap.has(mk)) {
-                    const [yyyy, mm] = mk.split('-');
-                    const d = new Date(parseInt(yyyy, 10), parseInt(mm, 10) - 1, 1);
-                    const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-                    monthMap.set(mk, { key: mk, label, count: 0, revenue: 0 });
-                  }
-                  const item = monthMap.get(mk);
-                  item.count += 1;
-                  if (c.active) item.revenue += (c.packageAmount || 0);
-                }
+                const info = getClientPlanInfo(c);
+                if (info.cycleMonthKey) monthKeys.add(info.cycleMonthKey);
+                if (info.renewalMonthKey) monthKeys.add(info.renewalMonthKey);
+                const mk = getClientMonthKey(c);
+                if (mk) monthKeys.add(mk);
               });
-              return Array.from(monthMap.values()).sort((a, b) => b.key.localeCompare(a.key));
+
+              const sortedKeys = Array.from(monthKeys).sort((a, b) => b.localeCompare(a));
+
+              return sortedKeys.map(mk => {
+                const [yyyy, mm] = mk.split('-');
+                const dateObj = new Date(parseInt(yyyy, 10), parseInt(mm, 10) - 1, 1);
+                const label = dateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+                let activeCount = 0;
+                let monthRevenue = 0;
+
+                clientsList.forEach(c => {
+                  if (c.active && isClientActiveInMonth(c, mk)) {
+                    activeCount += 1;
+                    monthRevenue += (c.packageAmount || 0);
+                  }
+                });
+
+                return { key: mk, label, count: activeCount, revenue: monthRevenue };
+              });
             })();
+
+            // Global Lifecycle Counts across ALL clients in the agency
+            const globalLifecycleCounts = {
+              all: clientsList.length,
+              active: clientsList.filter(c => c.active && getClientPlanInfo(c).status === 'Active').length,
+              expiring_soon: clientsList.filter(c => c.active && getClientPlanInfo(c).status === 'Expiring Soon').length,
+              expired: clientsList.filter(c => c.active && getClientPlanInfo(c).status === 'Expired').length,
+              renewable: clientsList.filter(c => {
+                const info = getClientPlanInfo(c);
+                return info.isRenewed || (c.active && (info.status === 'Expired' || info.status === 'Expiring Soon'));
+              }).length,
+              inactive: clientsList.filter(c => !c.active).length
+            };
 
             const filteredClients = clientsList.filter(c => {
               const query = searchQuery.toLowerCase();
@@ -1764,9 +1861,34 @@ export default function CeoDashboard() {
               );
               if (!matchesQuery) return false;
 
-              if (clientMonthFilter !== 'all') {
-                const mk = parseClientMonthKey(c);
-                if (mk !== clientMonthFilter) return false;
+              const planInfo = getClientPlanInfo(c);
+
+              // 1. Lifecycle Status Filter
+              if (clientLifecycleFilter !== 'all') {
+                if (clientLifecycleFilter === 'active') {
+                  if (!c.active || planInfo.status !== 'Active') return false;
+                } else if (clientLifecycleFilter === 'expiring_soon') {
+                  if (!c.active || planInfo.status !== 'Expiring Soon') return false;
+                } else if (clientLifecycleFilter === 'expired') {
+                  if (!c.active || planInfo.status !== 'Expired') return false;
+                } else if (clientLifecycleFilter === 'renewable') {
+                  const isRenewable = planInfo.isRenewed || (c.active && (planInfo.status === 'Expired' || planInfo.status === 'Expiring Soon'));
+                  if (!isRenewable) return false;
+                } else if (clientLifecycleFilter === 'inactive') {
+                  if (c.active) return false;
+                }
+              }
+
+              // 2. Month Scope Filter:
+              // When clientFilterScope === 'all_clients' (and a specific status filter is active), we show across ALL clients.
+              // Otherwise, we filter by the selected month or custom range.
+              const shouldApplyMonth = clientLifecycleFilter === 'all' || clientFilterScope === 'month';
+              if (shouldApplyMonth) {
+                if (clientStartDate || clientEndDate) {
+                  if (!isClientActiveInMonth(c, null, clientStartDate, clientEndDate)) return false;
+                } else if (clientMonthFilter !== 'all') {
+                  if (!isClientActiveInMonth(c, clientMonthFilter)) return false;
+                }
               }
 
               if (clientPaymentFilter !== 'all') {
@@ -1855,9 +1977,11 @@ export default function CeoDashboard() {
 
             const pendingRevenue = Math.max(0, expectedRevenue - actualRevenue);
             const actualPercent = expectedRevenue > 0 ? Math.round((actualRevenue / expectedRevenue) * 100) : 0;
-            const currentMonthLabel = clientMonthFilter === 'all' 
-              ? 'All Months (All-Time)' 
-              : (availableClientMonths.find(m => m.key === clientMonthFilter)?.label || clientMonthFilter);
+            const currentMonthLabel = (clientStartDate || clientEndDate)
+              ? `📅 ${clientStartDate || 'Start'} to ${clientEndDate || 'End'}`
+              : (clientMonthFilter === 'all' 
+                  ? 'All Months (All-Time)' 
+                  : (availableClientMonths.find(m => m.key === clientMonthFilter)?.label || clientMonthFilter));
 
             const totalRenewalPool = renewalsExpected + notRenewedExpected;
             const renewalPercent = totalRenewalPool > 0 ? Math.round((renewalsExpected / totalRenewalPool) * 100) : (renewalsCount > 0 ? 100 : 0);
@@ -2021,6 +2145,101 @@ export default function CeoDashboard() {
                   </div>
                 </div>
 
+                {/* Unified Lifecycle Status Filter Row across ALL clients */}
+                <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-400 mr-1">
+                        Lifecycle Status:
+                      </span>
+                      {[
+                        { key: 'all', label: 'All Clients', count: globalLifecycleCounts.all, color: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200' },
+                        { key: 'active', label: 'Active Plans', count: globalLifecycleCounts.active, color: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300' },
+                        { key: 'expiring_soon', label: 'Expiring Soon (7d)', count: globalLifecycleCounts.expiring_soon, color: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300' },
+                        { key: 'expired', label: 'Expired / Due', count: globalLifecycleCounts.expired, color: 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300' },
+                        { key: 'renewable', label: 'Renewable / Renewed', count: globalLifecycleCounts.renewable, color: 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300' },
+                        { key: 'inactive', label: 'Inactive Accounts', count: globalLifecycleCounts.inactive, color: 'bg-slate-100 dark:bg-slate-800 text-slate-500' }
+                      ].map(pill => {
+                        const isSelected = clientLifecycleFilter === pill.key;
+                        return (
+                          <button
+                            key={pill.key}
+                            onClick={() => {
+                              setClientLifecycleFilter(pill.key);
+                              if (pill.key !== 'all') {
+                                setClientFilterScope('all_clients');
+                              }
+                            }}
+                            className={`px-3 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${
+                              isSelected
+                                ? 'bg-blue-600 text-white shadow-sm'
+                                : 'bg-slate-50 dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                            }`}
+                          >
+                            <span>{pill.label}</span>
+                            <span className={`px-1.5 py-0.2 rounded-md text-[9px] font-black ${
+                              isSelected ? 'bg-white/20 text-white' : pill.color
+                            }`}>
+                              {pill.count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Scope Selector: All Clients (Global) vs Selected Month */}
+                    <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px] font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setClientFilterScope('all_clients')}
+                        className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                          clientFilterScope === 'all_clients'
+                            ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs font-black'
+                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                        }`}
+                        title="Search and filter across entire client base (all months)"
+                      >
+                        🌐 All Clients (Global)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setClientFilterScope('month')}
+                        className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                          clientFilterScope === 'month'
+                            ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs font-black'
+                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                        }`}
+                        title="Filter within the selected calendar month"
+                      >
+                        📅 Month Specific
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Active filter informational breadcrumb */}
+                  {clientLifecycleFilter !== 'all' && (
+                    <div className="flex items-center justify-between text-[11px] bg-blue-50/70 dark:bg-blue-950/30 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-900/40 text-blue-800 dark:text-blue-300">
+                      <span>
+                        Showing <strong>{
+                          clientLifecycleFilter === 'active' ? 'Active Plans' :
+                          clientLifecycleFilter === 'expiring_soon' ? 'Expiring Soon (Within 7 Days)' :
+                          clientLifecycleFilter === 'expired' ? 'Expired / Renewal Due' :
+                          clientLifecycleFilter === 'renewable' ? 'Renewable / Renewed Subscriptions' : 'Inactive Accounts'
+                        }</strong> from {clientFilterScope === 'all_clients' ? '🌐 All Clients in the agency (not restricted by month)' : `📅 ${currentMonthLabel}`}.
+                      </span>
+                      <button
+                        onClick={() => {
+                          setClientLifecycleFilter('all');
+                          setClientFilterScope('all_clients');
+                        }}
+                        className="font-bold underline hover:text-blue-950 dark:hover:text-white cursor-pointer ml-2"
+                      >
+                        Show All
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 {/* Action Toolbar with Filters */}
                 <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1 flex-wrap">
@@ -2039,7 +2258,7 @@ export default function CeoDashboard() {
                     <div className="flex items-center gap-1.5">
                       <select
                         value={clientMonthFilter}
-                        onChange={(e) => setClientMonthFilter(e.target.value)}
+                        onChange={(e) => handleMonthRangeChange(e.target.value, setClientMonthFilter, setClientStartDate, setClientEndDate)}
                         className="px-3 py-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-sm"
                       >
                         <option value="all">📅 All Months</option>
@@ -2049,6 +2268,39 @@ export default function CeoDashboard() {
                           </option>
                         ))}
                       </select>
+                    </div>
+
+                    {/* Date Range: Starting to Ending Date */}
+                    <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/80 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">From</span>
+                        <input
+                          type="date"
+                          value={clientStartDate}
+                          onChange={(e) => { setClientStartDate(e.target.value); setClientMonthFilter('custom'); }}
+                          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-inner"
+                        />
+                      </div>
+                      <span className="text-slate-400 font-bold text-xs">-</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">To</span>
+                        <input
+                          type="date"
+                          value={clientEndDate}
+                          onChange={(e) => { setClientEndDate(e.target.value); setClientMonthFilter('custom'); }}
+                          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-inner"
+                        />
+                      </div>
+                      {(clientStartDate || clientEndDate) && (
+                        <button
+                          onClick={() => { setClientStartDate(''); setClientEndDate(''); setClientMonthFilter('all'); }}
+                          className="ml-1 px-1.5 py-0.5 text-[10px] font-black text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition cursor-pointer"
+                          title="Clear Date Range"
+                        >
+                          ✕
+                        </button>
+                      )}
                     </div>
 
                     {/* Revenue Stream Filter Selector */}
@@ -2079,15 +2331,19 @@ export default function CeoDashboard() {
                       </select>
                     </div>
 
-                    {(clientMonthFilter !== 'all' || clientRevenueStreamFilter !== 'all' || clientPaymentFilter !== 'all' || searchQuery) && (
+                    {(clientMonthFilter !== 'all' || clientStartDate || clientEndDate || clientRevenueStreamFilter !== 'all' || clientPaymentFilter !== 'all' || clientLifecycleFilter !== 'all' || searchQuery) && (
                       <button
                         onClick={() => {
                           setClientMonthFilter('all');
+                          setClientStartDate('');
+                          setClientEndDate('');
                           setClientRevenueStreamFilter('all');
                           setClientPaymentFilter('all');
+                          setClientLifecycleFilter('all');
+                          setClientFilterScope('all_clients');
                           setSearchQuery('');
                         }}
-                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-semibold transition"
+                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-semibold transition cursor-pointer"
                       >
                         Reset
                       </button>
@@ -2106,14 +2362,14 @@ export default function CeoDashboard() {
                 {/* Table List */}
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full min-w-[850px] text-left border-collapse">
                       <thead>
                         <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase tracking-wider">
                           <th className="p-4">ID</th>
                           <th className="p-4">Business / Client Name</th>
                           <th className="p-4">Service & Plan Stream</th>
                           <th className="p-4">Amount & Payment</th>
-                          <th className="p-4">Joined Date</th>
+                          <th className="p-4">Plan Cycle & Expiry</th>
                           <th className="p-4 text-center">Page Ready?</th>
                           <th className="p-4 text-center">Active?</th>
                           <th className="p-4 text-right">Actions</th>
@@ -2130,6 +2386,7 @@ export default function CeoDashboard() {
                           filteredClients.map((client) => {
                             const stream = getClientRevenueStream(client, clientMonthFilter);
                             const pInfo = getClientPaymentInfo(client);
+                            const planInfo = getClientPlanInfo(client);
                             return (
                               <tr key={client.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/40 transition">
                                 <td className="p-4 font-bold text-slate-450">{client.clientId}</td>
@@ -2143,6 +2400,14 @@ export default function CeoDashboard() {
                                     <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${stream.badgeClass}`}>
                                       {stream.badge}
                                     </span>
+                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/40">
+                                      {planInfo.durationLabel}
+                                    </span>
+                                    {planInfo.isRenewed && (
+                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40">
+                                        🔄 Cycle #{(client.renewalHistory?.length || 0) + 1}
+                                      </span>
+                                    )}
                                   </div>
                                   <div className="text-[9px] text-slate-400 mt-0.5">{client.packageName}</div>
                                 </td>
@@ -2164,45 +2429,37 @@ export default function CeoDashboard() {
                                     </div>
                                   )}
                                 </td>
-                              <td className="p-4">
-                                <div className="font-extrabold text-slate-900 dark:text-white">
-                                  ₹{client.packageAmount.toLocaleString()}
-                                </div>
-                                {(() => {
-                                  const pInfo = getClientPaymentInfo(client);
-                                  if (pInfo.pStatus === 'Full') {
-                                    return (
-                                      <div className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
-                                        ✓ Full Paid (₹{pInfo.paidAmount.toLocaleString()})
-                                      </div>
-                                    );
-                                  } else if (pInfo.pStatus === 'Partial' || pInfo.pStatus === 'Half') {
-                                    return (
-                                      <div className="text-[9px] font-bold text-amber-600 dark:text-amber-400 mt-0.5">
-                                        Paid: ₹{pInfo.paidAmount.toLocaleString()} • Due: ₹{pInfo.pendingBalance.toLocaleString()}
-                                      </div>
-                                    );
-                                  } else {
-                                    return (
-                                      <div className="text-[9px] font-bold text-red-500 mt-0.5">
-                                        ⚠️ Pending (₹{client.packageAmount.toLocaleString()})
-                                      </div>
-                                    );
-                                  }
-                                })()}
-                              </td>
-                              <td className="p-4 text-slate-500 font-medium">{client.joiningDate}</td>
-                              <td className="p-4 text-center">
-                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${client.accountReady ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600' : 'bg-red-50 dark:bg-red-950/40 text-red-600'}`}>
-                                  {client.accountReady ? 'Yes' : 'No'}
-                                </span>
-                              </td>
-                              <td className="p-4 text-center">
-                                <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase ${client.active ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
-                                  {client.active ? 'ACTIVE' : 'INACTIVE'}
-                                </span>
-                              </td>
-                              <td className="p-4 text-right">
+                                <td className="p-4">
+                                  <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
+                                    {client.joiningDate} → {planInfo.expiryDateStr}
+                                  </div>
+                                  <div className="mt-1 flex items-center gap-1.5">
+                                    {planInfo.isExpired ? (
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/50">
+                                        Expired ({Math.abs(planInfo.daysLeft)}d ago)
+                                      </span>
+                                    ) : planInfo.isExpiringSoon ? (
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50 animate-pulse">
+                                        ⚠️ {planInfo.daysLeft}d left (Due: {planInfo.renewalDueDateStr})
+                                      </span>
+                                    ) : (
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40">
+                                        ✓ {planInfo.daysLeft}d left (Due: {planInfo.renewalDueDateStr})
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="p-4 text-center">
+                                  <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${client.accountReady ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600' : 'bg-red-50 dark:bg-red-950/40 text-red-600'}`}>
+                                    {client.accountReady ? 'Yes' : 'No'}
+                                  </span>
+                                </td>
+                                <td className="p-4 text-center">
+                                  <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase ${client.active ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
+                                    {client.active ? 'ACTIVE' : 'INACTIVE'}
+                                  </span>
+                                </td>
+                                <td className="p-4 text-right">
                                 <div className="flex gap-2 justify-end">
                                   <button
                                     onClick={() => {
@@ -2256,15 +2513,15 @@ export default function CeoDashboard() {
 
       {/* --- ADD USER MODAL --- */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-scale-up">
-            <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-scale-up max-h-[90vh] flex flex-col">
+            <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900 shrink-0">
               <h3 className="font-extrabold text-sm text-slate-950 dark:text-white">Add New Staff Member</h3>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600 transition text-sm">✕</button>
             </div>
             
-            <form onSubmit={handleAddUser} autoComplete="off">
-              <div className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleAddUser} autoComplete="off" className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1">
                 {formError && (
                   <div className="p-3.5 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-400 rounded-xl flex items-center gap-2">
                     <AlertCircle className="w-4.5 h-4.5 shrink-0" />
@@ -2272,7 +2529,7 @@ export default function CeoDashboard() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-300">Name</label>
                     <input
@@ -2298,7 +2555,7 @@ export default function CeoDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-300">Password</label>
                     <input
@@ -2324,7 +2581,7 @@ export default function CeoDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-300">Role</label>
                     <select
@@ -2366,18 +2623,18 @@ export default function CeoDashboard() {
 
               </div>
 
-              <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex justify-end gap-2 text-xs">
+              <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex flex-col-reverse sm:flex-row justify-end gap-2 text-xs shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="py-2 px-4 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+                  className="py-2.5 px-4 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition text-center"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={formLoading}
-                  className="py-2 px-4 bg-blue-800 hover:bg-blue-900 text-white rounded-lg transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  className="py-2.5 px-4 bg-blue-800 hover:bg-blue-900 text-white rounded-lg transition flex items-center justify-center gap-1.5 disabled:opacity-50 text-center"
                 >
                   {formLoading ? 'Creating...' : 'Create Staff Member'}
                 </button>
@@ -2389,15 +2646,15 @@ export default function CeoDashboard() {
 
       {/* --- EDIT USER MODAL --- */}
       {showEditModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-scale-up">
-            <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-scale-up max-h-[90vh] flex flex-col">
+            <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900 shrink-0">
               <h3 className="font-extrabold text-sm text-slate-950 dark:text-white">Modify Staff Profile</h3>
               <button onClick={() => setShowEditModal(false)} className="text-slate-400 hover:text-slate-600 transition text-sm">✕</button>
             </div>
             
-            <form onSubmit={handleEditUser} autoComplete="off">
-              <div className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleEditUser} autoComplete="off" className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1">
                 {formError && (
                   <div className="p-3.5 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-400 rounded-xl flex items-center gap-2">
                     <AlertCircle className="w-4.5 h-4.5 shrink-0" />
@@ -2405,7 +2662,7 @@ export default function CeoDashboard() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-300">Name</label>
                     <input
@@ -2429,7 +2686,7 @@ export default function CeoDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-300">Update Password (Leave blank to keep current)</label>
                     <input
@@ -2453,7 +2710,7 @@ export default function CeoDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-300">Role</label>
                     <select
@@ -2508,18 +2765,18 @@ export default function CeoDashboard() {
 
               </div>
 
-              <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex justify-end gap-2 text-xs">
+              <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex flex-col-reverse sm:flex-row justify-end gap-2 text-xs shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowEditModal(false)}
-                  className="py-2 px-4 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+                  className="py-2.5 px-4 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition text-center"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={formLoading}
-                  className="py-2 px-4 bg-blue-800 hover:bg-blue-900 text-white rounded-lg transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  className="py-2.5 px-4 bg-blue-800 hover:bg-blue-900 text-white rounded-lg transition flex items-center justify-center gap-1.5 disabled:opacity-50 text-center"
                 >
                   {formLoading ? 'Saving...' : 'Save Changes'}
                 </button>
@@ -2531,15 +2788,15 @@ export default function CeoDashboard() {
 
       {/* --- ADD CLIENT MODAL --- */}
       {showAddClientModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm animate-fade-in text-xs">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-855 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden animate-scale-up">
-            <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/50 backdrop-blur-sm animate-fade-in text-xs">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-855 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden animate-scale-up max-h-[90vh] flex flex-col">
+            <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900 shrink-0">
               <h3 className="font-extrabold text-sm text-slate-950 dark:text-white">Onboard New Client Account</h3>
               <button onClick={() => setShowAddClientModal(false)} className="text-slate-400 hover:text-slate-650 transition text-sm">✕</button>
             </div>
             
-            <form onSubmit={handleAddClient}>
-              <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+            <form onSubmit={handleAddClient} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
                 {formError && (
                   <div className="p-3.5 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 text-red-700 rounded-xl flex items-center gap-2">
                     <AlertCircle className="w-4.5 h-4.5 shrink-0" />
@@ -2547,7 +2804,7 @@ export default function CeoDashboard() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-350">Client ID (Auto Generated)</label>
                     <input
@@ -2571,7 +2828,7 @@ export default function CeoDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-350">Client Contact Person Name</label>
                     <input
@@ -2595,7 +2852,7 @@ export default function CeoDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-350">Services Category</label>
                     <select
@@ -2634,7 +2891,7 @@ export default function CeoDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-350">Contact Number</label>
                     <input
@@ -2667,7 +2924,7 @@ export default function CeoDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-355">Business Sector</label>
                     <input
@@ -2678,7 +2935,7 @@ export default function CeoDashboard() {
                       className="w-full p-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none"
                     />
                   </div>
-                  <div className="flex gap-6 items-center pt-5">
+                  <div className="flex flex-wrap gap-4 sm:gap-6 items-center pt-2 sm:pt-5">
                     <label className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
                       <input
                         type="checkbox"
@@ -2723,18 +2980,18 @@ export default function CeoDashboard() {
                 </div>
               </div>
 
-              <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex justify-end gap-2">
+              <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex flex-col-reverse sm:flex-row justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowAddClientModal(false)}
-                  className="py-2 px-4 border border-slate-200 dark:border-slate-755 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+                  className="py-2.5 px-4 border border-slate-200 dark:border-slate-755 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition text-center"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={formLoading}
-                  className="py-2 px-4 bg-blue-800 hover:bg-blue-900 text-white rounded-lg transition disabled:opacity-50"
+                  className="py-2.5 px-4 bg-blue-800 hover:bg-blue-900 text-white rounded-lg transition disabled:opacity-50 text-center"
                 >
                   {formLoading ? 'Onboarding...' : 'Onboard Client'}
                 </button>
@@ -2746,15 +3003,15 @@ export default function CeoDashboard() {
 
       {/* --- EDIT CLIENT MODAL --- */}
       {showEditClientModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm animate-fade-in text-xs">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-855 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden animate-scale-up">
-            <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/50 backdrop-blur-sm animate-fade-in text-xs">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-855 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden animate-scale-up max-h-[90vh] flex flex-col">
+            <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900 shrink-0">
               <h3 className="font-extrabold text-sm text-slate-950 dark:text-white">Modify Client Profile</h3>
               <button onClick={() => setShowEditClientModal(false)} className="text-slate-400 hover:text-slate-655 transition text-sm">✕</button>
             </div>
             
-            <form onSubmit={handleEditClient}>
-              <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+            <form onSubmit={handleEditClient} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
                 {formError && (
                   <div className="p-3.5 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 text-red-700 rounded-xl flex items-center gap-2">
                     <AlertCircle className="w-4.5 h-4.5 shrink-0" />
@@ -2762,7 +3019,7 @@ export default function CeoDashboard() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-355">Client ID</label>
                     <input
@@ -2785,7 +3042,7 @@ export default function CeoDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-355">Client Contact Person Name</label>
                     <input
@@ -2807,7 +3064,7 @@ export default function CeoDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-355">Services Category</label>
                     <select
@@ -2844,7 +3101,7 @@ export default function CeoDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-355">Contact Number</label>
                     <input
@@ -2874,7 +3131,7 @@ export default function CeoDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-355">Business Sector</label>
                     <input
@@ -2884,8 +3141,8 @@ export default function CeoDashboard() {
                       className="w-full p-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none"
                     />
                   </div>
-                  <div className="flex gap-6 items-center pt-5">
-                    <div className="space-y-1">
+                  <div className="flex flex-wrap gap-4 sm:gap-6 items-center pt-2 sm:pt-5">
+                    <div className="space-y-1 flex-1 min-w-[140px]">
                       <label className="font-bold text-slate-700 dark:text-slate-300">Page Created / Account Ready?</label>
                       <select
                         value={clientFormReady ? "Yes" : "No"}
@@ -2896,7 +3153,7 @@ export default function CeoDashboard() {
                         <option value="No">No (Page Creation Required)</option>
                       </select>
                     </div>
-                    <label className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
+                    <label className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300 cursor-pointer pt-4">
                       <input
                         type="checkbox"
                         checked={clientFormActive}
@@ -2929,18 +3186,18 @@ export default function CeoDashboard() {
                 </div>
               </div>
 
-              <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex justify-end gap-2">
+              <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex flex-col-reverse sm:flex-row justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowEditClientModal(false)}
-                  className="py-2 px-4 border border-slate-200 dark:border-slate-755 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+                  className="py-2.5 px-4 border border-slate-200 dark:border-slate-755 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition text-center"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={formLoading}
-                  className="py-2 px-4 bg-blue-800 hover:bg-blue-900 text-white rounded-lg transition disabled:opacity-50"
+                  className="py-2.5 px-4 bg-blue-800 hover:bg-blue-900 text-white rounded-lg transition disabled:opacity-50 text-center"
                 >
                   {formLoading ? 'Saving...' : 'Save Changes'}
                 </button>
@@ -2952,9 +3209,9 @@ export default function CeoDashboard() {
 
       {/* --- CLIENT DETAIL VIEW MODAL --- */}
       {showClientDetailModal && selectedClient && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm animate-fade-in text-xs">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-855 rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden animate-scale-up text-slate-800 dark:text-slate-200">
-            <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/50 backdrop-blur-sm animate-fade-in text-xs">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-855 rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden animate-scale-up text-slate-800 dark:text-slate-200 max-h-[90vh] flex flex-col">
+            <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900 shrink-0">
               <div>
                 <h3 className="font-extrabold text-sm text-slate-950 dark:text-white">{selectedClient.businessName}</h3>
                 <span className="text-[9px] text-slate-400 font-extrabold uppercase mt-0.5 tracking-wider">Client ID: {selectedClient.clientId}</span>
@@ -2962,11 +3219,11 @@ export default function CeoDashboard() {
               <button onClick={() => setShowClientDetailModal(false)} className="text-slate-400 hover:text-slate-655 transition text-sm">✕</button>
             </div>
             
-            <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 max-h-[80vh] overflow-y-auto">
+            <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-y-auto flex-1">
               
               {/* Left Column: Client Details */}
-              <div className="lg:col-span-5 space-y-4 border-r border-slate-100 dark:border-slate-800/60 pr-0 lg:pr-6">
-                <div className="grid grid-cols-2 gap-4 border-b border-slate-100 dark:border-slate-800/60 pb-3">
+              <div className="lg:col-span-5 space-y-4 border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-slate-800/60 pb-6 lg:pb-0 pr-0 lg:pr-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-b border-slate-100 dark:border-slate-800/60 pb-3">
                   <div>
                     <span className="text-[10px] text-slate-400 font-extrabold uppercase">Contact Person</span>
                     <p className="font-bold text-slate-900 dark:text-white text-[11px] mt-0.5">{selectedClient.clientName || 'N/A'}</p>
@@ -2977,7 +3234,7 @@ export default function CeoDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 border-b border-slate-100 dark:border-slate-800/60 pb-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-b border-slate-100 dark:border-slate-800/60 pb-3">
                   <div>
                     <span className="text-[10px] text-slate-400 font-extrabold uppercase">Services Category</span>
                     <p className="font-bold text-slate-900 dark:text-white text-[11px] mt-0.5">{selectedClient.services}</p>
@@ -2988,7 +3245,7 @@ export default function CeoDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 border-b border-slate-100 dark:border-slate-800/60 pb-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 border-b border-slate-100 dark:border-slate-800/60 pb-3">
                   <div>
                     <span className="text-[10px] text-slate-400 font-extrabold uppercase">Contact Number</span>
                     <p className="font-semibold text-slate-700 dark:text-slate-350 mt-0.5 truncate" title={selectedClient.contact}>{selectedClient.contact || 'N/A'}</p>
@@ -3003,7 +3260,7 @@ export default function CeoDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 border-b border-slate-100 dark:border-slate-800/60 pb-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-b border-slate-100 dark:border-slate-800/60 pb-3">
                   <div>
                     <span className="text-[10px] text-slate-400 font-extrabold uppercase">Sector</span>
                     <p className="font-semibold text-slate-800 dark:text-slate-300 mt-0.5">{selectedClient.sector || 'N/A'}</p>
@@ -3170,13 +3427,13 @@ export default function CeoDashboard() {
 
                 {/* Tasks Table */}
                 <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900">
-                  <div className="max-h-60 overflow-y-auto">
+                  <div className="max-h-60 overflow-y-auto overflow-x-auto">
                     {loadingTasks ? (
                       <div className="p-8 text-center text-slate-400">Loading deliverables...</div>
                     ) : selectedClientTasks.length === 0 ? (
                       <div className="p-8 text-center text-slate-400 italic">No task deliverables created.</div>
                     ) : (
-                      <table className="w-full text-left text-[11px] border-collapse">
+                      <table className="w-full min-w-[550px] text-left text-[11px] border-collapse">
                         <thead>
                           <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800">
                             <th className="p-2.5">Date & ID</th>

@@ -16,6 +16,17 @@ export const metadata = {
   description: "Unified, high-performance platform for payroll, scheduling, and employee lifecycle management.",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f8fafc" },
+    { media: "(prefers-color-scheme: dark)", color: "#020617" },
+  ],
+};
+
 export default function RootLayout({ children }) {
   return (
     <html

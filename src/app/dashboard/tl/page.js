@@ -8,7 +8,7 @@ import {
   Clock, CheckSquare, Calendar, LogOut, Plus, Building, UserCheck,
   CheckCircle, FileText, AlertCircle, Briefcase, Play, Check, Moon,
   Sun, DollarSign, TrendingUp, Download, Users, FileDown, Activity,
-  BarChart2, Lock
+  BarChart2, Lock, Menu, X
 } from 'lucide-react';
 import { uploadFileAction } from '@/app/actions/uploadAction';
 
@@ -43,8 +43,14 @@ export default function TLDashboard() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState('overview'); 
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   // Tabs: overview, team-overview, assign-task, tasks, directory, client-tasks, leaves, payroll
   const [loading, setLoading] = useState(true);
+
+  const handleSelectTab = (tab) => {
+    setActiveTab(tab);
+    setMobileSidebarOpen(false);
+  };
 
   // Data states
   const [allTasksList, setAllTasksList] = useState([]);
@@ -831,7 +837,7 @@ export default function TLDashboard() {
       <div>
         <h5 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3">Team Leave Requests</h5>
         <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="w-full min-w-[600px] text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-extrabold border-b border-slate-200 dark:border-slate-800">
                 <th className="p-3.5 uppercase tracking-wider">Employee</th>
@@ -935,17 +941,36 @@ export default function TLDashboard() {
         </div>
       )}
 
+      {/* Mobile Backdrop Overlay */}
+      {mobileSidebarOpen && (
+        <div 
+          onClick={() => setMobileSidebarOpen(false)}
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40 lg:hidden transition-opacity duration-300"
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between shrink-0 h-screen overflow-y-auto">
-        <div>
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between shrink-0 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static ${
+        mobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
+      }`}>
+        <div className="overflow-y-auto flex-1">
           {/* Brand */}
-          <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 sticky top-0 bg-white dark:bg-slate-900 z-10">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
-              <Building className="w-4 h-4 text-white" />
+          <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between sticky top-0 bg-white dark:bg-slate-900 z-10">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-sm">
+                <Building className="w-4 h-4 text-white" />
+              </div>
+              <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+                WorkForce TL
+              </span>
             </div>
-            <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
-              WorkForce TL
-            </span>
+            <button 
+              onClick={() => setMobileSidebarOpen(false)}
+              className="lg:hidden p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-lg transition"
+              title="Close Menu"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           {/* User profile details */}
@@ -962,11 +987,11 @@ export default function TLDashboard() {
           </div>
 
           {/* Sidebar Navigation */}
-          <nav className="p-4 flex flex-col gap-1">
+          <nav className="p-3 sm:p-4 flex flex-col gap-1">
             <p className="px-4 text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 mt-2">Personal</p>
             
             <button
-              onClick={() => setActiveTab('overview')}
+              onClick={() => handleSelectTab('overview')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'overview'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -978,7 +1003,7 @@ export default function TLDashboard() {
             </button>
             
             <button
-              onClick={() => setActiveTab('tasks')}
+              onClick={() => handleSelectTab('tasks')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'tasks'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -995,7 +1020,7 @@ export default function TLDashboard() {
             </button>
 
             <button
-              onClick={() => setActiveTab('client-tasks')}
+              onClick={() => handleSelectTab('client-tasks')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'client-tasks'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -1007,7 +1032,7 @@ export default function TLDashboard() {
             </button>
 
             <button
-              onClick={() => setActiveTab('leaves')}
+              onClick={() => handleSelectTab('leaves')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'leaves'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -1023,7 +1048,7 @@ export default function TLDashboard() {
             <p className="px-4 text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 mt-6">Team Leader</p>
 
             <button
-              onClick={() => setActiveTab('team-tasks')}
+              onClick={() => handleSelectTab('team-tasks')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'team-tasks'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -1035,7 +1060,7 @@ export default function TLDashboard() {
             </button>
 
             <button
-              onClick={() => setActiveTab('team-leaves')}
+              onClick={() => handleSelectTab('team-leaves')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'team-leaves'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -1047,7 +1072,7 @@ export default function TLDashboard() {
             </button>
 
             <button
-              onClick={() => setActiveTab('assign-task')}
+              onClick={() => handleSelectTab('assign-task')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'assign-task'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -1059,7 +1084,7 @@ export default function TLDashboard() {
             </button>
 
             <button
-              onClick={() => setActiveTab('directory')}
+              onClick={() => handleSelectTab('directory')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'directory'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -1074,7 +1099,7 @@ export default function TLDashboard() {
         </div>
 
         {/* Sidebar Footer Logout */}
-        <div className="p-4 border-t border-slate-200 dark:border-slate-800 sticky bottom-0 bg-white dark:bg-slate-900">
+        <div className="p-4 border-t border-slate-200 dark:border-slate-800 shrink-0">
           <button
             onClick={handleLogout}
             className="w-full flex items-center justify-center gap-2 py-2.5 px-4 border border-slate-200 dark:border-slate-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 font-bold rounded-xl text-sm transition"
@@ -1089,39 +1114,49 @@ export default function TLDashboard() {
       <main className="flex-grow flex flex-col min-w-0 overflow-y-auto h-screen">
         
         {/* Header */}
-        <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-8 shrink-0 sticky top-0 z-20">
-          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white capitalize">
-            {activeTab === 'overview' ? 'Personal workspace' : activeTab.replace('-', ' ')}
-          </h2>
+        <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-3 sm:px-6 lg:px-8 shrink-0 sticky top-0 z-20 transition-colors">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <button
+              onClick={() => setMobileSidebarOpen(true)}
+              className="lg:hidden p-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition shrink-0"
+              title="Open Navigation Menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <h2 className="text-sm sm:text-base lg:text-xl font-bold tracking-tight text-slate-900 dark:text-white capitalize truncate">
+              {activeTab === 'overview' ? 'Personal workspace' : activeTab.replace('-', ' ')}
+            </h2>
+          </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <button 
               onClick={toggleDarkMode}
-              className="px-3 py-1.5 border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur-md rounded-xl flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-xs hover:shadow-md transition-all duration-300 transform active:scale-95 cursor-pointer"
+              className="px-2.5 sm:px-3 py-1.5 border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur-md rounded-xl flex items-center gap-1.5 sm:gap-2 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-xs hover:shadow-md transition-all duration-300 transform active:scale-95 cursor-pointer"
               title="Toggle Dark / Light Mode"
             >
               {darkMode ? (
                 <>
                   <Sun className="w-4 h-4 text-amber-400 fill-amber-400/20" />
-                  <span className="text-[11px] font-semibold text-amber-300">Light Mode</span>
+                  <span className="hidden sm:inline text-[11px] font-semibold text-amber-300">Light</span>
                 </>
               ) : (
                 <>
                   <Moon className="w-4 h-4 text-slate-600 fill-slate-600/20" />
-                  <span className="text-[11px] font-semibold text-slate-600">Dark Mode</span>
+                  <span className="hidden sm:inline text-[11px] font-semibold text-slate-600">Dark</span>
                 </>
               )}
             </button>
 
-            <div className="text-sm font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
-              <Calendar className="w-4 h-4" />
-              <span>{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+            <div className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2.5 sm:px-3 py-1.5 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
+              <Calendar className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-blue-500 shrink-0" />
+              <span className="hidden md:inline">{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+              <span className="md:hidden">{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
             </div>
           </div>
         </header>
 
         {/* Tab Content Container */}
-        <div className="p-8 flex-grow">
+        <div className="p-3 sm:p-5 lg:p-8 flex-grow overflow-x-hidden">
           
           {/* TAB 1: OVERVIEW & CLOCK (Personal) */}
           {activeTab === 'overview' && (
@@ -1866,7 +1901,7 @@ export default function TLDashboard() {
 
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
+                  <table className="w-full min-w-[550px] text-left text-xs border-collapse">
                     <thead>
                       <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800">
                         <th className="p-4 uppercase tracking-wider">Reason / Details</th>

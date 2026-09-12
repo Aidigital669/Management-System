@@ -3,8 +3,18 @@
 import React, { useState } from 'react';
 import { 
   Users, DollarSign, FileText, CheckCircle, Clock, Truck, FileCheck, Target,
-  ChevronDown, ChevronUp, BarChart2, AlertCircle, Layers, RefreshCw, AlertTriangle, TrendingUp
+  ChevronDown, ChevronUp, BarChart2, AlertCircle, Layers, RefreshCw, AlertTriangle, TrendingUp, Tag
 } from 'lucide-react';
+import {
+  parseDbDate,
+  formatDateToDb,
+  getPlanDurationDays,
+  getPlanDurationLabel,
+  getClientPlanInfo,
+  isClientActiveInMonth,
+  getClientRevenueStream,
+  getClientMonthKey
+} from '@/lib/planUtils';
 
 export default function AgencyDashboard({ deliveries = [], clients = [], tasks = [] }) {
   
@@ -93,6 +103,8 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
   const todayStr = new Date().toISOString().slice(0, 10);
   const [taskFilterTab, setTaskFilterTab] = useState('all'); // 'all', 'today', 'overdue'
   const [selectedRevenueMonth, setSelectedRevenueMonth] = useState('all'); // 'all' or 'YYYY-MM'
+  const [revenueStartDate, setRevenueStartDate] = useState('');
+  const [revenueEndDate, setRevenueEndDate] = useState('');
 
   const isDoneStatus = (status) => {
     const s = (status || '').toLowerCase();
@@ -200,135 +212,54 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
   const todayEmployeeList = Object.values(todayByEmployee)
     .sort((a, b) => b.tasks.length - a.tasks.length);
 
-  // Helper to extract YYYY-MM from client joining date or creation date
-  const getClientMonthKey = (client) => {
-    if (!client) return null;
-    const rawDate = client.joiningDate || client.createdAt;
-    if (!rawDate) return null;
-    
-    if (typeof rawDate === 'string') {
-      const clean = rawDate.trim();
-      if (/^\d{4}-\d{2}/.test(clean)) return clean.slice(0, 7);
-      
-      const monthMap = { 
-        jan:'01', feb:'02', mar:'03', apr:'04', may:'05', jun:'06',
-        jul:'07', aug:'08', sep:'09', sept:'09', oct:'10', nov:'11', dec:'12' 
-      };
-      const parts = clean.split(/[\/\-\s]+/);
-      if (parts.length === 3) {
-        const [p1, p2, p3] = parts;
-        let yyyy = p3.length === 4 ? p3 : p1.length === 4 ? p1 : (p3.length === 2 ? '20' + p3 : '2026');
-        const p2Clean = p2.toLowerCase();
-        let mm = monthMap[p2Clean] || monthMap[p2Clean.slice(0, 3)];
-        if (!mm) {
-          if (!isNaN(p2) && parseInt(p2, 10) >= 1 && parseInt(p2, 10) <= 12) mm = p2.padStart(2, '0');
-          else if (!isNaN(p1) && parseInt(p1, 10) >= 1 && parseInt(p1, 10) <= 12) mm = p1.padStart(2, '0');
-          else mm = '01';
-        }
-        return `${yyyy}-${mm}`;
-      }
-
-      const d = new Date(clean);
-      if (!isNaN(d.getTime())) return d.toISOString().slice(0, 7);
-    }
-
-    if (client.createdAt) {
-      const d = new Date(client.createdAt);
-      if (!isNaN(d.getTime())) return d.toISOString().slice(0, 7);
-    }
-    return null;
-  };
-
-  // Extract distinct available months from clients
+  // Extract distinct available months from clients (counts clients whose plan is active in each month)
   const availableRevenueMonths = React.useMemo(() => {
-    const monthMap = new Map();
+    const monthKeys = new Set();
     const now = new Date();
-    const curKey = now.toISOString().slice(0, 7);
-    const curLabel = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    monthMap.set(curKey, { key: curKey, label: curLabel, count: 0, revenue: 0 });
+    const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    monthKeys.add(curKey);
 
     clients.forEach(c => {
+      const info = getClientPlanInfo(c);
+      if (info.cycleMonthKey) monthKeys.add(info.cycleMonthKey);
+      if (info.renewalMonthKey) monthKeys.add(info.renewalMonthKey);
       const mk = getClientMonthKey(c);
-      if (mk && mk.length >= 7) {
-        if (!monthMap.has(mk)) {
-          const [yyyy, mm] = mk.split('-');
-          const dateObj = new Date(parseInt(yyyy, 10), parseInt(mm, 10) - 1, 1);
-          const label = dateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-          monthMap.set(mk, { key: mk, label, count: 0, revenue: 0 });
-        }
-        const item = monthMap.get(mk);
-        item.count += 1;
-        if (c.active) {
-          item.revenue += (c.packageAmount || 0);
-        }
-      }
+      if (mk) monthKeys.add(mk);
     });
 
-    return Array.from(monthMap.values()).sort((a, b) => b.key.localeCompare(a.key));
+    const sortedKeys = Array.from(monthKeys).sort((a, b) => b.localeCompare(a));
+
+    return sortedKeys.map(mk => {
+      const [yyyy, mm] = mk.split('-');
+      const dateObj = new Date(parseInt(yyyy, 10), parseInt(mm, 10) - 1, 1);
+      const label = dateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+      // Count clients active in that month
+      let activeCount = 0;
+      let monthRevenue = 0;
+      clients.forEach(c => {
+        if (c.active && isClientActiveInMonth(c, mk)) {
+          activeCount += 1;
+          monthRevenue += (c.packageAmount || 0);
+        }
+      });
+
+      return { key: mk, label, count: activeCount, revenue: monthRevenue };
+    });
   }, [clients]);
 
-  // Filter clients for selected month
+  // Filter clients for selected month or date range (accurately includes clients whose plan is active in the period)
   const filteredRevenueClients = React.useMemo(() => {
+    if (revenueStartDate || revenueEndDate) {
+      return clients.filter(c => isClientActiveInMonth(c, null, revenueStartDate, revenueEndDate));
+    }
     if (selectedRevenueMonth === 'all') return clients;
-    return clients.filter(c => getClientMonthKey(c) === selectedRevenueMonth);
-  }, [clients, selectedRevenueMonth]);
+    return clients.filter(c => isClientActiveInMonth(c, selectedRevenueMonth));
+  }, [clients, selectedRevenueMonth, revenueStartDate, revenueEndDate]);
 
-  // Helper to determine revenue stream source (New Purchase vs Renewal vs Active Retainer)
-  const getClientRevenueStream = (client, selectedMonth) => {
-    if (!client || !client.active) return { type: 'Inactive', label: 'Inactive' };
-    const joiningMonth = getClientMonthKey(client);
-    let createdMonth = null;
-    if (client.createdAt) {
-      const cd = new Date(client.createdAt);
-      if (!isNaN(cd.getTime())) createdMonth = cd.toISOString().slice(0, 7);
-    }
-
-    let isRenewed = false;
-    try {
-      if (client.notes && client.notes.toLowerCase().includes('renew')) isRenewed = true;
-    } catch (e) {}
-
-    if (createdMonth && joiningMonth && createdMonth !== joiningMonth) {
-      isRenewed = true;
-    }
-
-    if (isRenewed) {
-      return { type: 'Renewal', label: 'Plan Renewed', badge: '🔄 Renewed' };
-    }
-    if (createdMonth && (selectedMonth === 'all' || createdMonth === selectedMonth)) {
-      return { type: 'NewPurchase', label: 'New Purchase', badge: '🛒 New Plan' };
-    }
-    return { type: 'ActiveRetainer', label: 'Active Retainer', badge: '💼 Retainer' };
-  };
-
-  // Helper to determine 30-day cycle plan health for a client
+  // Helper to determine plan cycle health for a client using dynamic duration (30, 90, 180, 365 days)
   const getClientPlanHealth = (client) => {
-    if (!client) return { status: 'Unknown', diffDays: 0, daysPassed: 0 };
-    const rawDate = client.joiningDate || client.createdAt;
-    const iso = parseToISO(rawDate);
-    if (!iso) return { status: 'Unknown', diffDays: 0, daysPassed: 0 };
-    
-    const [yyyy, mm, dd] = iso.split('-').map(Number);
-    const start = new Date(yyyy, mm - 1, dd);
-    start.setHours(0, 0, 0, 0);
-
-    const expiry = new Date(start);
-    expiry.setDate(expiry.getDate() + 30);
-    expiry.setHours(0, 0, 0, 0);
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const diffTime = expiry.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    const daysPassed = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-
-    if (diffDays <= 0) {
-      return { status: 'Expired', diffDays, daysPassed };
-    } else if (daysPassed >= 22) {
-      return { status: 'ExpiringSoon', diffDays, daysPassed };
-    }
-    return { status: 'Active', diffDays, daysPassed };
+    return getClientPlanInfo(client);
   };
 
   // Compute revenue/billing details dynamically for the filtered month
@@ -389,26 +320,24 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
     const stream = getClientRevenueStream(c, selectedRevenueMonth);
     const health = getClientPlanHealth(c);
 
-    if (stream.type === 'NewPurchase') {
-      newPurchasesCount += 1;
-      newPurchasesExpected += pkgAmt;
-      newPurchasesActual += actualCollected;
+    if (health.status === 'Expired') {
+      notRenewedCount += 1;
+      notRenewedExpected += pkgAmt;
     } else if (stream.type === 'Renewal') {
       renewalsCount += 1;
       renewalsExpected += pkgAmt;
       renewalsActual += actualCollected;
+    } else if (stream.type === 'NewPurchase') {
+      newPurchasesCount += 1;
+      newPurchasesExpected += pkgAmt;
+      newPurchasesActual += actualCollected;
     } else {
       retainersCount += 1;
       retainersExpected += pkgAmt;
       retainersActual += actualCollected;
     }
 
-    if (stream.type !== 'Renewal' && health.status === 'Expired') {
-      notRenewedCount += 1;
-      notRenewedExpected += pkgAmt;
-    }
-
-    if (health.status === 'ExpiringSoon') {
+    if (health.status === 'Expiring Soon') {
       expiringSoonCount += 1;
       expiringSoonExpected += pkgAmt;
     }
@@ -416,13 +345,18 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
 
   const pendingRevenue = Math.max(0, dynamicEstimatedRevenue - dynamicTotalRevenue);
 
+  // Active Ongoing Contracts in the period
+  const totalActiveOngoingCount = newPurchasesCount + renewalsCount + retainersCount;
+  const totalOngoingExpected = newPurchasesExpected + renewalsExpected + retainersExpected;
+  const totalPoolRevenue = totalOngoingExpected + notRenewedExpected;
+  const totalAccountsInPool = totalActiveOngoingCount + notRenewedCount;
+
   // Renewal Opportunity Metrics (Renewed vs Overdue Non-Renewals)
-  const totalRenewalPoolRevenue = renewalsExpected + notRenewedExpected;
-  const renewalPercent = totalRenewalPoolRevenue > 0 
-    ? Math.round((renewalsExpected / totalRenewalPoolRevenue) * 100) 
-    : (renewalsCount > 0 ? 100 : 0);
-  const notRenewedPercent = totalRenewalPoolRevenue > 0 
-    ? Math.round((notRenewedExpected / totalRenewalPoolRevenue) * 100) 
+  const renewalPercent = totalPoolRevenue > 0 
+    ? Math.round((totalOngoingExpected / totalPoolRevenue) * 100) 
+    : (totalActiveOngoingCount > 0 ? 100 : 0);
+  const notRenewedPercent = totalPoolRevenue > 0 
+    ? Math.round((notRenewedExpected / totalPoolRevenue) * 100) 
     : (notRenewedCount > 0 ? 100 : 0);
 
   // Dynamically calculate employee data from both tasks and deliveries
@@ -495,7 +429,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
     <div className="space-y-8 animate-fade-in text-slate-800 dark:text-slate-200">
       
       {/* 1. KPIs Section */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         {/* Active Clients */}
         <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group">
           <div className="absolute -right-6 -top-6 w-24 h-24 bg-blue-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
@@ -582,13 +516,14 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         
         {/* Revenue Progress Chart */}
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between overflow-hidden">
           <div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3">
               <div>
                 <h4 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                  <DollarSign className="w-5 h-5 text-emerald-500" />
-                  Revenue Breakdown (Actual vs Expected vs Pending)
+                  <DollarSign className="w-5 h-5 text-emerald-500 shrink-0" />
+                  <span>Revenue Breakdown</span>
+                  <span className="text-xs font-semibold text-slate-400 hidden xl:inline">(Actual vs Expected vs Pending)</span>
                 </h4>
                 <p className="text-[11px] text-slate-400 mt-0.5">
                   Period: <span className="font-bold text-slate-700 dark:text-slate-300">{selectedRevenueMonth === 'all' ? 'All Months' : (availableRevenueMonths.find(m => m.key === selectedRevenueMonth)?.label || selectedRevenueMonth)}</span> • {filteredRevenueClients.filter(c => c.active).length} Active Accounts
@@ -596,48 +531,108 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
               </div>
 
               {/* Month Selector Dropdown */}
-              <select
-                value={selectedRevenueMonth}
-                onChange={(e) => setSelectedRevenueMonth(e.target.value)}
-                className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl px-3 py-1.5 focus:outline-none focus:border-emerald-500 transition cursor-pointer shadow-sm"
-              >
-                <option value="all">🌐 All Months (Combined)</option>
-                {availableRevenueMonths.map(m => (
-                  <option key={m.key} value={m.key}>
-                    📅 {m.label} ({m.count} clients)
-                  </option>
-                ))}
-              </select>
+              <div className="shrink-0">
+                <select
+                  value={selectedRevenueMonth}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedRevenueMonth(val);
+                    if (val === 'all') {
+                      setRevenueStartDate('');
+                      setRevenueEndDate('');
+                    } else {
+                      const [yyyy, mm] = val.split('-');
+                      const y = parseInt(yyyy, 10);
+                      const m = parseInt(mm, 10);
+                      setRevenueStartDate(`${y}-${String(m).padStart(2, '0')}-01`);
+                      const lastDate = new Date(y, m, 0).getDate();
+                      setRevenueEndDate(`${y}-${String(m).padStart(2, '0')}-${String(lastDate).padStart(2, '0')}`);
+                    }
+                  }}
+                  className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl px-3 py-1.5 focus:outline-none focus:border-emerald-500 transition cursor-pointer shadow-xs w-full sm:w-auto"
+                >
+                  <option value="all">🌐 All Months (Combined)</option>
+                  {availableRevenueMonths.map(m => (
+                    <option key={m.key} value={m.key}>
+                      📅 {m.label} ({m.count} clients)
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            {/* Quick Month Filter Pills */}
-            <div className="flex flex-wrap gap-1.5 mb-5 pb-3 border-b border-slate-100 dark:border-slate-800">
-              <button
-                type="button"
-                onClick={() => setSelectedRevenueMonth('all')}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
-                  selectedRevenueMonth === 'all'
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-                }`}
-              >
-                All Months
-              </button>
-              {availableRevenueMonths.map(m => (
+            {/* Quick Month Filter Pills & Date Range in a dedicated secondary toolbar */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 mb-5 pb-3 border-b border-slate-100 dark:border-slate-800">
+              {/* Month Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full no-scrollbar flex-nowrap sm:flex-wrap">
                 <button
-                  key={m.key}
                   type="button"
-                  onClick={() => setSelectedRevenueMonth(m.key)}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
-                    selectedRevenueMonth === m.key
-                      ? 'bg-emerald-600 text-white shadow-sm'
+                  onClick={() => { setSelectedRevenueMonth('all'); setRevenueStartDate(''); setRevenueEndDate(''); }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer shrink-0 ${
+                    selectedRevenueMonth === 'all' && !revenueStartDate && !revenueEndDate
+                      ? 'bg-emerald-600 text-white shadow-xs'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                   }`}
                 >
-                  <span>{m.label.split(' ')[0]}</span>
-                  <span className="text-[9px] opacity-75 font-normal">({m.count})</span>
+                  All Months
                 </button>
-              ))}
+                {availableRevenueMonths.map(m => (
+                  <button
+                    key={m.key}
+                    type="button"
+                    onClick={() => {
+                      setSelectedRevenueMonth(m.key);
+                      const [yyyy, mm] = m.key.split('-');
+                      const y = parseInt(yyyy, 10);
+                      const mInt = parseInt(mm, 10);
+                      setRevenueStartDate(`${y}-${String(mInt).padStart(2, '0')}-01`);
+                      const lastDate = new Date(y, mInt, 0).getDate();
+                      setRevenueEndDate(`${y}-${String(mInt).padStart(2, '0')}-${String(lastDate).padStart(2, '0')}`);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer shrink-0 ${
+                      selectedRevenueMonth === m.key
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    <span>{m.label.split(' ')[0]}</span>
+                    <span className="text-[9px] opacity-75 font-normal">({m.count})</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Date Range: Fluid on mobile, compact on desktop */}
+              <div className="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-1.5 bg-slate-50 dark:bg-slate-800/80 p-1.5 sm:px-2 sm:py-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs shrink-0">
+                <div className="flex items-center gap-1 flex-1 sm:flex-initial min-w-0">
+                  <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 shrink-0">From</span>
+                  <input
+                    type="date"
+                    value={revenueStartDate}
+                    onChange={(e) => { setRevenueStartDate(e.target.value); setSelectedRevenueMonth('custom'); }}
+                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-1.5 py-1 sm:py-0.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer shadow-inner w-full sm:w-[115px] min-w-0"
+                  />
+                </div>
+                <span className="text-slate-400 font-bold text-xs shrink-0">-</span>
+                <div className="flex items-center gap-1 flex-1 sm:flex-initial min-w-0">
+                  <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 shrink-0">To</span>
+                  <input
+                    type="date"
+                    value={revenueEndDate}
+                    onChange={(e) => { setRevenueEndDate(e.target.value); setSelectedRevenueMonth('custom'); }}
+                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-1.5 py-1 sm:py-0.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer shadow-inner w-full sm:w-[115px] min-w-0"
+                  />
+                </div>
+                {(revenueStartDate || revenueEndDate) && (
+                  <button
+                    type="button"
+                    onClick={() => { setRevenueStartDate(''); setRevenueEndDate(''); setSelectedRevenueMonth('all'); }}
+                    className="ml-0.5 px-1.5 py-0.5 text-[10px] font-black text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition cursor-pointer shrink-0"
+                    title="Clear Date Range"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
             </div>
           </div>
           
@@ -742,18 +737,18 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
             </div>
           </div>
           
-          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-3 gap-2 text-center text-xs">
-            <div className="bg-emerald-50 dark:bg-emerald-950/30 p-2 rounded-xl border border-emerald-100 dark:border-emerald-800/30">
-              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold block">Actual</span>
-              <span className="text-xs font-extrabold text-emerald-800 dark:text-emerald-300">₹{dynamicTotalRevenue.toLocaleString()}</span>
+          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-3 gap-1.5 sm:gap-2 text-center text-xs">
+            <div className="bg-emerald-50 dark:bg-emerald-950/30 p-2 rounded-xl border border-emerald-100 dark:border-emerald-800/30 min-w-0">
+              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold block truncate">Actual</span>
+              <span className="text-[11px] sm:text-xs font-extrabold text-emerald-800 dark:text-emerald-300 block truncate">₹{dynamicTotalRevenue.toLocaleString()}</span>
             </div>
-            <div className="bg-indigo-50 dark:bg-indigo-950/30 p-2 rounded-xl border border-indigo-100 dark:border-indigo-800/30">
-              <span className="text-[10px] text-indigo-700 dark:text-indigo-400 font-bold block">Expected</span>
-              <span className="text-xs font-extrabold text-indigo-800 dark:text-indigo-300">₹{dynamicEstimatedRevenue.toLocaleString()}</span>
+            <div className="bg-indigo-50 dark:bg-indigo-950/30 p-2 rounded-xl border border-indigo-100 dark:border-indigo-800/30 min-w-0">
+              <span className="text-[10px] text-indigo-700 dark:text-indigo-400 font-bold block truncate">Expected</span>
+              <span className="text-[11px] sm:text-xs font-extrabold text-indigo-800 dark:text-indigo-300 block truncate">₹{dynamicEstimatedRevenue.toLocaleString()}</span>
             </div>
-            <div className="bg-orange-50 dark:bg-orange-950/30 p-2 rounded-xl border border-orange-100 dark:border-orange-800/30">
-              <span className="text-[10px] text-orange-700 dark:text-orange-400 font-bold block">Pending</span>
-              <span className="text-xs font-extrabold text-orange-800 dark:text-orange-300">₹{pendingRevenue.toLocaleString()}</span>
+            <div className="bg-orange-50 dark:bg-orange-950/30 p-2 rounded-xl border border-orange-100 dark:border-orange-800/30 min-w-0">
+              <span className="text-[10px] text-orange-700 dark:text-orange-400 font-bold block truncate">Pending</span>
+              <span className="text-[11px] sm:text-xs font-extrabold text-orange-800 dark:text-orange-300 block truncate">₹{pendingRevenue.toLocaleString()}</span>
             </div>
           </div>
         </div>
@@ -836,25 +831,25 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
       </div>
 
       {/* 2.5. Plan Renewals vs Non-Renewals Revenue Health & Progress Bar Card */}
-      <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">
+      <div className="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-5 overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-100 dark:border-purple-900 shadow-inner shrink-0">
               <RefreshCw className="w-5 h-5" />
             </div>
-            <div>
-              <h4 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                Plan Renewals vs Non-Renewals Revenue Analysis
-                <span className="text-[10px] font-bold text-purple-600 bg-purple-50 dark:bg-purple-900/30 px-2.5 py-0.5 rounded-full border border-purple-100 dark:border-purple-800/40">
+            <div className="min-w-0">
+              <h4 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <span>Plan Renewals vs Non-Renewals</span>
+                <span className="text-[10px] font-bold text-purple-600 bg-purple-50 dark:bg-purple-900/30 px-2 py-0.5 rounded-full border border-purple-100 dark:border-purple-800/40">
                   {selectedRevenueMonth === 'all' ? 'All Months Portfolio' : `${availableRevenueMonths.find(m => m.key === selectedRevenueMonth)?.label || selectedRevenueMonth}`}
                 </span>
               </h4>
-              <p className="text-[11px] text-slate-400 mt-0.5">
+              <p className="text-[11px] text-slate-400 mt-0.5 truncate">
                 Real-time tracking of renewed subscription revenue vs overdue / unrenewed plan revenue at risk
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <span className="px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/40 text-purple-700 dark:text-purple-300 text-xs font-black">
               Renewal Conversion: {renewalPercent}%
             </span>
@@ -864,14 +859,16 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
         {/* Dual-Segment Progress Bar */}
         <div className="space-y-2">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs font-bold gap-2">
-            <span className="flex items-center gap-2 text-purple-700 dark:text-purple-400">
-              <span className="w-3 h-3 rounded-full bg-purple-600 inline-block shadow-sm"></span>
-              🔄 Renewed: <span className="font-extrabold text-slate-900 dark:text-white">₹{renewalsExpected.toLocaleString()}</span>
+            <span className="flex flex-wrap items-center gap-1.5 text-purple-700 dark:text-purple-400">
+              <span className="w-3 h-3 rounded-full bg-purple-600 inline-block shadow-sm shrink-0"></span>
+              <span>🔄 Renewed:</span>
+              <span className="font-extrabold text-slate-900 dark:text-white">₹{renewalsExpected.toLocaleString()}</span>
               <span className="text-[10px] text-slate-400 font-semibold">({renewalsCount} clients • {renewalPercent}%)</span>
             </span>
-            <span className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
-              <span className="w-3 h-3 rounded-full bg-rose-500 inline-block shadow-sm"></span>
-              ⚠️ Not Renewed / Overdue: <span className="font-extrabold text-slate-900 dark:text-white">₹{notRenewedExpected.toLocaleString()}</span>
+            <span className="flex flex-wrap items-center gap-1.5 text-rose-600 dark:text-rose-400">
+              <span className="w-3 h-3 rounded-full bg-rose-500 inline-block shadow-sm shrink-0"></span>
+              <span>⚠️ Not Renewed:</span>
+              <span className="font-extrabold text-slate-900 dark:text-white">₹{notRenewedExpected.toLocaleString()}</span>
               <span className="text-[10px] text-slate-400 font-semibold">({notRenewedCount} clients • {notRenewedPercent}%)</span>
             </span>
           </div>
@@ -896,7 +893,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
                 {notRenewedPercent}% Not Renewed (₹{notRenewedExpected.toLocaleString()})
               </div>
             )}
-            {totalRenewalPoolRevenue === 0 && (
+            {totalPoolRevenue === 0 && (
               <div className="w-full h-full flex items-center justify-center text-[11px] text-slate-400 font-bold">
                 No renewal cycle data recorded in this period
               </div>
@@ -955,7 +952,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
                 ₹{expiringSoonExpected.toLocaleString()}
               </div>
               <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                Days 23–30 of active cycle
+                Within 7 days of contract renewal
               </div>
             </div>
             <span className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold">
@@ -971,14 +968,14 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
             </div>
             <div className="my-1.5">
               <div className="text-lg font-black text-indigo-700 dark:text-indigo-300">
-                {renewalsCount} / {renewalsCount + notRenewedCount} Renewed
+                {totalActiveOngoingCount} / {totalAccountsInPool} Active
               </div>
               <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
                 {notRenewedCount} contracts pending renewal
               </div>
             </div>
             <span className="text-[9px] text-indigo-600 dark:text-indigo-400 font-semibold">
-              Conversion on 30-day cycles
+              Active plan retention rate
             </span>
           </div>
         </div>
@@ -1001,7 +998,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
           </div>
           
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border-collapse">
+            <table className="min-w-[520px] w-full text-left text-sm border-collapse">
               <thead>
                 <tr className="bg-white dark:bg-slate-900 text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800 text-[10px] uppercase tracking-wider">
                   <th className="p-4 pl-6">Employee</th>

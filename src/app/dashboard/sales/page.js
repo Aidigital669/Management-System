@@ -17,7 +17,9 @@ import {
   MessageCircle,
   FileText,
   MessageSquare,
-  Trash2
+  Trash2,
+  Menu,
+  X
 } from 'lucide-react';
 
 export default function SalesDashboard() {
@@ -896,21 +898,40 @@ export default function SalesDashboard() {
             WorkForce OS
           </span>
         </div>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-600 dark:text-slate-400">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isMobileMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} /></svg>
+        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-600 dark:text-slate-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+          {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
       </div>
 
+      {/* Mobile Backdrop Overlay */}
+      {isMobileMenuOpen && (
+        <div
+          onClick={() => setIsMobileMenuOpen(false)}
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40 md:hidden transition-opacity duration-300"
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className={`${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-64 bg-white dark:bg-slate-900 border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800 justify-between shrink-0 z-20 absolute md:static top-[73px] md:top-0 left-0 h-[calc(100vh-73px)] md:h-screen overflow-y-auto`}>
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between shrink-0 transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static ${
+        isMobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
+      }`}>
         <div>
-          <div className="hidden md:flex p-6 border-b border-slate-200 dark:border-slate-800 items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
-              <Building className="w-4 h-4 text-white" />
+          <div className="flex p-4 sm:p-6 border-b border-slate-200 dark:border-slate-800 items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
+                <Building className="w-4 h-4 text-white" />
+              </div>
+              <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+                WorkForce OS
+              </span>
             </div>
-            <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
-              WorkForce OS
-            </span>
+            <button
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="md:hidden p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-lg transition"
+              title="Close Menu"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center gap-3 bg-slate-50/50 dark:bg-slate-800/20">
@@ -944,17 +965,17 @@ export default function SalesDashboard() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto relative h-[calc(100vh-73px)] md:h-screen w-full">
-        <header className="sticky top-0 z-10 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-6 py-3 flex items-center justify-between shrink-0">
-          <h1 className="text-xl font-bold capitalize">
+      <main className="flex-1 overflow-y-auto relative h-[calc(100vh-65px)] md:h-screen w-full">
+        <header className="sticky top-0 z-10 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3 flex items-center justify-between shrink-0">
+          <h1 className="text-lg sm:text-xl font-bold capitalize">
             {activeTab === 'tasks' ? 'Overview' : activeTab === 'followups' ? "Today's Followup" : 'Clock'}
           </h1>
-          <div className="font-mono text-base font-semibold bg-slate-100 dark:bg-slate-900 px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
+          <div className="font-mono text-sm sm:text-base font-semibold bg-slate-100 dark:bg-slate-900 px-2.5 sm:px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
             {timeStr}
           </div>
         </header>
 
-        <div className="p-4 md:p-6 min-h-[calc(100vh-4rem)]">
+        <div className="p-3 sm:p-5 md:p-6 min-h-[calc(100vh-4rem)]">
           {activeTab === 'overview' && (
             <div className="max-w-3xl mx-auto">
               <div className="relative bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] flex flex-col items-center justify-center text-center gap-6 overflow-hidden animate-slide-up" style={{ animationDelay: '100ms' }}>
@@ -1503,8 +1524,8 @@ export default function SalesDashboard() {
 
       {/* New Call Modal */}
       {showCallModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 sm:p-6">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md shadow-2xl flex flex-col max-h-full">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-6">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
             <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center shrink-0">
               <h2 className="text-xl font-bold">Log New Call</h2>
               <button onClick={() => setShowCallModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1">
@@ -1542,7 +1563,7 @@ export default function SalesDashboard() {
                   onChange={e => setNewCallData({ ...newCallData, requirement: e.target.value })}
                 ></textarea>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold mb-1">Follow-up Date</label>
                   <input type="datetime-local" className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 transition-colors"

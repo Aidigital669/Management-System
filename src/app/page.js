@@ -235,9 +235,19 @@ export default function LoginPage() {
       </div>
 
       {/* Right form panel */}
-      <div className="lg:col-span-5 flex flex-col justify-between p-8 sm:p-12 md:p-16 bg-white shadow-2xl relative overflow-hidden">
+      <div className="lg:col-span-5 flex flex-col justify-between p-5 sm:p-10 md:p-16 bg-white shadow-2xl relative overflow-hidden min-h-screen lg:min-h-0">
         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50/50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none animate-pulse-soft"></div>
-        <div className="w-full max-w-md mx-auto my-auto flex flex-col gap-8 relative z-10 animate-scale-in">
+        <div className="w-full max-w-md mx-auto my-auto flex flex-col gap-6 sm:gap-8 relative z-10 animate-scale-in">
+
+          {/* Mobile Brand Logo */}
+          <div className="lg:hidden flex items-center justify-center gap-2.5 mb-1">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/25">
+              <Building2 className="w-5 h-5 text-white" />
+            </div>
+            <span className="font-sans font-extrabold text-xl tracking-tight bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
+              WorkForce OS
+            </span>
+          </div>
 
           {/* Tabs */}
           <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">

@@ -26,6 +26,7 @@ import {
   Sun,
   Moon
 } from 'lucide-react';
+import { getClientPlanInfo } from '@/lib/planUtils';
 
 export default function ClientDashboard() {
   const router = useRouter();
@@ -312,24 +313,23 @@ export default function ClientDashboard() {
 
   // Calculations for current cycle
   const getCycleStats = () => {
-    if (!clientInfo) return { startStr: '', expiryStr: '', daysLeft: 0, progressPct: 0 };
+    if (!clientInfo) return { startStr: '', expiryStr: '', daysLeft: 0, progressPct: 0, durationLabel: 'Contract Plan' };
 
-    const cycleStart = parseDbDate(clientInfo.joiningDate);
-    const cycleEnd = new Date(cycleStart.getTime() + 30 * 24 * 60 * 60 * 1000);
-    const today = new Date();
-
-    const totalDays = 30;
-    const timeDiff = cycleEnd.getTime() - today.getTime();
-    const daysLeft = Math.max(0, Math.ceil(timeDiff / (1000 * 60 * 60 * 24)));
-
+    const planInfo = getClientPlanInfo(clientInfo);
+    const totalDays = planInfo.durationDays || 30;
+    const daysLeft = Math.max(0, planInfo.daysLeft);
     const elapsedDays = Math.max(0, Math.min(totalDays, totalDays - daysLeft));
     const progressPct = Math.round((elapsedDays / totalDays) * 100);
 
     return {
-      startStr: clientInfo.joiningDate,
-      expiryStr: formatDbDate(cycleEnd),
-      daysLeft,
-      progressPct
+      startStr: planInfo.cycleStartDateStr || clientInfo.joiningDate,
+      expiryStr: planInfo.expiryDateStr,
+      renewalDueDateStr: planInfo.renewalDueDateStr,
+      daysLeft: planInfo.daysLeft,
+      progressPct,
+      durationLabel: planInfo.durationLabel || 'Contract Cycle',
+      isExpired: planInfo.isExpired,
+      isExpiringSoon: planInfo.isExpiringSoon
     };
   };
 
@@ -394,32 +394,32 @@ export default function ClientDashboard() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans select-none antialiased transition-colors duration-300">
 
       {/* Header bar */}
-      <header className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/80 px-6 py-4 flex justify-between items-center transition-colors duration-300">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-            <Building2 className="w-5 h-5 text-white" />
+      <header className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/80 px-3 sm:px-6 py-3 sm:py-4 flex justify-between items-center transition-colors duration-300">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <div className="w-8 sm:w-9 h-8 sm:h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
+            <Building2 className="w-4 sm:w-5 h-4 sm:h-5 text-white" />
           </div>
-          <div>
-            <h1 className="font-extrabold text-sm tracking-tight text-slate-900 dark:text-white">{clientInfo?.businessName || 'Workspace'}</h1>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold tracking-wider uppercase">Customer Portal | ID: {clientInfo?.clientId}</p>
+          <div className="min-w-0">
+            <h1 className="font-extrabold text-xs sm:text-sm tracking-tight text-slate-900 dark:text-white truncate">{clientInfo?.businessName || 'Workspace'}</h1>
+            <p className="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400 font-semibold tracking-wider uppercase truncate">Customer Portal | ID: {clientInfo?.clientId}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <button
             onClick={toggleDarkMode}
-            className="px-3 py-1.5 border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur-md rounded-xl flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-xs hover:shadow-md transition-all duration-300 transform active:scale-95 cursor-pointer"
+            className="px-2.5 sm:px-3 py-1.5 border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur-md rounded-xl flex items-center gap-1.5 sm:gap-2 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-xs hover:shadow-md transition-all duration-300 transform active:scale-95 cursor-pointer"
             title="Toggle Dark / Light Mode"
           >
             {darkMode ? (
               <>
                 <Sun className="w-4 h-4 text-amber-400 fill-amber-400/20" />
-                <span className="text-[11px] font-semibold text-amber-300">Light Mode</span>
+                <span className="hidden sm:inline text-[11px] font-semibold text-amber-300">Light</span>
               </>
             ) : (
               <>
                 <Moon className="w-4 h-4 text-slate-600 fill-slate-600/20" />
-                <span className="text-[11px] font-semibold text-slate-600">Dark Mode</span>
+                <span className="hidden sm:inline text-[11px] font-semibold text-slate-600">Dark</span>
               </>
             )}
           </button>
@@ -427,19 +427,19 @@ export default function ClientDashboard() {
           <button
             onClick={handleLogout}
             disabled={actionLoading}
-            className="py-1.5 px-3 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-slate-800/60 hover:bg-red-50 dark:hover:bg-red-950/20 border border-slate-200 dark:border-slate-700/60 hover:border-red-300 dark:hover:border-red-900/40 text-slate-700 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            className="py-1.5 px-2.5 sm:px-3 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-slate-800/60 hover:bg-red-50 dark:hover:bg-red-950/20 border border-slate-200 dark:border-slate-700/60 hover:border-red-300 dark:hover:border-red-900/40 text-slate-700 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
           >
             <LogOut className="w-3.5 h-3.5" />
-            <span>Exit Portal</span>
+            <span className="hidden sm:inline">Exit Portal</span>
           </button>
         </div>
       </header>
 
       {/* Subheader portal tab navigation */}
-      <div className="bg-slate-900/40 border-b border-slate-800/60 px-6 flex items-center text-[10px] uppercase font-bold tracking-wider">
+      <div className="bg-slate-900/40 border-b border-slate-800/60 px-3 sm:px-6 flex items-center text-[10px] uppercase font-bold tracking-wider overflow-x-auto no-scrollbar whitespace-nowrap gap-1">
         <button
           onClick={() => setActivePortalTab('onboarding')}
-          className={`py-3 px-4 border-b-2 transition flex items-center gap-1.5 cursor-pointer ${activePortalTab === 'onboarding'
+          className={`py-3 px-3 sm:px-4 border-b-2 transition flex items-center gap-1.5 cursor-pointer shrink-0 ${activePortalTab === 'onboarding'
             ? 'border-blue-500 text-white font-extrabold'
             : 'border-transparent text-slate-450 hover:text-slate-200'
             }`}
@@ -449,7 +449,7 @@ export default function ClientDashboard() {
         </button>
         <button
           onClick={() => setActivePortalTab('deliverables')}
-          className={`py-3 px-4 border-b-2 transition flex items-center gap-1.5 cursor-pointer ${activePortalTab === 'deliverables'
+          className={`py-3 px-3 sm:px-4 border-b-2 transition flex items-center gap-1.5 cursor-pointer shrink-0 ${activePortalTab === 'deliverables'
             ? 'border-blue-500 text-white font-extrabold'
             : 'border-transparent text-slate-450 hover:text-slate-200'
             }`}
@@ -459,7 +459,7 @@ export default function ClientDashboard() {
         </button>
         <button
           onClick={() => setActivePortalTab('feedback')}
-          className={`py-3 px-4 border-b-2 transition flex items-center gap-1.5 cursor-pointer ${activePortalTab === 'feedback'
+          className={`py-3 px-3 sm:px-4 border-b-2 transition flex items-center gap-1.5 cursor-pointer shrink-0 ${activePortalTab === 'feedback'
             ? 'border-blue-500 text-white font-extrabold'
             : 'border-transparent text-slate-450 hover:text-slate-200'
             }`}
@@ -470,7 +470,7 @@ export default function ClientDashboard() {
       </div>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 lg:p-6 space-y-6 overflow-x-hidden">
 
         {error && (
           <div className="p-4 bg-red-950/40 border border-red-900/50 rounded-xl flex items-center gap-3 text-red-400 text-xs">
@@ -574,10 +574,10 @@ export default function ClientDashboard() {
                   <div className="flex justify-between items-center">
                     <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider flex items-center gap-1.5">
                       <Calendar className="w-4 h-4 text-indigo-400" />
-                      Active 30-Day Contract Cycle
+                      Active {cycle.durationLabel}
                     </span>
                     <span className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded text-[9px] font-bold">
-                      Cycle Countdowns
+                      Cycle Countdown
                     </span>
                   </div>
 
@@ -613,7 +613,7 @@ export default function ClientDashboard() {
 
                 <div className="flex items-center gap-2 text-[10px] text-slate-400 bg-slate-950/30 p-2.5 rounded-xl border border-slate-800/40">
                   <Info className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                  <p>Upon plan expiry, subscription renewing will dynamically schedule your next 30-day deliverables schedule.</p>
+                  <p>Upon plan expiry, subscription renewal will dynamically schedule your next deliverables schedule ({cycle.durationLabel}).</p>
                 </div>
               </div>
 
@@ -727,7 +727,7 @@ export default function ClientDashboard() {
 
               {/* Checklist Table */}
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
+                <table className="min-w-[720px] w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-slate-950/40 text-slate-400 font-bold border-b border-slate-800 text-[9px] uppercase tracking-wider">
                       <th className="p-4 pl-6">Estimated Scheduled Date</th>
@@ -1109,8 +1109,8 @@ export default function ClientDashboard() {
 
       {/* Revision notes popup Modal */}
       {showRevisionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-4 sm:p-6 space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
 
             <div className="flex justify-between items-start">
               <div>

@@ -788,7 +788,7 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+            <table className="min-w-[800px] w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-black uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
                   <th className="p-4 pl-6">Client / Lead</th>

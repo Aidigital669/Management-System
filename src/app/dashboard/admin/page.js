@@ -37,9 +37,23 @@ import {
   X,
   UserX,
   PhoneCall,
-  TrendingUp
+  TrendingUp,
+  Tag,
+  Menu
 } from 'lucide-react';
 import { uploadFileAction } from '@/app/actions/uploadAction';
+import {
+  parseDbDate as parsePlanDbDate,
+  formatDateToDb,
+  getPlanDurationDays,
+  getPlanDurationLabel,
+  getClientPlanInfo,
+  isClientActiveInMonth,
+  isClientExpiringInMonth,
+  isClientStartingInMonth,
+  getClientRevenueStream,
+  getClientMonthKey
+} from '@/lib/planUtils';
 
 const SERVICES_PRICING = {
   "Meta Ads Plans": [
@@ -129,7 +143,11 @@ export default function AdminDashboard() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [clientMonthFilter, setClientMonthFilter] = useState('all');
+  const [clientStartDate, setClientStartDate] = useState('');
+  const [clientEndDate, setClientEndDate] = useState('');
   const [clientPaymentFilter, setClientPaymentFilter] = useState('all');
+  const [clientLifecycleFilter, setClientLifecycleFilter] = useState('all'); // 'all', 'active', 'expiring_soon', 'expired', 'renewable', 'inactive'
+  const [clientFilterScope, setClientFilterScope] = useState('all_clients'); // 'all_clients' (global) or 'month'
 
   // Form Fields - User
   const [formName, setFormName] = useState('');
@@ -192,6 +210,13 @@ export default function AdminDashboard() {
   const [paidAmount, setPaidAmount] = useState('19499');
   const [actualNotes, setActualNotes] = useState('');
 
+  // Responsive Mobile Navigation State
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const handleSelectTab = (tab) => {
+    setActiveTab(tab);
+    setMobileSidebarOpen(false);
+  };
+
   // Deliverable Assignment States
   const [showDeliverableAssignmentModal, setShowDeliverableAssignmentModal] = useState(false);
   const [pendingClientSave, setPendingClientSave] = useState(null); // 'ADD' or 'EDIT'
@@ -230,6 +255,18 @@ export default function AdminDashboard() {
   // Renewal Filters State
   const [renewalFilter, setRenewalFilter] = useState('All');
   const [renewalSearch, setRenewalSearch] = useState('');
+  const [renewalMonthFilter, setRenewalMonthFilter] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [renewalStartDate, setRenewalStartDate] = useState('');
+  const [renewalEndDate, setRenewalEndDate] = useState('');
+  const [renewalCalendarMode, setRenewalCalendarMode] = useState('activeMonth'); // 'activeMonth' | 'renewalMonth' | 'cycleMonth'
+
+  // Deliverables Filters State
+  const [deliverableMonthFilter, setDeliverableMonthFilter] = useState('all');
+  const [deliverableStartDate, setDeliverableStartDate] = useState('');
+  const [deliverableEndDate, setDeliverableEndDate] = useState('');
 
   // Client Feedbacks & Concerns states
   const [feedbacksList, setFeedbacksList] = useState([]);
@@ -239,8 +276,20 @@ export default function AdminDashboard() {
   // Pending Payments tab states
   const [paymentTabFilter, setPaymentTabFilter] = useState('All'); // 'All', 'Overdue7', 'Within7'
   const [paymentTabSearch, setPaymentTabSearch] = useState('');
+  const [paymentMonthFilter, setPaymentMonthFilter] = useState('all');
+  const [paymentStartDate, setPaymentStartDate] = useState('');
+  const [paymentEndDate, setPaymentEndDate] = useState('');
   const [clientRevenueStreamFilter, setClientRevenueStreamFilter] = useState('all'); // 'all', 'NewPurchase', 'Renewal', 'ActiveRetainer'
   const [employeeStatusFilter, setEmployeeStatusFilter] = useState('ALL'); // 'ALL', 'ACTIVE', 'INACTIVE'
+
+  // Campaign Deliveries tab states
+  const [deliveryMonthFilter, setDeliveryMonthFilter] = useState('all');
+  const [deliveryStartDate, setDeliveryStartDate] = useState('');
+  const [deliveryEndDate, setDeliveryEndDate] = useState('');
+
+  // Duties / Tasks Board Date Range
+  const [taskStartDate, setTaskStartDate] = useState('');
+  const [taskEndDate, setTaskEndDate] = useState('');
 
   const parseClientMonthKey = (client) => {
     if (!client) return null;
@@ -1290,68 +1339,87 @@ export default function AdminDashboard() {
 
   const parseDbDate = (dateStr) => {
     if (!dateStr || typeof dateStr !== 'string') return null;
-    const parts = dateStr.split('-');
+    const cleanStr = dateStr.trim();
+    
+    // 1. Format: YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}/.test(cleanStr)) {
+      const [yyyy, mm, dd] = cleanStr.slice(0, 10).split('-').map(Number);
+      return new Date(yyyy, mm - 1, dd);
+    }
+    
+    // 2. Format: DD-MMM-YYYY or DD-MM-YYYY or DD/MM/YYYY
+    const parts = cleanStr.split(/[\/\-]/);
     if (parts.length === 3) {
-      const day = parseInt(parts[0]);
-      const monthName = parts[1];
-      const year = parseInt(parts[2]);
+      const p0 = parseInt(parts[0], 10);
+      const p1 = parts[1].trim().toLowerCase();
+      const p2 = parseInt(parts[2], 10);
+      
       const months = {
         jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
-        jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
+        jul: 6, aug: 7, sep: 8, sept: 8, oct: 9, nov: 10, dec: 11
       };
-      const month = months[monthName.toLowerCase()];
-      if (month !== undefined && !isNaN(day) && !isNaN(year)) {
-        return new Date(year, month, day);
+      
+      let m = months[p1] !== undefined ? months[p1] : months[p1.slice(0, 3)];
+      if (m === undefined && !isNaN(parseInt(p1, 10))) {
+        m = parseInt(p1, 10) - 1;
+      }
+      
+      if (m !== undefined && !isNaN(p0) && !isNaN(p2)) {
+        if (p0 > 1000) {
+          return new Date(p0, m, p2);
+        }
+        return new Date(p2, m, p0);
       }
     }
-    const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? null : d;
+    
+    const d = new Date(cleanStr);
+    return isNaN(d.getTime()) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  };
+
+  const isDateInRange = (dateStr, startDateStr, endDateStr) => {
+    if (!startDateStr && !endDateStr) return true;
+    const d = parseDbDate(dateStr);
+    if (!d) return false;
+    const t = d.getTime();
+
+    if (startDateStr) {
+      const start = parseDbDate(startDateStr);
+      if (start && t < start.getTime()) return false;
+    }
+    if (endDateStr) {
+      const end = parseDbDate(endDateStr);
+      if (end && t > end.getTime()) return false;
+    }
+    return true;
+  };
+
+  const handleMonthRangeChange = (monthKey, setMonth, setStart, setEnd) => {
+    setMonth(monthKey);
+    if (monthKey === 'all' || !monthKey) {
+      setStart('');
+      setEnd('');
+    } else {
+      const [yyyy, mm] = monthKey.split('-');
+      const y = parseInt(yyyy, 10);
+      const m = parseInt(mm, 10);
+      const firstDay = `${y}-${String(m).padStart(2, '0')}-01`;
+      const lastDate = new Date(y, m, 0).getDate();
+      const lastDay = `${y}-${String(m).padStart(2, '0')}-${String(lastDate).padStart(2, '0')}`;
+      setStart(firstDay);
+      setEnd(lastDay);
+    }
+  };
+
+  const getClientRenewalInfo = (client) => {
+    return getClientPlanInfo(client);
   };
 
   const getClientPlanStatus = (client) => {
-    const start = parseDbDate(client.joiningDate);
-    if (!start) return { status: 'Unknown', daysLeft: 0, expiringSoonDay: 0, overdueDays: 0, displayText: 'Unknown', expiryDateStr: '' };
-    
-    const expiry = new Date(start);
-    expiry.setDate(expiry.getDate() + 30); // 30-day cycle
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    start.setHours(0, 0, 0, 0);
-    expiry.setHours(0, 0, 0, 0);
-    
-    const diffTime = expiry.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    const daysPassed = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    const expiryDateStr = expiry.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
-    
-    if (diffDays <= 0) {
-      const overdueDays = Math.abs(diffDays) + 1;
-      return { 
-        status: 'Expired', 
-        daysLeft: diffDays, 
-        expiringSoonDay: 0,
-        overdueDays: overdueDays,
-        displayText: `Overdue (${overdueDays})`,
-        expiryDateStr 
-      };
-    } else if (daysPassed >= 22) {
-      const expiringSoonDay = daysPassed - 21;
-      return { 
-        status: 'Expiring Soon', 
-        daysLeft: diffDays, 
-        expiringSoonDay: expiringSoonDay,
-        overdueDays: 0,
-        displayText: `Expiring Soon (${expiringSoonDay})`,
-        expiryDateStr 
-      };
-    }
-    return { status: 'Active', daysLeft: diffDays, expiringSoonDay: 0, overdueDays: 0, displayText: 'Active', expiryDateStr };
+    return getClientRenewalInfo(client);
   };
 
   const handleRenewClientPlan = async (clientDbId, bizName) => {
-    if (!confirm(`Are you sure you want to renew the plan for "${bizName}"? Setup/onboarding tasks will be skipped; only content deliverables (Creatives, Reels, AI Videos, Weekly Reports) will be generated for the new 30-day cycle.`)) return;
+    if (!confirm(`Are you sure you want to renew the plan for "${bizName}"? Setup/onboarding tasks will be skipped; only content deliverables (Creatives, Reels, AI Videos, Weekly Reports) will be generated for the new contract cycle.`)) return;
     
     setFormLoading(true);
     try {
@@ -1808,22 +1876,41 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Sidebar Panel */}
-      <aside className="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between shrink-0">
-        <div>
+      {/* Mobile Backdrop Overlay */}
+      {mobileSidebarOpen && (
+        <div 
+          onClick={() => setMobileSidebarOpen(false)}
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40 lg:hidden transition-opacity duration-300"
+        />
+      )}
+
+      {/* Responsive Sidebar Panel */}
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between shrink-0 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static ${
+        mobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
+      }`}>
+        <div className="overflow-y-auto flex-1">
           {/* Header Brand */}
-          <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
-              <Building className="w-4 h-4 text-white" />
+          <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shrink-0 shadow-sm">
+                <Building className="w-4 h-4 text-white" />
+              </div>
+              <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+                WorkForce OS
+              </span>
             </div>
-            <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
-              WorkForce OS
-            </span>
+            <button 
+              onClick={() => setMobileSidebarOpen(false)}
+              className="lg:hidden p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-lg transition"
+              title="Close Menu"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           {/* User Sidebar Summary */}
           <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center gap-3 bg-slate-50/50 dark:bg-slate-800/20">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-lg font-bold shadow-md">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-lg font-bold shadow-md shrink-0">
               {currentUser.avatar || '👩‍💼'}
             </div>
             <div className="overflow-hidden">
@@ -1835,9 +1922,9 @@ export default function AdminDashboard() {
           </div>
 
           {/* Navigation Links */}
-          <nav className="p-4 flex flex-col gap-1">
+          <nav className="p-3 sm:p-4 flex flex-col gap-1">
             <button
-              onClick={() => setActiveTab('agency-dashboard')}
+              onClick={() => handleSelectTab('agency-dashboard')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'agency-dashboard'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -1848,7 +1935,7 @@ export default function AdminDashboard() {
               Agency Dashboard
             </button>
             <button
-              onClick={() => setActiveTab('overview')}
+              onClick={() => handleSelectTab('overview')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'overview'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -1860,7 +1947,7 @@ export default function AdminDashboard() {
             </button>
             
             <button
-              onClick={() => setActiveTab('directory')}
+              onClick={() => handleSelectTab('directory')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'directory'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -1872,7 +1959,7 @@ export default function AdminDashboard() {
             </button>
 
             <button
-              onClick={() => setActiveTab('seller-dashboard')}
+              onClick={() => handleSelectTab('seller-dashboard')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'seller-dashboard'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -1884,7 +1971,7 @@ export default function AdminDashboard() {
             </button>
 
             <button
-              onClick={() => setActiveTab('clients')}
+              onClick={() => handleSelectTab('clients')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'clients'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -1896,7 +1983,7 @@ export default function AdminDashboard() {
             </button>
 
             <button
-              onClick={() => setActiveTab('deliverables')}
+              onClick={() => handleSelectTab('deliverables')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'deliverables'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -1908,7 +1995,7 @@ export default function AdminDashboard() {
             </button>
 
             <button
-              onClick={() => setActiveTab('feedback')}
+              onClick={() => handleSelectTab('feedback')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'feedback'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -1925,7 +2012,7 @@ export default function AdminDashboard() {
             </button>
 
             <button
-              onClick={() => setActiveTab('pending-payments')}
+              onClick={() => handleSelectTab('pending-payments')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'pending-payments'
                   ? 'bg-amber-50 dark:bg-amber-955/40 text-amber-700 dark:text-amber-400 font-extrabold'
@@ -1956,7 +2043,7 @@ export default function AdminDashboard() {
             </button>
 
             <button
-              onClick={() => setActiveTab('renewals')}
+              onClick={() => handleSelectTab('renewals')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'renewals'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -1973,7 +2060,7 @@ export default function AdminDashboard() {
             </button>
 
             <button
-              onClick={() => setActiveTab('campaign-deliveries')}
+              onClick={() => handleSelectTab('campaign-deliveries')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'campaign-deliveries'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -1985,7 +2072,7 @@ export default function AdminDashboard() {
             </button>
 
             <button
-              onClick={() => setActiveTab('brand-onboarding')}
+              onClick={() => handleSelectTab('brand-onboarding')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'brand-onboarding'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -1997,7 +2084,7 @@ export default function AdminDashboard() {
             </button>
 
             <button
-              onClick={() => setActiveTab('tasks')}
+              onClick={() => handleSelectTab('tasks')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'tasks'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -2009,7 +2096,7 @@ export default function AdminDashboard() {
             </button>
 
             <button
-              onClick={() => setActiveTab('leaves')}
+              onClick={() => handleSelectTab('leaves')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'leaves'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -2026,7 +2113,7 @@ export default function AdminDashboard() {
             </button>
 
             <button
-              onClick={() => setActiveTab('attendance')}
+              onClick={() => handleSelectTab('attendance')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'attendance'
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
@@ -2040,7 +2127,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Sidebar Footer Logout */}
-        <div className="p-4 border-t border-slate-200 dark:border-slate-800">
+        <div className="p-4 border-t border-slate-200 dark:border-slate-800 shrink-0">
           <button
             onClick={handleLogout}
             className="w-full flex items-center justify-center gap-2 py-2.5 px-4 border border-slate-200 dark:border-slate-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 font-bold rounded-xl text-sm transition"
@@ -2055,39 +2142,50 @@ export default function AdminDashboard() {
       <main className="flex-grow flex flex-col min-w-0 overflow-y-auto h-screen">
         
         {/* Header */}
-        <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-8 shrink-0">
-          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white capitalize">
-            {activeTab === 'overview' ? 'Administration Console' : activeTab.replace('-', ' ')}
-          </h2>
+        <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-3 sm:px-6 lg:px-8 shrink-0 transition-colors">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            {/* Hamburger Button for Mobile/Tablet */}
+            <button
+              onClick={() => setMobileSidebarOpen(true)}
+              className="lg:hidden p-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition shrink-0"
+              title="Open Navigation Menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <h2 className="text-sm sm:text-base lg:text-xl font-bold tracking-tight text-slate-900 dark:text-white capitalize truncate">
+              {activeTab === 'overview' ? 'Administration Console' : activeTab.replace('-', ' ')}
+            </h2>
+          </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <button 
               onClick={toggleDarkMode}
-              className="px-3 py-1.5 border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur-md rounded-xl flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-xs hover:shadow-md transition-all duration-300 transform active:scale-95 cursor-pointer"
+              className="px-2.5 sm:px-3 py-1.5 border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur-md rounded-xl flex items-center gap-1.5 sm:gap-2 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-xs hover:shadow-md transition-all duration-300 transform active:scale-95 cursor-pointer"
               title="Toggle Dark / Light Mode"
             >
               {darkMode ? (
                 <>
                   <Sun className="w-4 h-4 text-amber-400 fill-amber-400/20" />
-                  <span className="text-[11px] font-semibold text-amber-300">Light Mode</span>
+                  <span className="hidden sm:inline text-[11px] font-semibold text-amber-300">Light</span>
                 </>
               ) : (
                 <>
                   <Moon className="w-4 h-4 text-slate-600 fill-slate-600/20" />
-                  <span className="text-[11px] font-semibold text-slate-600">Dark Mode</span>
+                  <span className="hidden sm:inline text-[11px] font-semibold text-slate-600">Dark</span>
                 </>
               )}
             </button>
 
-            <div className="text-sm font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
-              <Calendar className="w-4 h-4" />
-              <span>{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+            <div className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2.5 sm:px-3 py-1.5 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
+              <Calendar className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-blue-500 shrink-0" />
+              <span className="hidden md:inline">{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+              <span className="md:hidden">{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
             </div>
           </div>
         </header>
 
         {/* Tab Content Container */}
-        <div className="p-8 flex-grow">
+        <div className="p-3 sm:p-5 lg:p-8 flex-grow overflow-x-hidden">
           
           {/* TAB 0: AGENCY DASHBOARD */}
           {activeTab === 'agency-dashboard' && (
@@ -2388,7 +2486,7 @@ export default function AdminDashboard() {
 
               {/* Employees Table */}
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
+                <table className="min-w-[650px] w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800">
                       <th className="p-4 uppercase tracking-wider">Staff</th>
@@ -2468,6 +2566,9 @@ export default function AdminDashboard() {
           {/* TAB 3: TASKS BOARD */}
           {activeTab === 'tasks' && (() => {
             const filteredTasks = tasksList.filter(t => {
+              if (taskStartDate || taskEndDate) {
+                if (!isDateInRange(t.dueDate || t.createdAt, taskStartDate, taskEndDate)) return false;
+              }
               if (taskStaffFilter === 'ALL') return true;
               const worker = ((t.workingOn || '') + ' ' + (t.assignedTo?.name || '') + ' ' + (t.assignTo || '')).toLowerCase();
               if (taskStaffFilter === 'SANMEET') return worker.includes('sanmeet');
@@ -2499,6 +2600,40 @@ export default function AdminDashboard() {
                           <option key={emp.id} value={emp.name.toUpperCase()}>👤 {emp.name} ({emp.designation || emp.department || 'Staff'})</option>
                         ))}
                       </select>
+                    </div>
+
+                    {/* Date Range: Starting to Ending Date */}
+                    <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/80 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">From</span>
+                        <input
+                          type="date"
+                          value={taskStartDate}
+                          onChange={(e) => setTaskStartDate(e.target.value)}
+                          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-inner"
+                        />
+                      </div>
+                      <span className="text-slate-400 font-bold text-xs">-</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">To</span>
+                        <input
+                          type="date"
+                          value={taskEndDate}
+                          onChange={(e) => setTaskEndDate(e.target.value)}
+                          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-inner"
+                        />
+                      </div>
+                      {(taskStartDate || taskEndDate) && (
+                        <button
+                          type="button"
+                          onClick={() => { setTaskStartDate(''); setTaskEndDate(''); }}
+                          className="ml-1 px-1.5 py-0.5 text-[10px] font-black text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition cursor-pointer"
+                          title="Clear Date Range"
+                        >
+                          ✕
+                        </button>
+                      )}
                     </div>
 
                     <button
@@ -2709,7 +2844,7 @@ export default function AdminDashboard() {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
+                <table className="min-w-[650px] w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800">
                       <th className="p-4 uppercase tracking-wider">Employee</th>
@@ -2786,7 +2921,7 @@ export default function AdminDashboard() {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
+                <table className="min-w-[700px] w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800">
                       <th className="p-4 uppercase tracking-wider">Date</th>
@@ -2837,84 +2972,184 @@ export default function AdminDashboard() {
           )}
 
           {/* TAB 7: GLOBAL DELIVERABLES BOARD */}
-          {activeTab === 'deliverables' && (
-            <div className="space-y-6 animate-fade-in text-xs">
-              
-              {/* Deliverables Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
-                  <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Total Deliverables</span>
-                  <div className="text-xl font-bold text-slate-900 dark:text-white mt-1">{allClientTasks.length}</div>
-                  <span className="text-[9px] text-slate-400 font-medium">All campaigns deliverables</span>
-                </div>
+          {activeTab === 'deliverables' && (() => {
+            const availableDeliverableMonths = (() => {
+              const monthMap = new Map();
+              allClientTasks.forEach(t => {
+                const d = parseDbDate(t.date);
+                if (d) {
+                  const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                  if (!monthMap.has(mk)) {
+                    const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                    monthMap.set(mk, { key: mk, label, count: 0 });
+                  }
+                  monthMap.get(mk).count += 1;
+                }
+              });
+              return Array.from(monthMap.values()).sort((a, b) => b.key.localeCompare(a.key));
+            })();
+
+            const filteredDeliverables = allClientTasks.filter(t => {
+              const query = searchQuery.toLowerCase();
+              const matchesQuery = !query || (
+                t.businessName.toLowerCase().includes(query) ||
+                t.taskId.toLowerCase().includes(query) ||
+                t.taskTitle.toLowerCase().includes(query) ||
+                (t.workingOn && t.workingOn.toLowerCase().includes(query)) ||
+                (t.assignTo && t.assignTo.toLowerCase().includes(query))
+              );
+              if (!matchesQuery) return false;
+
+              if (deliverableStartDate || deliverableEndDate) {
+                if (!isDateInRange(t.date, deliverableStartDate, deliverableEndDate)) return false;
+              } else if (deliverableMonthFilter !== 'all') {
+                const d = parseDbDate(t.date);
+                if (!d) return false;
+                const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                if (mk !== deliverableMonthFilter) return false;
+              }
+              return true;
+            });
+
+            return (
+              <div className="space-y-6 animate-fade-in text-xs">
                 
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
-                  <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Completed Tasks</span>
-                  <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
-                    {allClientTasks.filter(t => t.status === 'Complete Task').length}
+                {/* Deliverables Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
+                    <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Total Deliverables</span>
+                    <div className="text-xl font-bold text-slate-900 dark:text-white mt-1">{filteredDeliverables.length}</div>
+                    <span className="text-[9px] text-slate-400 font-medium">Deliverables in selected scope</span>
                   </div>
-                  <span className="text-[9px] text-slate-400 font-medium">Successfully completed</span>
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
-                  <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">In Progress</span>
-                  <div className="text-xl font-bold text-orange-500 mt-1">
-                    {allClientTasks.filter(t => t.status === 'Working On It').length}
+                  
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
+                    <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Completed Tasks</span>
+                    <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+                      {filteredDeliverables.filter(t => t.status === 'Complete Task').length}
+                    </div>
+                    <span className="text-[9px] text-slate-400 font-medium">Successfully completed</span>
                   </div>
-                  <span className="text-[9px] text-slate-400 font-medium">Under active production</span>
-                </div>
 
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
-                  <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Pending Release</span>
-                  <div className="text-xl font-bold text-slate-500 mt-1">
-                    {allClientTasks.filter(t => t.status === 'Not Started').length}
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
+                    <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">In Progress</span>
+                    <div className="text-xl font-bold text-orange-500 mt-1">
+                      {filteredDeliverables.filter(t => t.status === 'Working On It').length}
+                    </div>
+                    <span className="text-[9px] text-slate-400 font-medium">Under active production</span>
                   </div>
-                  <span className="text-[9px] text-slate-400 font-medium">Queued or not started</span>
-                </div>
-              </div>
 
-              {/* Action Toolbar */}
-              <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
-                <div className="relative flex items-center w-full max-w-md">
-                  <Search className="absolute left-3 w-4 h-4 text-slate-400" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search client, business name, task, ID..."
-                    className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-xl focus:outline-none focus:border-blue-600 text-xs transition"
-                  />
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
+                    <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Pending Release</span>
+                    <div className="text-xl font-bold text-slate-500 mt-1">
+                      {filteredDeliverables.filter(t => t.status === 'Not Started').length}
+                    </div>
+                    <span className="text-[9px] text-slate-400 font-medium">Queued or not started</span>
+                  </div>
                 </div>
-              </div>
 
-              {/* Global Deliverables Table */}
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase tracking-wider">
-                        <th className="p-4">Date & ID</th>
-                        <th className="p-4">Business / Client Name</th>
-                        <th className="p-4">Deliverable Task</th>
-                        <th className="p-4">Assigned Department</th>
-                        <th className="p-4">Staff Assigned</th>
-                        <th className="p-4">Status</th>
-                        <th className="p-4 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {allClientTasks
-                        .filter(t => {
-                          const query = searchQuery.toLowerCase();
-                          return (
-                            t.businessName.toLowerCase().includes(query) ||
-                            t.taskId.toLowerCase().includes(query) ||
-                            t.taskTitle.toLowerCase().includes(query) ||
-                            (t.workingOn && t.workingOn.toLowerCase().includes(query)) ||
-                            (t.assignTo && t.assignTo.toLowerCase().includes(query))
-                          );
-                        })
-                        .map((task) => (
+                {/* Action Toolbar */}
+                <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1 flex-wrap">
+                    <div className="relative flex items-center flex-1 min-w-[200px] max-w-md">
+                      <Search className="absolute left-3 w-4 h-4 text-slate-400" />
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search client, business name, task, ID..."
+                        className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-xl focus:outline-none focus:border-blue-600 text-xs transition"
+                      />
+                    </div>
+
+                    {/* Month Filter Selector */}
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        value={deliverableMonthFilter}
+                        onChange={(e) => handleMonthRangeChange(e.target.value, setDeliverableMonthFilter, setDeliverableStartDate, setDeliverableEndDate)}
+                        className="px-3 py-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-sm"
+                      >
+                        <option value="all">📅 All Months</option>
+                        {availableDeliverableMonths.map(m => (
+                          <option key={m.key} value={m.key}>
+                            📅 {m.label} ({m.count} tasks)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Date Range: Starting to Ending Date */}
+                    <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/80 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">From</span>
+                        <input
+                          type="date"
+                          value={deliverableStartDate}
+                          onChange={(e) => { setDeliverableStartDate(e.target.value); setDeliverableMonthFilter('custom'); }}
+                          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-inner"
+                        />
+                      </div>
+                      <span className="text-slate-400 font-bold text-xs">-</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">To</span>
+                        <input
+                          type="date"
+                          value={deliverableEndDate}
+                          onChange={(e) => { setDeliverableEndDate(e.target.value); setDeliverableMonthFilter('custom'); }}
+                          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-inner"
+                        />
+                      </div>
+                      {(deliverableStartDate || deliverableEndDate) && (
+                        <button
+                          type="button"
+                          onClick={() => { setDeliverableStartDate(''); setDeliverableEndDate(''); setDeliverableMonthFilter('all'); }}
+                          className="ml-1 px-1.5 py-0.5 text-[10px] font-black text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition cursor-pointer"
+                          title="Clear Date Range"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    {(deliverableMonthFilter !== 'all' || deliverableStartDate || deliverableEndDate || searchQuery) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDeliverableMonthFilter('all');
+                          setDeliverableStartDate('');
+                          setDeliverableEndDate('');
+                          setSearchQuery('');
+                        }}
+                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold transition cursor-pointer"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Global Deliverables Table */}
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-[800px] w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase tracking-wider">
+                          <th className="p-4">Date & ID</th>
+                          <th className="p-4">Business / Client Name</th>
+                          <th className="p-4">Deliverable Task</th>
+                          <th className="p-4">Assigned Department</th>
+                          <th className="p-4">Staff Assigned</th>
+                          <th className="p-4">Status</th>
+                          <th className="p-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {filteredDeliverables.length === 0 ? (
+                          <tr>
+                            <td colSpan="7" className="p-8 text-center text-slate-400 italic">No deliverable tasks found matching date/search criteria.</td>
+                          </tr>
+                        ) : (
+                          filteredDeliverables.map((task) => (
                           <tr key={task.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/40 transition">
                             <td className="p-4 font-bold text-slate-450">
                               <div>
@@ -2980,13 +3215,15 @@ export default function AdminDashboard() {
                               </button>
                             </td>
                           </tr>
-                        ))}
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
               </div>
             </div>
-          )}
+          );
+        })()}
 
           {/* TAB: CLIENT FEEDBACK & CONCERNS */}
           {activeTab === 'feedback' && (
@@ -3182,76 +3419,182 @@ export default function AdminDashboard() {
           {activeTab === 'pending-payments' && (
             <div className="space-y-6 animate-fade-in text-xs">
               
-              {/* Top Metrics Cards */}
+              {/* Top Metrics Cards & Filtered List */}
               {(() => {
-                const pendingClients = clientsList.filter(c => getClientPaymentInfo(c).isPartial);
-                const overdue7Clients = pendingClients.filter(c => getClientPaymentInfo(c).isOverdue7Days);
-                const totalPendingBalance = pendingClients.reduce((sum, c) => sum + getClientPaymentInfo(c).pendingBalance, 0);
-                const totalReceived = clientsList.reduce((sum, c) => sum + getClientPaymentInfo(c).paidAmount, 0);
+                const availablePaymentMonths = (() => {
+                  const monthMap = new Map();
+                  clientsList.filter(c => getClientPaymentInfo(c).isPartial).forEach(c => {
+                    const mk = parseClientMonthKey(c);
+                    if (mk && mk.length >= 7) {
+                      if (!monthMap.has(mk)) {
+                        const [yyyy, mm] = mk.split('-');
+                        const d = new Date(parseInt(yyyy, 10), parseInt(mm, 10) - 1, 1);
+                        const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                        monthMap.set(mk, { key: mk, label, count: 0 });
+                      }
+                      monthMap.get(mk).count += 1;
+                    }
+                  });
+                  return Array.from(monthMap.values()).sort((a, b) => b.key.localeCompare(a.key));
+                })();
+
+                const filteredPendingClients = clientsList
+                  .filter(c => getClientPaymentInfo(c).isPartial)
+                  .filter(c => {
+                    const q = paymentTabSearch.toLowerCase();
+                    const matchesSearch = !q || (
+                      c.businessName.toLowerCase().includes(q) ||
+                      c.clientId.toLowerCase().includes(q) ||
+                      (c.clientName && c.clientName.toLowerCase().includes(q)) ||
+                      (c.contact && c.contact.includes(q))
+                    );
+                    if (!matchesSearch) return false;
+
+                    if (paymentStartDate || paymentEndDate) {
+                      if (!isDateInRange(c.joiningDate, paymentStartDate, paymentEndDate)) return false;
+                    } else if (paymentMonthFilter !== 'all') {
+                      const mk = parseClientMonthKey(c);
+                      if (mk !== paymentMonthFilter) return false;
+                    }
+                    return true;
+                  });
+
+                const overdue7Clients = filteredPendingClients.filter(c => getClientPaymentInfo(c).isOverdue7Days);
+                const totalPendingBalance = filteredPendingClients.reduce((sum, c) => sum + getClientPaymentInfo(c).pendingBalance, 0);
+                const totalReceived = filteredPendingClients.reduce((sum, c) => sum + getClientPaymentInfo(c).paidAmount, 0);
 
                 return (
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
-                      <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Clients with Pending Balance</span>
-                      <div className="text-xl font-bold text-slate-900 dark:text-white mt-1">{pendingClients.length}</div>
-                      <span className="text-[9px] text-slate-400 font-medium">Partial / Half payment accounts</span>
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
+                        <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Clients with Pending Balance</span>
+                        <div className="text-xl font-bold text-slate-900 dark:text-white mt-1">{filteredPendingClients.length}</div>
+                        <span className="text-[9px] text-slate-400 font-medium">Partial / Half payment accounts</span>
+                      </div>
+
+                      <div className="bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/50 p-5 rounded-2xl shadow-sm flex flex-col gap-1 bg-amber-50/30 dark:bg-amber-955/10">
+                        <span className="text-[10px] text-amber-700 dark:text-amber-400 font-extrabold uppercase tracking-wider">Total Remaining Rupees Due</span>
+                        <div className="text-xl font-black text-amber-700 dark:text-amber-400 mt-1">₹{totalPendingBalance.toLocaleString()}</div>
+                        <span className="text-[9px] text-amber-600/80 dark:text-amber-400/80 font-medium">Uncollected package balance</span>
+                      </div>
+
+                      <div className="bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/50 p-5 rounded-2xl shadow-sm flex flex-col gap-1 bg-red-50/30 dark:bg-red-955/10">
+                        <span className="text-[10px] text-red-600 dark:text-red-400 font-extrabold uppercase tracking-wider">7-Day Overdue Follow-ups</span>
+                        <div className="text-xl font-black text-red-600 dark:text-red-400 mt-1">{overdue7Clients.length}</div>
+                        <span className="text-[9px] text-red-600/80 dark:text-red-400/80 font-medium">7 days elapsed since payment</span>
+                      </div>
+
+                      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
+                        <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Total Received Revenue</span>
+                        <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">₹{totalReceived.toLocaleString()}</div>
+                        <span className="text-[9px] text-slate-400 font-medium">Payments collected in period</span>
+                      </div>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/50 p-5 rounded-2xl shadow-sm flex flex-col gap-1 bg-amber-50/30 dark:bg-amber-955/10">
-                      <span className="text-[10px] text-amber-700 dark:text-amber-400 font-extrabold uppercase tracking-wider">Total Remaining Rupees Due</span>
-                      <div className="text-xl font-black text-amber-700 dark:text-amber-400 mt-1">₹{totalPendingBalance.toLocaleString()}</div>
-                      <span className="text-[9px] text-amber-600/80 dark:text-amber-400/80 font-medium">Uncollected package balance</span>
-                    </div>
+                    {/* Toolbar */}
+                    <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1 flex-wrap">
+                        <div className="relative flex items-center flex-1 min-w-[200px] max-w-md">
+                          <Search className="absolute left-3 w-4 h-4 text-slate-400" />
+                          <input
+                            type="text"
+                            value={paymentTabSearch}
+                            onChange={(e) => setPaymentTabSearch(e.target.value)}
+                            placeholder="Search business, name, ID, contact..."
+                            className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-xl focus:outline-none focus:border-blue-600 text-xs transition"
+                          />
+                        </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/50 p-5 rounded-2xl shadow-sm flex flex-col gap-1 bg-red-50/30 dark:bg-red-955/10">
-                      <span className="text-[10px] text-red-600 dark:text-red-400 font-extrabold uppercase tracking-wider">7-Day Overdue Follow-ups</span>
-                      <div className="text-xl font-black text-red-600 dark:text-red-400 mt-1">{overdue7Clients.length}</div>
-                      <span className="text-[9px] text-red-600/80 dark:text-red-400/80 font-medium">7 days elapsed since payment</span>
-                    </div>
+                        {/* Month Filter Selector */}
+                        <div className="flex items-center gap-1.5">
+                          <select
+                            value={paymentMonthFilter}
+                            onChange={(e) => handleMonthRangeChange(e.target.value, setPaymentMonthFilter, setPaymentStartDate, setPaymentEndDate)}
+                            className="px-3 py-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-sm"
+                          >
+                            <option value="all">📅 All Months</option>
+                            {availablePaymentMonths.map(m => (
+                              <option key={m.key} value={m.key}>
+                                📅 {m.label} ({m.count} pending)
+                              </option>
+                            ))}
+                          </select>
+                        </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
-                      <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Total Received Revenue</span>
-                      <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">₹{totalReceived.toLocaleString()}</div>
-                      <span className="text-[9px] text-slate-400 font-medium">Total payments collected</span>
+                        {/* Date Range: Starting to Ending Date */}
+                        <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/80 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">From</span>
+                            <input
+                              type="date"
+                              value={paymentStartDate}
+                              onChange={(e) => { setPaymentStartDate(e.target.value); setPaymentMonthFilter('custom'); }}
+                              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-inner"
+                            />
+                          </div>
+                          <span className="text-slate-400 font-bold text-xs">-</span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">To</span>
+                            <input
+                              type="date"
+                              value={paymentEndDate}
+                              onChange={(e) => { setPaymentEndDate(e.target.value); setPaymentMonthFilter('custom'); }}
+                              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-inner"
+                            />
+                          </div>
+                          {(paymentStartDate || paymentEndDate) && (
+                            <button
+                              type="button"
+                              onClick={() => { setPaymentStartDate(''); setPaymentEndDate(''); setPaymentMonthFilter('all'); }}
+                              className="ml-1 px-1.5 py-0.5 text-[10px] font-black text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition cursor-pointer"
+                              title="Clear Date Range"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+
+                        {(paymentMonthFilter !== 'all' || paymentStartDate || paymentEndDate || paymentTabSearch) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPaymentMonthFilter('all');
+                              setPaymentStartDate('');
+                              setPaymentEndDate('');
+                              setPaymentTabSearch('');
+                            }}
+                            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold transition cursor-pointer"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {['All', 'Overdue7', 'Within7'].map(mode => (
+                          <button
+                            key={mode}
+                            onClick={() => setPaymentTabFilter(mode)}
+                            className={`px-3 py-1.5 rounded-xl font-extrabold text-[11px] transition ${
+                              paymentTabFilter === mode
+                                ? mode === 'Overdue7' ? 'bg-red-600 text-white shadow' : 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+                            }`}
+                          >
+                            {mode === 'All' ? 'All Pending' : mode === 'Overdue7' ? '⚠️ 7-Day Overdue' : '⏳ Within 7 Days'}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  </>
                 );
               })()}
-
-              {/* Toolbar */}
-              <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
-                <div className="relative flex items-center w-full max-w-md">
-                  <Search className="absolute left-3 w-4 h-4 text-slate-400" />
-                  <input
-                    type="text"
-                    value={paymentTabSearch}
-                    onChange={(e) => setPaymentTabSearch(e.target.value)}
-                    placeholder="Search business, name, ID, contact..."
-                    className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-xl focus:outline-none focus:border-blue-600 text-xs transition"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {['All', 'Overdue7', 'Within7'].map(mode => (
-                    <button
-                      key={mode}
-                      onClick={() => setPaymentTabFilter(mode)}
-                      className={`px-3 py-1.5 rounded-xl font-extrabold text-[11px] transition ${
-                        paymentTabFilter === mode
-                          ? mode === 'Overdue7' ? 'bg-red-600 text-white shadow' : 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
-                      }`}
-                    >
-                      {mode === 'All' ? 'All Pending' : mode === 'Overdue7' ? '⚠️ 7-Day Overdue' : '⏳ Within 7 Days'}
-                    </button>
-                  ))}
-                </div>
-              </div>
 
               {/* Pending Payments Table */}
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
+                  <table className="min-w-[850px] w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase tracking-wider">
                         <th className="p-4">Client / Business</th>
@@ -3270,6 +3613,15 @@ export default function AdminDashboard() {
                         const list = clientsList
                           .filter(c => getClientPaymentInfo(c).isPartial)
                           .filter(c => {
+                            if (paymentStartDate || paymentEndDate) {
+                              if (!isDateInRange(c.joiningDate, paymentStartDate, paymentEndDate)) return false;
+                            } else if (paymentMonthFilter !== 'all') {
+                              const mk = parseClientMonthKey(c);
+                              if (mk !== paymentMonthFilter) return false;
+                            }
+                            return true;
+                          })
+                          .filter(c => {
                             const info = getClientPaymentInfo(c);
                             if (paymentTabFilter === 'Overdue7') return info.isOverdue7Days;
                             if (paymentTabFilter === 'Within7') return !info.isOverdue7Days;
@@ -3282,7 +3634,7 @@ export default function AdminDashboard() {
                               c.businessName.toLowerCase().includes(q) ||
                               c.clientId.toLowerCase().includes(q) ||
                               (c.clientName && c.clientName.toLowerCase().includes(q)) ||
-                              (c.contact && c.contact.toLowerCase().includes(q))
+                              (c.contact && c.contact.includes(q))
                             );
                           });
 
@@ -3355,92 +3707,193 @@ export default function AdminDashboard() {
           )}
 
           {/* TAB 8: GLOBAL CAMPAIGN DELIVERIES */}
-          {activeTab === 'campaign-deliveries' && (
-            <div className="space-y-6 animate-fade-in text-xs">
-              
-              {/* Campaign Deliveries Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
-                  <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Scheduled Deliveries</span>
-                  <div className="text-xl font-bold text-slate-900 dark:text-white mt-1">{allClientDeliveries.length}</div>
-                  <span className="text-[9px] text-slate-400 font-medium">All campaigns scheduled posts</span>
-                </div>
+          {activeTab === 'campaign-deliveries' && (() => {
+            const availableDeliveryMonths = (() => {
+              const monthMap = new Map();
+              allClientDeliveries.forEach(d => {
+                const dt = parseDbDate(d.postDate);
+                if (dt) {
+                  const mk = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+                  if (!monthMap.has(mk)) {
+                    const label = dt.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                    monthMap.set(mk, { key: mk, label, count: 0 });
+                  }
+                  monthMap.get(mk).count += 1;
+                }
+              });
+              return Array.from(monthMap.values()).sort((a, b) => b.key.localeCompare(a.key));
+            })();
+
+            const filteredDeliveries = allClientDeliveries.filter(d => {
+              const query = searchQuery.toLowerCase();
+              const matchesSearch = !query || (
+                d.clientName.toLowerCase().includes(query) ||
+                d.deliveryId.toLowerCase().includes(query) ||
+                d.postType.toLowerCase().includes(query) ||
+                (d.workingOn && d.workingOn.toLowerCase().includes(query)) ||
+                (d.notes && d.notes.toLowerCase().includes(query))
+              );
+              if (!matchesSearch) return false;
+
+              if (deliveryStartDate || deliveryEndDate) {
+                if (!isDateInRange(d.postDate, deliveryStartDate, deliveryEndDate)) return false;
+              } else if (deliveryMonthFilter !== 'all') {
+                const dt = parseDbDate(d.postDate);
+                if (!dt) return false;
+                const mk = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+                if (mk !== deliveryMonthFilter) return false;
+              }
+              return true;
+            });
+
+            return (
+              <div className="space-y-6 animate-fade-in text-xs">
                 
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
-                  <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Pending Release</span>
-                  <div className="text-xl font-bold text-orange-500 mt-1">
-                    {allClientDeliveries.filter(d => d.status === 'Pending').length}
+                {/* Campaign Deliveries Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
+                    <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Scheduled Deliveries</span>
+                    <div className="text-xl font-bold text-slate-900 dark:text-white mt-1">{filteredDeliveries.length}</div>
+                    <span className="text-[9px] text-slate-400 font-medium">Deliveries in selected period</span>
                   </div>
-                  <span className="text-[9px] text-slate-400 font-medium">Awaiting publication</span>
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
-                  <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Posted / Completed</span>
-                  <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
-                    {allClientDeliveries.filter(d => d.status === 'Posted' || d.status === 'Completed').length}
+                  
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
+                    <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Pending Release</span>
+                    <div className="text-xl font-bold text-orange-500 mt-1">
+                      {filteredDeliveries.filter(d => d.status === 'Pending').length}
+                    </div>
+                    <span className="text-[9px] text-slate-400 font-medium">Awaiting publication</span>
                   </div>
-                  <span className="text-[9px] text-slate-400 font-medium">Successfully published online</span>
-                </div>
 
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
-                  <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Under Review</span>
-                  <div className="text-xl font-bold text-slate-500 mt-1">
-                    {allClientDeliveries.filter(d => d.status !== 'Pending' && d.status !== 'Posted' && d.status !== 'Completed').length}
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
+                    <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Posted / Completed</span>
+                    <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+                      {filteredDeliveries.filter(d => d.status === 'Posted' || d.status === 'Completed').length}
+                    </div>
+                    <span className="text-[9px] text-slate-400 font-medium">Successfully published online</span>
                   </div>
-                  <span className="text-[9px] text-slate-400 font-medium">Drafts and approvals</span>
-                </div>
-              </div>
 
-              {/* Action Toolbar */}
-              <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
-                <div className="relative flex items-center w-full max-w-md">
-                  <Search className="absolute left-3 w-4 h-4 text-slate-400" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search client name, delivery ID, post type, assignee..."
-                    className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-xl focus:outline-none focus:border-blue-600 text-xs transition"
-                  />
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
+                    <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Under Review</span>
+                    <div className="text-xl font-bold text-slate-500 mt-1">
+                      {filteredDeliveries.filter(d => d.status !== 'Pending' && d.status !== 'Posted' && d.status !== 'Completed').length}
+                    </div>
+                    <span className="text-[9px] text-slate-400 font-medium">Drafts and approvals</span>
+                  </div>
                 </div>
-                <button
-                  onClick={handleClearAllDeliveries}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 font-bold rounded-xl text-xs transition"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Clear All Deliveries
-                </button>
-              </div>
 
-              {/* Global Deliveries Table */}
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase tracking-wider">
-                        <th className="p-4">Date & Task ID</th>
-                        <th className="p-4">Client Name</th>
-                        <th className="p-4">Post Type</th>
-                        <th className="p-4">Staff Member</th>
-                        <th className="p-4">Status</th>
-                        <th className="p-4">Notes</th>
-                        <th className="p-4 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {allClientDeliveries
-                        .filter(d => {
-                          const query = searchQuery.toLowerCase();
-                          return (
-                            d.clientName.toLowerCase().includes(query) ||
-                            d.deliveryId.toLowerCase().includes(query) ||
-                            d.postType.toLowerCase().includes(query) ||
-                            (d.workingOn && d.workingOn.toLowerCase().includes(query)) ||
-                            (d.notes && d.notes.toLowerCase().includes(query))
-                          );
-                        })
-                        .map((delivery) => (
-                          <tr key={delivery.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/40 transition">
+                {/* Action Toolbar */}
+                <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1 flex-wrap">
+                    <div className="relative flex items-center flex-1 min-w-[200px] max-w-md">
+                      <Search className="absolute left-3 w-4 h-4 text-slate-400" />
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search client name, delivery ID, post type, assignee..."
+                        className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-xl focus:outline-none focus:border-blue-600 text-xs transition"
+                      />
+                    </div>
+
+                    {/* Month Filter Selector */}
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        value={deliveryMonthFilter}
+                        onChange={(e) => handleMonthRangeChange(e.target.value, setDeliveryMonthFilter, setDeliveryStartDate, setDeliveryEndDate)}
+                        className="px-3 py-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-sm"
+                      >
+                        <option value="all">📅 All Months</option>
+                        {availableDeliveryMonths.map(m => (
+                          <option key={m.key} value={m.key}>
+                            📅 {m.label} ({m.count} posts)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Date Range: Starting to Ending Date */}
+                    <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/80 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">From</span>
+                        <input
+                          type="date"
+                          value={deliveryStartDate}
+                          onChange={(e) => { setDeliveryStartDate(e.target.value); setDeliveryMonthFilter('custom'); }}
+                          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-inner"
+                        />
+                      </div>
+                      <span className="text-slate-400 font-bold text-xs">-</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">To</span>
+                        <input
+                          type="date"
+                          value={deliveryEndDate}
+                          onChange={(e) => { setDeliveryEndDate(e.target.value); setDeliveryMonthFilter('custom'); }}
+                          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-inner"
+                        />
+                      </div>
+                      {(deliveryStartDate || deliveryEndDate) && (
+                        <button
+                          type="button"
+                          onClick={() => { setDeliveryStartDate(''); setDeliveryEndDate(''); setDeliveryMonthFilter('all'); }}
+                          className="ml-1 px-1.5 py-0.5 text-[10px] font-black text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition cursor-pointer"
+                          title="Clear Date Range"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    {(deliveryMonthFilter !== 'all' || deliveryStartDate || deliveryEndDate || searchQuery) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDeliveryMonthFilter('all');
+                          setDeliveryStartDate('');
+                          setDeliveryEndDate('');
+                          setSearchQuery('');
+                        }}
+                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold transition cursor-pointer"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handleClearAllDeliveries}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 font-bold rounded-xl text-xs transition shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Clear All Deliveries
+                  </button>
+                </div>
+
+                {/* Global Deliveries Table */}
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-[800px] w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase tracking-wider">
+                          <th className="p-4">Date & Task ID</th>
+                          <th className="p-4">Client Name</th>
+                          <th className="p-4">Post Type</th>
+                          <th className="p-4">Staff Member</th>
+                          <th className="p-4">Status</th>
+                          <th className="p-4">Notes</th>
+                          <th className="p-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {filteredDeliveries.length === 0 ? (
+                          <tr>
+                            <td colSpan="7" className="p-8 text-center text-slate-400 italic">No campaign deliveries match the selected date or filter.</td>
+                          </tr>
+                        ) : (
+                          filteredDeliveries.map((delivery) => (
+                            <tr key={delivery.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/40 transition">
                             <td className="p-4 font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">
                               <div className="flex items-center gap-1.5 text-xs">
                                 <span>{delivery.postDate}</span>
@@ -3529,526 +3982,925 @@ export default function AdminDashboard() {
                               </div>
                             </td>
                           </tr>
-                        ))}
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
               </div>
             </div>
-          )}
+          );
+        })()}
           
           {/* TAB: PLAN RENEWALS */}
-          {activeTab === 'renewals' && (
-            <div className="space-y-6 animate-fade-in text-xs">
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">Renew Plan</h4>
-                  <p className="text-xs text-slate-400 mt-1">Review active plan cycles, view expiring contracts, and renew subscription plans for clients.</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-355 text-[10px] font-bold rounded-lg border border-slate-200/60 dark:border-slate-700">
-                    Expired/Expiring: <span className="text-orange-500 font-extrabold">{expiringCount}</span>
-                  </span>
-                </div>
-              </div>
+          {activeTab === 'renewals' && (() => {
+            // Build available months dynamically based on client renewal/cycle dates and active coverage
+            const availableRenewalMonths = (() => {
+              const monthKeys = new Set();
+              const now = new Date();
+              const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+              monthKeys.add(curKey);
 
-              {/* Renewal vs Non-Renewal Revenue Health Card with Dual Progress Bar */}
-              {(() => {
-                const activeRenewalClients = clientsList.filter(c => c.active);
-                let renewalRenewedExpected = 0;
-                let renewalRenewedActual = 0;
-                let renewalRenewedCount = 0;
+              clientsList.filter(c => c.active).forEach(c => {
+                const info = getClientRenewalInfo(c);
+                if (info.cycleMonthKey) monthKeys.add(info.cycleMonthKey);
+                if (info.renewalMonthKey) monthKeys.add(info.renewalMonthKey);
+                const mk = getClientMonthKey(c);
+                if (mk) monthKeys.add(mk);
+              });
 
-                let renewalExpiredExpected = 0;
-                let renewalExpiredCount = 0;
+              const sortedKeys = Array.from(monthKeys).sort((a, b) => b.localeCompare(a));
 
-                let renewalExpiringSoonExpected = 0;
-                let renewalExpiringSoonCount = 0;
+              return sortedKeys.map(mk => {
+                const [yyyy, mm] = mk.split('-');
+                const dateObj = new Date(parseInt(yyyy, 10), parseInt(mm, 10) - 1, 1);
+                const label = dateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-                activeRenewalClients.forEach(c => {
-                  const pkgAmt = c.packageAmount || 0;
-                  const planStatus = getClientPlanStatus(c);
-                  const stream = getClientRevenueStream(c, 'all');
-                  const pInfo = getClientPaymentInfo(c);
+                let activePlansCount = 0;
+                let renewalDueCount = 0;
+                let cycleStartCount = 0;
+                let monthRevenue = 0;
 
-                  if (stream.type === 'Renewal') {
-                    renewalRenewedCount += 1;
-                    renewalRenewedExpected += pkgAmt;
-                    renewalRenewedActual += pInfo.paidAmount;
+                clientsList.filter(c => c.active).forEach(c => {
+                  if (isClientActiveInMonth(c, mk)) {
+                    activePlansCount += 1;
+                    monthRevenue += (c.packageAmount || 0);
                   }
-
-                  if (planStatus.status === 'Expired' && stream.type !== 'Renewal') {
-                    renewalExpiredCount += 1;
-                    renewalExpiredExpected += pkgAmt;
-                  } else if (planStatus.status === 'Expiring Soon') {
-                    renewalExpiringSoonCount += 1;
-                    renewalExpiringSoonExpected += pkgAmt;
+                  if (isClientExpiringInMonth(c, mk)) {
+                    renewalDueCount += 1;
+                  }
+                  if (isClientStartingInMonth(c, mk)) {
+                    cycleStartCount += 1;
                   }
                 });
 
-                const totalRenewalPool = renewalRenewedExpected + renewalExpiredExpected;
-                const renewalPercent = totalRenewalPool > 0 ? Math.round((renewalRenewedExpected / totalRenewalPool) * 100) : (renewalRenewedCount > 0 ? 100 : 0);
-                const notRenewedPercent = totalRenewalPool > 0 ? Math.round((renewalExpiredExpected / totalRenewalPool) * 100) : (renewalExpiredCount > 0 ? 100 : 0);
+                const count = renewalCalendarMode === 'activeMonth' 
+                  ? activePlansCount 
+                  : (renewalCalendarMode === 'cycleMonth' ? cycleStartCount : renewalDueCount);
 
-                return (
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-100 dark:border-purple-900 shadow-inner shrink-0">
-                          <RefreshCw className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <h4 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                            Plan Renewals vs Non-Renewals Revenue Analysis
-                          </h4>
-                          <p className="text-[11px] text-slate-400 mt-0.5">
-                            Breakdown of successfully renewed contracts vs overdue / expired unrenewed revenue
-                          </p>
-                        </div>
+                return { 
+                  key: mk, 
+                  label, 
+                  count, 
+                  active: activePlansCount, 
+                  renewalDue: renewalDueCount, 
+                  cycleStart: cycleStartCount, 
+                  revenue: monthRevenue 
+                };
+              });
+            })();
+
+            // Filter active clients by calendar month or custom date range if selected
+            const filteredRenewalClients = clientsList
+              .filter(c => c.active)
+              .filter(c => {
+                // If custom date range manually picked:
+                if (renewalStartDate || renewalEndDate) {
+                  return isClientActiveInMonth(c, null, renewalStartDate, renewalEndDate);
+                }
+                // If all months:
+                if (!renewalMonthFilter || renewalMonthFilter === 'all') {
+                  return true;
+                }
+                // If specific month selected from dropdown:
+                if (renewalCalendarMode === 'activeMonth') {
+                  return isClientActiveInMonth(c, renewalMonthFilter);
+                }
+                if (renewalCalendarMode === 'cycleMonth') {
+                  return isClientStartingInMonth(c, renewalMonthFilter);
+                }
+                return isClientExpiringInMonth(c, renewalMonthFilter);
+              });
+
+            let activeExpected = 0;
+            let activeActual = 0;
+            let activeCount = 0;
+
+            let expiredExpected = 0;
+            let expiredActual = 0;
+            let expiredCount = 0;
+
+            let expiringSoonExpected = 0;
+            let expiringSoonActual = 0;
+            let expiringSoonCount = 0;
+
+            filteredRenewalClients.forEach(c => {
+              const pkgAmt = c.packageAmount || 0;
+              const planStatus = getClientRenewalInfo(c);
+              const pInfo = getClientPaymentInfo(c);
+
+              if (planStatus.status === 'Expired') {
+                expiredCount += 1;
+                expiredExpected += pkgAmt;
+                expiredActual += pInfo.paidAmount;
+              } else if (planStatus.status === 'Expiring Soon') {
+                expiringSoonCount += 1;
+                expiringSoonExpected += pkgAmt;
+                expiringSoonActual += pInfo.paidAmount;
+              } else {
+                activeCount += 1;
+                activeExpected += pkgAmt;
+                activeActual += pInfo.paidAmount;
+              }
+            });
+
+            const totalOngoingCount = activeCount + expiringSoonCount;
+            const totalOngoingExpected = activeExpected + expiringSoonExpected;
+            const totalOngoingActual = activeActual + expiringSoonActual;
+            const totalAllContracts = filteredRenewalClients.length;
+            const totalPoolRevenue = totalOngoingExpected + expiredExpected;
+
+            const activePercent = totalPoolRevenue > 0 ? Math.round((totalOngoingExpected / totalPoolRevenue) * 100) : (totalOngoingCount > 0 ? 100 : 0);
+            const expiredPercent = totalPoolRevenue > 0 ? Math.round((expiredExpected / totalPoolRevenue) * 100) : (expiredCount > 0 ? 100 : 0);
+
+            const selectedMonthObj = availableRenewalMonths.find(m => m.key === renewalMonthFilter);
+            const activeCalendarLabel = renewalMonthFilter === 'all' 
+              ? 'All Calendar Months (Full Portfolio)' 
+              : `${selectedMonthObj?.label || renewalMonthFilter} (${renewalCalendarMode === 'activeMonth' ? 'Active in Month' : (renewalCalendarMode === 'cycleMonth' ? 'Cycle Start' : 'Renewal Due')})`;
+
+            return (
+              <div className="space-y-6 animate-fade-in text-xs">
+                {/* Upper Area Header Bar with Calendar Option */}
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-900 shrink-0">
+                        <RefreshCw className="w-4 h-4" />
                       </div>
-                      <span className="px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/40 text-purple-700 dark:text-purple-300 text-xs font-black w-fit">
-                        Renewal Conversion: {renewalPercent}%
+                      <h4 className="text-base font-black text-slate-900 dark:text-white">Renew Plan & Subscription Management</h4>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Review active plan cycles, track real-time contract expiry, and renew subscriptions on exact renewal dates.
+                    </p>
+                  </div>
+
+                  {/* Calendar Options & Filter Controls in Upper Area */}
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {/* Calendar Filter Mode Toggle */}
+                    <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700 text-[11px] font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setRenewalCalendarMode('activeMonth')}
+                        className={`px-2.5 py-1 rounded-lg transition ${
+                          renewalCalendarMode === 'activeMonth' 
+                            ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs font-black' 
+                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                        }`}
+                        title="Show all accounts whose plan cycle is Active during this Month"
+                      >
+                        Active in Month
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRenewalCalendarMode('renewalMonth')}
+                        className={`px-2.5 py-1 rounded-lg transition ${
+                          renewalCalendarMode === 'renewalMonth' 
+                            ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs font-black' 
+                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                        }`}
+                        title="Filter by contract Expiry / Renewal Due Month"
+                      >
+                        Renewal Due Month
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRenewalCalendarMode('cycleMonth')}
+                        className={`px-2.5 py-1 rounded-lg transition ${
+                          renewalCalendarMode === 'cycleMonth' 
+                            ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs font-black' 
+                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                        }`}
+                        title="Filter by Cycle Start / Joining Month"
+                      >
+                        Cycle Start Month
+                      </button>
+                    </div>
+
+                    {/* Calendar Month Dropdown Selector */}
+                    <div className="relative flex items-center">
+                      <div className="absolute left-3 pointer-events-none text-blue-600 dark:text-blue-400">
+                        <Calendar className="w-4 h-4" />
+                      </div>
+                      <select
+                        value={renewalMonthFilter}
+                        onChange={(e) => handleMonthRangeChange(e.target.value, setRenewalMonthFilter, setRenewalStartDate, setRenewalEndDate)}
+                        className="pl-9 pr-8 py-2 border-2 border-blue-500/20 hover:border-blue-500/40 dark:border-blue-400/20 bg-white dark:bg-slate-800 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer shadow-sm transition"
+                      >
+                        <option value="all">📅 All Calendar Months ({clientsList.filter(c => c.active).length} Contracts • All-Time)</option>
+                        {availableRenewalMonths.map(m => (
+                          <option key={m.key} value={m.key}>
+                            📅 {m.label} ({m.count} contracts • {m.active} active, {m.expired} renewal due)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Date Range: Starting to Ending Date */}
+                    <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/80 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">From</span>
+                        <input
+                          type="date"
+                          value={renewalStartDate}
+                          onChange={(e) => { setRenewalStartDate(e.target.value); setRenewalMonthFilter('custom'); }}
+                          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-inner"
+                        />
+                      </div>
+                      <span className="text-slate-400 font-bold text-xs">-</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">To</span>
+                        <input
+                          type="date"
+                          value={renewalEndDate}
+                          onChange={(e) => { setRenewalEndDate(e.target.value); setRenewalMonthFilter('custom'); }}
+                          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-inner"
+                        />
+                      </div>
+                      {(renewalStartDate || renewalEndDate) && (
+                        <button
+                          type="button"
+                          onClick={() => { setRenewalStartDate(''); setRenewalEndDate(''); setRenewalMonthFilter('all'); }}
+                          className="ml-1 px-1.5 py-0.5 text-[10px] font-black text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition cursor-pointer"
+                          title="Clear Date Range"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    {(renewalMonthFilter !== 'all' || renewalStartDate || renewalEndDate) && (
+                      <button
+                        type="button"
+                        onClick={() => { setRenewalMonthFilter('all'); setRenewalStartDate(''); setRenewalEndDate(''); }}
+                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold transition cursor-pointer"
+                        title="Reset calendar filter to view All Months"
+                      >
+                        Reset
+                      </button>
+                    )}
+
+                    <span className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-bold rounded-xl border border-slate-200/60 dark:border-slate-700">
+                      Expired/Expiring: <span className="text-orange-500 font-extrabold">{expiredCount + expiringSoonCount}</span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Plan Renewals Revenue Analysis Card with Dual Progress Bar */}
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-100 dark:border-purple-900 shadow-inner shrink-0">
+                        <RefreshCw className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                          Plan Renewals vs Non-Renewals Revenue Analysis
+                          <span className="text-[10px] font-bold text-purple-600 bg-purple-50 dark:bg-purple-900/30 px-2.5 py-0.5 rounded-full border border-purple-100 dark:border-purple-800/40">
+                            📅 {activeCalendarLabel}
+                          </span>
+                        </h4>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Real-time breakdown of active ongoing plan contracts vs overdue / expired unrenewed revenue
+                        </p>
+                      </div>
+                    </div>
+                    <span className="px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/40 text-purple-700 dark:text-purple-300 text-xs font-black w-fit">
+                      Active Plan Health: {activePercent}% ({totalOngoingCount}/{totalAllContracts})
+                    </span>
+                  </div>
+
+                  {/* Dual-Segment Progress Bar */}
+                  <div className="space-y-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs font-bold gap-2">
+                      <span className="flex items-center gap-2 text-purple-700 dark:text-purple-400">
+                        <span className="w-3 h-3 rounded-full bg-purple-600 inline-block shadow-sm"></span>
+                        🔄 Active / On-Track: <span className="font-extrabold text-slate-900 dark:text-white">₹{totalOngoingExpected.toLocaleString()}</span>
+                        <span className="text-[10px] text-slate-400 font-semibold">({totalOngoingCount} accounts • {activePercent}%)</span>
+                      </span>
+                      <span className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
+                        <span className="w-3 h-3 rounded-full bg-rose-500 inline-block shadow-sm"></span>
+                        ⚠️ Not Renewed (Expired): <span className="font-extrabold text-slate-900 dark:text-white">₹{expiredExpected.toLocaleString()}</span>
+                        <span className="text-[10px] text-slate-400 font-semibold">({expiredCount} accounts • {expiredPercent}%)</span>
                       </span>
                     </div>
 
-                    {/* Dual-Segment Progress Bar */}
-                    <div className="space-y-2">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs font-bold gap-2">
-                        <span className="flex items-center gap-2 text-purple-700 dark:text-purple-400">
-                          <span className="w-3 h-3 rounded-full bg-purple-600 inline-block shadow-sm"></span>
-                          🔄 Renewed: <span className="font-extrabold text-slate-900 dark:text-white">₹{renewalRenewedExpected.toLocaleString()}</span>
-                          <span className="text-[10px] text-slate-400 font-semibold">({renewalRenewedCount} accounts • {renewalPercent}%)</span>
-                        </span>
-                        <span className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
-                          <span className="w-3 h-3 rounded-full bg-rose-500 inline-block shadow-sm"></span>
-                          ⚠️ Not Renewed (Expired): <span className="font-extrabold text-slate-900 dark:text-white">₹{renewalExpiredExpected.toLocaleString()}</span>
-                          <span className="text-[10px] text-slate-400 font-semibold">({renewalExpiredCount} accounts • {notRenewedPercent}%)</span>
-                        </span>
-                      </div>
-
-                      <div className="w-full bg-slate-100 dark:bg-slate-800 h-7 rounded-2xl overflow-hidden flex shadow-inner p-1 gap-1">
-                        {renewalRenewedExpected > 0 && (
-                          <div 
-                            className="bg-gradient-to-r from-purple-500 to-indigo-600 h-full rounded-xl transition-all duration-1000 ease-out flex items-center justify-center text-[10px] font-black text-white px-2 shadow-sm"
-                            style={{ width: `${Math.max(renewalPercent, 12)}%` }}
-                          >
-                            {renewalPercent}% Renewed (₹{renewalRenewedExpected.toLocaleString()})
-                          </div>
-                        )}
-                        {renewalExpiredExpected > 0 && (
-                          <div 
-                            className="bg-gradient-to-r from-rose-500 to-red-600 h-full rounded-xl transition-all duration-1000 ease-out flex items-center justify-center text-[10px] font-black text-white px-2 shadow-sm"
-                            style={{ width: `${Math.max(notRenewedPercent, 12)}%` }}
-                          >
-                            {notRenewedPercent}% Not Renewed (₹{renewalExpiredExpected.toLocaleString()})
-                          </div>
-                        )}
-                        {totalRenewalPool === 0 && (
-                          <div className="w-full h-full flex items-center justify-center text-[11px] text-slate-400 font-bold">
-                            No renewal cycle data recorded in this period
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* 4 Detail Metric Cards */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 text-xs">
-                      <div className="p-3 bg-purple-50/70 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-800/40 rounded-xl">
-                        <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-purple-700 dark:text-purple-400">
-                          <span>🔄 Renewed Revenue</span>
-                          <span className="px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/60 font-black">{renewalRenewedCount}</span>
-                        </div>
-                        <div className="text-base font-black text-purple-700 dark:text-purple-300 mt-1">
-                          ₹{renewalRenewedExpected.toLocaleString()}
-                        </div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                          Collected: <b className="text-emerald-600 font-bold">₹{renewalRenewedActual.toLocaleString()}</b>
-                        </div>
-                      </div>
-
-                      <div className="p-3 bg-rose-50/70 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-800/40 rounded-xl">
-                        <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-rose-700 dark:text-rose-400">
-                          <span>⚠️ Not Renewed (Expired)</span>
-                          <span className="px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-900/60 font-black">{renewalExpiredCount}</span>
-                        </div>
-                        <div className="text-base font-black text-rose-600 dark:text-rose-400 mt-1">
-                          ₹{renewalExpiredExpected.toLocaleString()}
-                        </div>
-                        <div className="text-[10px] text-rose-600 dark:text-rose-300 font-semibold mt-0.5">
-                          Immediate renewal required
-                        </div>
-                      </div>
-
-                      <div className="p-3 bg-amber-50/70 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-800/40 rounded-xl">
-                        <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-amber-700 dark:text-amber-400">
-                          <span>⏳ Expiring Soon (7 Days)</span>
-                          <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/60 font-black">{renewalExpiringSoonCount}</span>
-                        </div>
-                        <div className="text-base font-black text-amber-600 dark:text-amber-400 mt-1">
-                          ₹{renewalExpiringSoonExpected.toLocaleString()}
-                        </div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                          Days 23–30 of active cycle
-                        </div>
-                      </div>
-
-                      <div className="p-3 bg-indigo-50/70 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-800/40 rounded-xl">
-                        <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-indigo-700 dark:text-indigo-400">
-                          <span>📊 Retention Rate</span>
-                          <span className="px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/60 font-black">{renewalPercent}%</span>
-                        </div>
-                        <div className="text-base font-black text-indigo-700 dark:text-indigo-300 mt-1">
-                          {renewalRenewedCount} / {renewalRenewedCount + renewalExpiredCount} Renewed
-                        </div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                          {renewalExpiredCount} contracts pending renewal
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                
-                {/* Search and Filters Bar */}
-                <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  
-                  {/* Status Buttons */}
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { key: 'All', label: 'All Contracts', count: clientsList.filter(c => c.active).length },
-                      { key: 'Expired', label: 'Expired (Renewal Due)', count: clientsList.filter(c => c.active && getClientPlanStatus(c).status === 'Expired').length, color: 'text-red-500 bg-red-50 dark:bg-red-950/20' },
-                      { key: 'Expiring Soon', label: 'Expiring Soon (Days 23–30)', count: clientsList.filter(c => c.active && getClientPlanStatus(c).status === 'Expiring Soon').length, color: 'text-orange-500 bg-orange-50 dark:bg-orange-955/20' },
-                      { key: 'Active', label: 'Active (Days 1–22)', count: clientsList.filter(c => c.active && getClientPlanStatus(c).status === 'Active').length, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-955/20' }
-                    ].map(btn => (
-                      <button
-                        key={btn.key}
-                        onClick={() => setRenewalFilter(btn.key)}
-                        className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
-                          renewalFilter === btn.key
-                            ? 'bg-blue-600 text-white shadow-sm'
-                            : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'
-                        }`}
-                      >
-                        <span>{btn.label}</span>
-                        <span className={`px-1.5 py-0.5 text-[8px] rounded-md font-black
-                          ${renewalFilter === btn.key 
-                            ? 'bg-white/20 text-white' 
-                            : btn.color || 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-7 rounded-2xl overflow-hidden flex shadow-inner p-1 gap-1">
+                      {totalOngoingExpected > 0 && (
+                        <div 
+                          className="bg-gradient-to-r from-purple-500 to-indigo-600 h-full rounded-xl transition-all duration-1000 ease-out flex items-center justify-center text-[10px] font-black text-white px-2 shadow-sm"
+                          style={{ width: `${Math.max(activePercent, 12)}%` }}
+                          title={`Active & On-Track: ₹${totalOngoingExpected.toLocaleString()} (${totalOngoingCount} accounts)`}
                         >
-                          {btn.count}
-                        </span>
-                      </button>
-                    ))}
+                          {activePercent}% Active / On-Track (₹{totalOngoingExpected.toLocaleString()})
+                        </div>
+                      )}
+                      {expiredExpected > 0 && (
+                        <div 
+                          className="bg-gradient-to-r from-rose-500 to-red-600 h-full rounded-xl transition-all duration-1000 ease-out flex items-center justify-center text-[10px] font-black text-white px-2 shadow-sm"
+                          style={{ width: `${Math.max(expiredPercent, 12)}%` }}
+                          title={`Not Renewed / Expired: ₹${expiredExpected.toLocaleString()} (${expiredCount} accounts)`}
+                        >
+                          {expiredPercent}% Not Renewed (₹{expiredExpected.toLocaleString()})
+                        </div>
+                      )}
+                      {totalPoolRevenue === 0 && (
+                        <div className="w-full h-full flex items-center justify-center text-[11px] text-slate-400 font-bold">
+                          No renewal cycle data recorded in this period
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Search input field */}
-                  <div className="relative w-full md:w-72 shrink-0">
-                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                      <Search className="w-4 h-4" />
-                    </span>
-                    <input
-                      type="text"
-                      placeholder="Search business or client name..."
-                      value={renewalSearch}
-                      onChange={(e) => setRenewalSearch(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    />
-                    {renewalSearch && (
-                      <button
-                        onClick={() => setRenewalSearch('')}
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-655"
-                      >
-                        ✕
-                      </button>
+                  {/* 4 Detail Metric Cards */}
+                  {/* 4 Detail Metric Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 text-xs">
+                    {/* Card 1: Active Contracts (Total Ongoing) */}
+                    <div className="p-3 bg-purple-50/70 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-800/40 rounded-xl">
+                      <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-purple-700 dark:text-purple-400">
+                        <span>🔄 Active Contracts (Total)</span>
+                        <span className="px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/60 font-black">{totalOngoingCount} Accounts</span>
+                      </div>
+                      <div className="text-base font-black text-purple-700 dark:text-purple-300 mt-1">
+                        ₹{totalOngoingExpected.toLocaleString()}
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        <span className="text-emerald-600 font-bold">{activeCount} On-Track</span> • <span className="text-amber-600 font-bold">{expiringSoonCount} Expiring Soon</span>
+                      </div>
+                    </div>
+
+                    {/* Card 2: Expiring Soon (Within 7 Days) */}
+                    <div className="p-3 bg-amber-50/70 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-800/40 rounded-xl">
+                      <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-amber-700 dark:text-amber-400">
+                        <span>⏳ Expiring Soon (7 Days)</span>
+                        <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/60 font-black">{expiringSoonCount} Accounts</span>
+                      </div>
+                      <div className="text-base font-black text-amber-600 dark:text-amber-400 mt-1">
+                        ₹{expiringSoonExpected.toLocaleString()}
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        Within 7 days of contract renewal
+                      </div>
+                    </div>
+
+                    {/* Card 3: Expired (Renewal Due) */}
+                    <div className="p-3 bg-rose-50/70 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-800/40 rounded-xl">
+                      <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-rose-700 dark:text-rose-400">
+                        <span>⚠️ Not Renewed (Expired)</span>
+                        <span className="px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-900/60 font-black">{expiredCount} Accounts</span>
+                      </div>
+                      <div className="text-base font-black text-rose-600 dark:text-rose-400 mt-1">
+                        ₹{expiredExpected.toLocaleString()}
+                      </div>
+                      <div className="text-[10px] text-rose-600 dark:text-rose-300 font-semibold mt-0.5">
+                        Immediate renewal required
+                      </div>
+                    </div>
+
+                    {/* Card 4: Retention Rate */}
+                    <div className="p-3 bg-indigo-50/70 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-800/40 rounded-xl">
+                      <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-indigo-700 dark:text-indigo-400">
+                        <span>📊 Active Retention Rate</span>
+                        <span className="px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/60 font-black">{activePercent}%</span>
+                      </div>
+                      <div className="text-base font-black text-indigo-700 dark:text-indigo-300 mt-1">
+                        {totalOngoingCount} / {totalAllContracts} Active
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        {expiredCount} contracts pending renewal
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                  {/* Search and Filters Bar */}
+                  <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    {/* Status Buttons */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {[
+                        { key: 'All', label: 'All Contracts', count: filteredRenewalClients.length },
+                        { key: 'Active', label: 'Active (Ongoing Plan)', count: totalOngoingCount, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-955/20' },
+                        { key: 'Expiring Soon', label: 'Expiring Soon (7 Days)', count: expiringSoonCount, color: 'text-orange-500 bg-orange-50 dark:bg-orange-955/20' },
+                        { key: 'Expired', label: 'Expired (Renewal Due)', count: expiredCount, color: 'text-red-500 bg-red-50 dark:bg-red-950/20' }
+                      ].map(btn => (
+                        <button
+                          key={btn.key}
+                          onClick={() => setRenewalFilter(btn.key)}
+                          className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
+                            renewalFilter === btn.key
+                              ? 'bg-blue-600 text-white shadow-sm'
+                              : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'
+                          }`}
+                        >
+                          <span>{btn.label}</span>
+                          <span className={`px-1.5 py-0.5 text-[8px] rounded-md font-black ${
+                            renewalFilter === btn.key 
+                              ? 'bg-white/20 text-white' 
+                              : btn.color || 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                          }`}>
+                            {btn.count}
+                          </span>
+                        </button>
+                      ))}
+                      <span className="ml-1 px-2.5 py-1 text-[10.5px] font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 rounded-lg border border-blue-200/60 dark:border-blue-900/40">
+                        Month: <strong className="underline">{activeCalendarLabel}</strong>
+                      </span>
+                    </div>
+
+                    {/* Search input field */}
+                    <div className="relative w-full md:w-72 shrink-0">
+                      <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                        <Search className="w-4 h-4" />
+                      </span>
+                      <input
+                        type="text"
+                        placeholder="Search business, client name, ID..."
+                        value={renewalSearch}
+                        onChange={(e) => setRenewalSearch(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      />
+                      {renewalSearch && (
+                        <button
+                          onClick={() => setRenewalSearch('')}
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto p-4 space-y-6">
+                    {/* Expired / Overdue Contracts Table (Renewal Required) */}
+                    {(renewalFilter === 'All' || renewalFilter === 'Expired') && (
+                      <div className="border border-red-200 dark:border-red-900/50 rounded-xl overflow-hidden shadow-sm">
+                        <div className="p-3 bg-red-50/70 dark:bg-red-950/30 border-b border-red-200 dark:border-red-900/50 flex justify-between items-center">
+                          <div>
+                            <span className="text-[11px] font-extrabold uppercase tracking-wider text-red-700 dark:text-red-400 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                              Expired Contracts — Renewal Required (Post Plan Cycle)
+                            </span>
+                            <p className="text-[10px] text-red-600/80 dark:text-red-300/70 font-medium mt-0.5">Plan cycle completed. Renewal starts on next day after plan expiry.</p>
+                          </div>
+                          <span className="px-2 py-0.5 bg-red-600 text-white text-[8px] font-bold rounded uppercase tracking-wider shadow-sm">
+                            Renewal Required ({expiredCount})
+                          </span>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-[850px] w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50/50 dark:bg-slate-800/20 text-slate-500 font-semibold border-b border-slate-200 dark:border-slate-800 text-[9px] uppercase tracking-wider">
+                              <th className="p-4">Business / Client Name</th>
+                              <th className="p-4">Current Cycle Date</th>
+                              <th className="p-4">Expiry Date</th>
+                              <th className="p-4">Renewal Due Date & Month</th>
+                              <th className="p-4">Overdue Days</th>
+                              <th className="p-4">Subscribed Plan & Package</th>
+                              <th className="p-4">Status</th>
+                              <th className="p-4 text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {(() => {
+                              const list = filteredRenewalClients
+                                .filter(c => getClientRenewalInfo(c).status === 'Expired')
+                                .filter(c => {
+                                  if (!renewalSearch) return true;
+                                  const q = renewalSearch.toLowerCase();
+                                  return c.businessName.toLowerCase().includes(q) || c.clientId.toLowerCase().includes(q);
+                                });
+
+                              if (list.length === 0) {
+                                return (
+                                  <tr>
+                                    <td colSpan="8" className="p-8 text-center text-slate-400 italic">No expired contracts matching calendar/search filter.</td>
+                                  </tr>
+                                );
+                              }
+
+                              return list.map(client => {
+                                const info = getClientRenewalInfo(client);
+                                const { cycleStartStr, expiryDateStr, renewalDueStr, renewalMonthLabel, overdueDays, displayText } = info;
+                                return (
+                                  <tr key={`renew-${client.id}`} className="hover:bg-red-50/30 dark:hover:bg-red-950/20 transition text-slate-700 dark:text-slate-300">
+                                    <td className="p-4">
+                                      <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                        {client.businessName}
+                                        <span className="px-1.5 py-0.5 bg-red-600 text-white text-[7px] font-black rounded uppercase tracking-widest shrink-0">
+                                          EXPIRED
+                                        </span>
+                                      </div>
+                                      <div className="text-[10px] text-slate-400 mt-0.5">ID: {client.clientId} | Person: {client.clientName || 'N/A'}</div>
+                                    </td>
+                                    <td className="p-4 font-semibold">{cycleStartStr}</td>
+                                    <td className="p-4 font-semibold">{expiryDateStr}</td>
+                                    <td className="p-4">
+                                      <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                                        <Calendar className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                        <span>{renewalDueStr}</span>
+                                      </div>
+                                      <div className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 mt-0.5">
+                                        Month: <span className="font-extrabold underline">{renewalMonthLabel}</span>
+                                      </div>
+                                    </td>
+                                    <td className="p-4 font-bold">
+                                      <span className="text-red-500 font-extrabold">Overdue ({overdueDays})</span>
+                                    </td>
+                                    <td className="p-4">
+                                      <div className="flex items-center gap-1.5 font-black text-xs text-blue-600 dark:text-blue-400">
+                                        <Tag className="w-3.5 h-3.5 shrink-0 text-blue-500" />
+                                        <span>{client.packageName || 'Standard Plan'}</span>
+                                        <span className="ml-1 px-1.5 py-0.5 rounded text-[8px] font-black bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800">
+                                          {info.durationLabel}
+                                        </span>
+                                        {info.isRenewed && (
+                                          <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-purple-50 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800">
+                                            🔄 Renewed Cycle
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-[10px] font-semibold text-slate-700 dark:text-slate-300 mt-0.5">{client.services}</div>
+                                      <div className="flex items-center gap-2 mt-1">
+                                        <span className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded text-[9px] font-extrabold border border-slate-200/60 dark:border-slate-700">
+                                          ₹{(client.packageAmount || 0).toLocaleString()} / cycle
+                                        </span>
+                                        {client.requirement && (
+                                          <span className="text-[8.5px] text-slate-400 italic truncate max-w-[130px]" title={client.requirement}>
+                                            📋 {client.requirement}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="p-4">
+                                      <span className="inline-block px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-red-100 text-red-800 dark:bg-red-955/40 dark:text-red-400 border border-red-200 dark:border-red-900/45">
+                                        {displayText}
+                                      </span>
+                                    </td>
+                                    <td className="p-4 text-right">
+                                      <button
+                                        onClick={() => handleRenewClientPlan(client.id, client.businessName)}
+                                        disabled={formLoading}
+                                        className="py-1.5 px-3 rounded-lg text-[10px] font-bold transition flex items-center gap-1 shadow-sm disabled:opacity-50 ml-auto bg-red-600 hover:bg-red-700 text-white shadow-red-500/10 cursor-pointer"
+                                      >
+                                        <RefreshCw className={`w-3 h-3 ${formLoading ? 'animate-spin' : ''}`} />
+                                        <span>Renew Plan Now</span>
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              });
+                            })()}
+                          </tbody>
+                        </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Expiring Soon Notice Table (Active Contracts Days 23 to 30) */}
+                    {(renewalFilter === 'All' || renewalFilter === 'Expiring Soon') && (
+                      <div className="border border-orange-200 dark:border-orange-900/50 rounded-xl overflow-hidden shadow-sm">
+                        <div className="p-3 bg-orange-50/70 dark:bg-orange-955/30 border-b border-orange-200 dark:border-orange-900/50 flex justify-between items-center">
+                          <div>
+                            <span className="text-[11px] font-extrabold uppercase tracking-wider text-orange-700 dark:text-orange-400 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
+                              Expiring Soon Notice — Active Contracts (Days 23–30 of 30)
+                            </span>
+                            <p className="text-[10px] text-orange-600/80 dark:text-orange-300/70 font-medium mt-0.5">Plan remains active through Day 30. Renewal starts on Day 31 (next day after Day 30).</p>
+                          </div>
+                          <span className="px-2 py-0.5 bg-orange-500 text-white text-[8px] font-bold rounded uppercase tracking-wider">
+                            Final Week Notice ({expiringSoonCount})
+                          </span>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-[850px] w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50/50 dark:bg-slate-800/20 text-slate-500 font-semibold border-b border-slate-200 dark:border-slate-800 text-[9px] uppercase tracking-wider">
+                              <th className="p-4">Business / Client Name</th>
+                              <th className="p-4">Current Cycle Date</th>
+                              <th className="p-4">Expected End Date (Day 30)</th>
+                              <th className="p-4">Renewal Due Date & Month</th>
+                              <th className="p-4">Expiring Soon Countdown</th>
+                              <th className="p-4">Subscribed Plan & Package</th>
+                              <th className="p-4">Status</th>
+                              <th className="p-4 text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {(() => {
+                              const list = filteredRenewalClients
+                                .filter(c => getClientRenewalInfo(c).status === 'Expiring Soon')
+                                .filter(c => {
+                                  if (!renewalSearch) return true;
+                                  const q = renewalSearch.toLowerCase();
+                                  return c.businessName.toLowerCase().includes(q) || c.clientId.toLowerCase().includes(q);
+                                });
+
+                              if (list.length === 0) {
+                                return (
+                                  <tr>
+                                    <td colSpan="8" className="p-8 text-center text-slate-400 italic">No contracts currently in expiring soon notice (Days 23–30).</td>
+                                  </tr>
+                                );
+                              }
+
+                              return list.map(client => {
+                                const info = getClientRenewalInfo(client);
+                                const { cycleStartStr, expiryDateStr, renewalDueStr, renewalMonthLabel, expiringSoonDay, displayText } = info;
+                                return (
+                                  <tr key={`expiring-${client.id}`} className="hover:bg-orange-50/30 dark:hover:bg-orange-955/20 transition text-slate-700 dark:text-slate-300">
+                                    <td className="p-4">
+                                      <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                        {client.businessName}
+                                        <span className="px-1.5 py-0.5 bg-orange-500 text-white text-[7px] font-black rounded uppercase tracking-widest shrink-0">
+                                          EXPIRING SOON
+                                        </span>
+                                      </div>
+                                      <div className="text-[10px] text-slate-400 mt-0.5">ID: {client.clientId} | Person: {client.clientName || 'N/A'}</div>
+                                    </td>
+                                    <td className="p-4 font-semibold">{cycleStartStr}</td>
+                                    <td className="p-4 font-semibold">{expiryDateStr}</td>
+                                    <td className="p-4">
+                                      <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                                        <Calendar className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                        <span>{renewalDueStr}</span>
+                                      </div>
+                                      <div className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 mt-0.5">
+                                        Month: <span className="font-extrabold underline">{renewalMonthLabel}</span>
+                                      </div>
+                                    </td>
+                                    <td className="p-4 font-bold">
+                                      <span className="text-orange-500 font-extrabold">Expiring Soon ({expiringSoonDay})</span>
+                                    </td>
+                                    <td className="p-4">
+                                      <div className="flex items-center gap-1.5 font-black text-xs text-blue-600 dark:text-blue-400">
+                                        <Tag className="w-3.5 h-3.5 shrink-0 text-blue-500" />
+                                        <span>{client.packageName || 'Standard Plan'}</span>
+                                        <span className="ml-1 px-1.5 py-0.5 rounded text-[8px] font-black bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800">
+                                          {info.durationLabel}
+                                        </span>
+                                        {info.isRenewed && (
+                                          <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-purple-50 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800">
+                                            🔄 Renewed Cycle
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-[10px] font-semibold text-slate-700 dark:text-slate-300 mt-0.5">{client.services}</div>
+                                      <div className="flex items-center gap-2 mt-1">
+                                        <span className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded text-[9px] font-extrabold border border-slate-200/60 dark:border-slate-700">
+                                          ₹{(client.packageAmount || 0).toLocaleString()} / cycle
+                                        </span>
+                                        {client.requirement && (
+                                          <span className="text-[8.5px] text-slate-400 italic truncate max-w-[130px]" title={client.requirement}>
+                                            📋 {client.requirement}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="p-4">
+                                      <span className="inline-block px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-orange-100 text-orange-850 dark:bg-orange-955/40 dark:text-orange-400 border border-orange-200 dark:border-orange-900/45">
+                                        {displayText}
+                                      </span>
+                                    </td>
+                                    <td className="p-4 text-right">
+                                      <span className="inline-block px-2.5 py-1 rounded-lg text-[9px] font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-900/40">
+                                        Active (Renewal on Day 31)
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              });
+                            })()}
+                          </tbody>
+                        </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Active Contracts Table (Days 1 to 22, or all 1-30 if Active filter selected) */}
+                    {(renewalFilter === 'All' || renewalFilter === 'Active') && (
+                      <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+                        <div className="p-3 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800 flex flex-wrap justify-between items-center gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                              Active Client Contracts (Ongoing)
+                            </span>
+                            {renewalFilter === 'Active' ? (
+                              <span className="text-[10px] text-slate-400 font-semibold">
+                                ({totalOngoingCount} Total: <span className="text-emerald-600 font-bold">{activeCount} On-Track</span> + <span className="text-amber-600 font-bold">{expiringSoonCount} Expiring Soon</span>)
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 font-semibold">
+                                ({activeCount} On-Track • {expiringSoonCount} in Notice table above)
+                              </span>
+                            )}
+                          </div>
+                          <span className="px-2 py-0.5 bg-emerald-600 text-white text-[8px] font-bold rounded uppercase tracking-wider">
+                            Active ({renewalFilter === 'Active' ? totalOngoingCount : activeCount})
+                          </span>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-[850px] w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50/50 dark:bg-slate-800/20 text-slate-500 font-semibold border-b border-slate-200 dark:border-slate-800 text-[9px] uppercase tracking-wider">
+                              <th className="p-4">Business / Client Name</th>
+                              <th className="p-4">Current Cycle Date</th>
+                              <th className="p-4">Calculated Expiry Date</th>
+                              <th className="p-4">Renewal Due Date & Month</th>
+                              <th className="p-4">Days Remaining</th>
+                              <th className="p-4">Subscribed Plan & Package</th>
+                              <th className="p-4">Status</th>
+                              <th className="p-4 text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {(() => {
+                              const list = filteredRenewalClients
+                                .filter(c => {
+                                  const s = getClientRenewalInfo(c).status;
+                                  if (renewalFilter === 'Active') {
+                                    // When viewing Active filter, include ALL active ongoing contracts (both on-track and expiring soon)
+                                    return s === 'Active' || s === 'Expiring Soon';
+                                  }
+                                  // In 'All' view, this table shows on-track active clients (since Expiring Soon has its own table above)
+                                  return s === 'Active';
+                                })
+                                .filter(c => {
+                                  if (!renewalSearch) return true;
+                                  const q = renewalSearch.toLowerCase();
+                                  return c.businessName.toLowerCase().includes(q) || c.clientId.toLowerCase().includes(q);
+                                });
+
+                              if (list.length === 0) {
+                                return (
+                                  <tr>
+                                    <td colSpan="8" className="p-8 text-center text-slate-400 italic">No active contracts found matching calendar/search filter.</td>
+                                  </tr>
+                                );
+                              }
+
+                              return list.map(client => {
+                                const info = getClientRenewalInfo(client);
+                                const { cycleStartStr, expiryDateStr, renewalDueStr, renewalMonthLabel, daysLeft, status } = info;
+                                const isExpiringSoon = status === 'Expiring Soon';
+
+                                return (
+                                  <tr key={`active-${client.id}`} className={`hover:bg-slate-50/50 dark:hover:bg-slate-850/40 transition text-slate-700 dark:text-slate-300 ${isExpiringSoon ? 'bg-amber-50/20 dark:bg-amber-950/10' : ''}`}>
+                                    <td className="p-4">
+                                      <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                        {client.businessName}
+                                        {isExpiringSoon && (
+                                          <span className="px-1.5 py-0.2 bg-amber-500 text-white text-[7px] font-black rounded uppercase tracking-wider">
+                                            Expiring Soon
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-[10px] text-slate-400 mt-0.5">ID: {client.clientId} | Person: {client.clientName || 'N/A'}</div>
+                                    </td>
+                                    <td className="p-4 font-semibold">{cycleStartStr}</td>
+                                    <td className="p-4 font-semibold">{expiryDateStr}</td>
+                                    <td className="p-4">
+                                      <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                                        <Calendar className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                        <span>{renewalDueStr}</span>
+                                      </div>
+                                      <div className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 mt-0.5">
+                                        Month: <span className="font-extrabold underline">{renewalMonthLabel}</span>
+                                      </div>
+                                    </td>
+                                    <td className="p-4 font-bold">
+                                      {isExpiringSoon ? (
+                                        <div>
+                                          <span className="text-amber-600 dark:text-amber-400 font-extrabold flex items-center gap-1">
+                                            ⚠️ {daysLeft} day(s) left
+                                          </span>
+                                          <span className="text-[9px] font-semibold text-amber-500">Day {info.expiringSoonDay || '23-30'} of 30</span>
+                                        </div>
+                                      ) : (
+                                        <span className="text-emerald-600 dark:text-emerald-400">{daysLeft} day(s) left</span>
+                                      )}
+                                    </td>
+                                    <td className="p-4">
+                                      <div className="flex items-center gap-1.5 font-black text-xs text-blue-600 dark:text-blue-400">
+                                        <Tag className="w-3.5 h-3.5 shrink-0 text-blue-500" />
+                                        <span>{client.packageName || 'Standard Plan'}</span>
+                                        <span className="ml-1 px-1.5 py-0.5 rounded text-[8px] font-black bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800">
+                                          {info.durationLabel}
+                                        </span>
+                                        {info.isRenewed && (
+                                          <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-purple-50 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800">
+                                            🔄 Renewed Cycle
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-[10px] font-semibold text-slate-700 dark:text-slate-300 mt-0.5">{client.services}</div>
+                                      <div className="flex items-center gap-2 mt-1">
+                                        <span className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded text-[9px] font-extrabold border border-slate-200/60 dark:border-slate-700">
+                                          ₹{(client.packageAmount || 0).toLocaleString()} / cycle
+                                        </span>
+                                        {client.requirement && (
+                                          <span className="text-[8.5px] text-slate-400 italic truncate max-w-[130px]" title={client.requirement}>
+                                            📋 {client.requirement}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="p-4">
+                                      {isExpiringSoon ? (
+                                        <span className="inline-block px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800/40">
+                                          Expiring Soon (Active)
+                                        </span>
+                                      ) : (
+                                        <span className="inline-block px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-955/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/45">
+                                          Active Plan
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="p-4 text-right">
+                                      {isExpiringSoon ? (
+                                        <div className="flex items-center justify-end gap-1.5">
+                                          <button
+                                            onClick={() => handleRenewClientPlan(client.id, client.businessName)}
+                                            disabled={formLoading}
+                                            className="py-1 px-2.5 rounded-lg text-[9px] font-bold transition flex items-center gap-1 shadow-sm disabled:opacity-50 bg-amber-600 hover:bg-amber-700 text-white cursor-pointer"
+                                            title="Advance to next cycle"
+                                          >
+                                            <RefreshCw className={`w-2.5 h-2.5 ${formLoading ? 'animate-spin' : ''}`} />
+                                            <span>Renew Plan</span>
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <span className="inline-block px-2.5 py-1 rounded-lg text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-955/30 border border-emerald-200 dark:border-emerald-900/40">
+                                          Plan Active
+                                        </span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              });
+                            })()}
+                          </tbody>
+                        </table>
+                        </div>
+                      </div>
                     )}
                   </div>
-                  
                 </div>
-
-                <div className="overflow-x-auto p-4 space-y-6">
-                  {/* Expired / Overdue Contracts Table (Renewal Required) */}
-                  {(renewalFilter === 'All' || renewalFilter === 'Expired') && (
-                    <div className="border border-red-200 dark:border-red-900/50 rounded-xl overflow-hidden shadow-sm">
-                      <div className="p-3 bg-red-50/70 dark:bg-red-950/30 border-b border-red-200 dark:border-red-900/50 flex justify-between items-center">
-                        <div>
-                          <span className="text-[11px] font-extrabold uppercase tracking-wider text-red-700 dark:text-red-400 flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-                            Expired Contracts — Renewal Required (Post 30-Day Cycle)
-                          </span>
-                          <p className="text-[10px] text-red-600/80 dark:text-red-300/70 font-medium mt-0.5">30-day cycle completed. Renewal starts on Day 31 (next day after Day 30).</p>
-                        </div>
-                        <span className="px-2 py-0.5 bg-red-600 text-white text-[8px] font-bold rounded uppercase tracking-wider shadow-sm">
-                          Renewal Required
-                        </span>
-                      </div>
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="bg-slate-50/50 dark:bg-slate-800/20 text-slate-500 font-semibold border-b border-slate-200 dark:border-slate-800 text-[9px] uppercase tracking-wider">
-                            <th className="p-4">Business / Client Name</th>
-                            <th className="p-4">Current Cycle Date</th>
-                            <th className="p-4">Expiry Date (30 Days Completed)</th>
-                            <th className="p-4">Overdue Days</th>
-                            <th className="p-4">Active Plan Services</th>
-                            <th className="p-4">Status</th>
-                            <th className="p-4 text-right">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                          {(() => {
-                            const list = clientsList
-                              .filter(c => c.active)
-                              .filter(c => getClientPlanStatus(c).status === 'Expired')
-                              .filter(c => {
-                                if (!renewalSearch) return true;
-                                const q = renewalSearch.toLowerCase();
-                                return c.businessName.toLowerCase().includes(q) || c.clientId.toLowerCase().includes(q);
-                              });
-
-                            if (list.length === 0) {
-                              return (
-                                <tr>
-                                  <td colSpan="7" className="p-8 text-center text-slate-400 italic">No expired contracts currently.</td>
-                                </tr>
-                              );
-                            }
-
-                            return list.map(client => {
-                              const planStatus = getClientPlanStatus(client);
-                              const { expiryDateStr, overdueDays, displayText } = planStatus;
-                              return (
-                                <tr key={`renew-${client.id}`} className="hover:bg-red-50/30 dark:hover:bg-red-950/20 transition text-slate-700 dark:text-slate-300">
-                                  <td className="p-4">
-                                    <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                                      {client.businessName}
-                                      <span className="px-1.5 py-0.5 bg-red-600 text-white text-[7px] font-black rounded uppercase tracking-widest shrink-0">
-                                        EXPIRED
-                                      </span>
-                                    </div>
-                                    <div className="text-[10px] text-slate-400 mt-0.5">ID: {client.clientId} | Person: {client.clientName || 'N/A'}</div>
-                                  </td>
-                                  <td className="p-4 font-semibold">{client.joiningDate}</td>
-                                  <td className="p-4 font-semibold">{expiryDateStr || 'N/A'}</td>
-                                  <td className="p-4 font-bold">
-                                    <span className="text-red-500 font-extrabold">Overdue ({overdueDays})</span>
-                                  </td>
-                                  <td className="p-4">
-                                    <div className="font-bold text-blue-650 dark:text-blue-400">{client.services}</div>
-                                    <div className="text-[9px] text-slate-450 mt-0.5">{client.packageName}</div>
-                                  </td>
-                                  <td className="p-4">
-                                    <span className="inline-block px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-red-100 text-red-800 dark:bg-red-955/40 dark:text-red-400 border border-red-200 dark:border-red-900/45">
-                                      {displayText}
-                                    </span>
-                                  </td>
-                                  <td className="p-4 text-right">
-                                    <button
-                                      onClick={() => handleRenewClientPlan(client.id, client.businessName)}
-                                      disabled={formLoading}
-                                      className="py-1.5 px-3 rounded-lg text-[10px] font-bold transition flex items-center gap-1 shadow-sm disabled:opacity-50 ml-auto bg-red-600 hover:bg-red-700 text-white shadow-red-500/10 cursor-pointer"
-                                    >
-                                      <RefreshCw className={`w-3 h-3 ${formLoading ? 'animate-spin' : ''}`} />
-                                      <span>Renew Plan Now</span>
-                                    </button>
-                                  </td>
-                                </tr>
-                              );
-                            });
-                          })()}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-
-                  {/* Expiring Soon Notice Table (Active Contracts Days 23 to 30) */}
-                  {(renewalFilter === 'All' || renewalFilter === 'Expiring Soon') && (
-                    <div className="border border-orange-200 dark:border-orange-900/50 rounded-xl overflow-hidden shadow-sm">
-                      <div className="p-3 bg-orange-50/70 dark:bg-orange-955/30 border-b border-orange-200 dark:border-orange-900/50 flex justify-between items-center">
-                        <div>
-                          <span className="text-[11px] font-extrabold uppercase tracking-wider text-orange-700 dark:text-orange-400 flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
-                            Expiring Soon Notice — Active Contracts (Days 23–30 of 30)
-                          </span>
-                          <p className="text-[10px] text-orange-600/80 dark:text-orange-300/70 font-medium mt-0.5">Plan remains active through Day 30. Renewal starts on Day 31 (next day after Day 30).</p>
-                        </div>
-                        <span className="px-2 py-0.5 bg-orange-500 text-white text-[8px] font-bold rounded uppercase tracking-wider">
-                          Final Week Notice
-                        </span>
-                      </div>
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="bg-slate-50/50 dark:bg-slate-800/20 text-slate-500 font-semibold border-b border-slate-200 dark:border-slate-800 text-[9px] uppercase tracking-wider">
-                            <th className="p-4">Business / Client Name</th>
-                            <th className="p-4">Current Cycle Date</th>
-                            <th className="p-4">Expected End Date (Day 30)</th>
-                            <th className="p-4">Expiring Soon Countdown</th>
-                            <th className="p-4">Active Plan Services</th>
-                            <th className="p-4">Status</th>
-                            <th className="p-4 text-right">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                          {(() => {
-                            const list = clientsList
-                              .filter(c => c.active)
-                              .filter(c => getClientPlanStatus(c).status === 'Expiring Soon')
-                              .filter(c => {
-                                if (!renewalSearch) return true;
-                                const q = renewalSearch.toLowerCase();
-                                return c.businessName.toLowerCase().includes(q) || c.clientId.toLowerCase().includes(q);
-                              });
-
-                            if (list.length === 0) {
-                              return (
-                                <tr>
-                                  <td colSpan="7" className="p-8 text-center text-slate-400 italic">No contracts currently in expiring soon notice (Days 23–30).</td>
-                                </tr>
-                              );
-                            }
-
-                            return list.map(client => {
-                              const planStatus = getClientPlanStatus(client);
-                              const { expiryDateStr, expiringSoonDay, displayText } = planStatus;
-                              return (
-                                <tr key={`expiring-${client.id}`} className="hover:bg-orange-50/30 dark:hover:bg-orange-955/20 transition text-slate-700 dark:text-slate-300">
-                                  <td className="p-4">
-                                    <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                                      {client.businessName}
-                                      <span className="px-1.5 py-0.5 bg-orange-500 text-white text-[7px] font-black rounded uppercase tracking-widest shrink-0">
-                                        EXPIRING SOON
-                                      </span>
-                                    </div>
-                                    <div className="text-[10px] text-slate-400 mt-0.5">ID: {client.clientId} | Person: {client.clientName || 'N/A'}</div>
-                                  </td>
-                                  <td className="p-4 font-semibold">{client.joiningDate}</td>
-                                  <td className="p-4 font-semibold">{expiryDateStr || 'N/A'}</td>
-                                  <td className="p-4 font-bold">
-                                    <span className="text-orange-500 font-extrabold">Expiring Soon ({expiringSoonDay})</span>
-                                  </td>
-                                  <td className="p-4">
-                                    <div className="font-bold text-blue-650 dark:text-blue-400">{client.services}</div>
-                                    <div className="text-[9px] text-slate-450 mt-0.5">{client.packageName}</div>
-                                  </td>
-                                  <td className="p-4">
-                                    <span className="inline-block px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-orange-100 text-orange-850 dark:bg-orange-955/40 dark:text-orange-400 border border-orange-200 dark:border-orange-900/45">
-                                      {displayText}
-                                    </span>
-                                  </td>
-                                  <td className="p-4 text-right">
-                                    <span className="inline-block px-2.5 py-1 rounded-lg text-[9px] font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-900/40">
-                                      Active (Renewal on Day 31)
-                                    </span>
-                                  </td>
-                                </tr>
-                              );
-                            });
-                          })()}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-
-                  {/* Active Contracts Table (Days 1 to 22) */}
-                  {(renewalFilter === 'All' || renewalFilter === 'Active') && (
-                    <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-                      <div className="p-3 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800">
-                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-655">
-                          Active Client Contracts (Ongoing)
-                        </span>
-                      </div>
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="bg-slate-50/50 dark:bg-slate-800/20 text-slate-500 font-semibold border-b border-slate-200 dark:border-slate-800 text-[9px] uppercase tracking-wider">
-                            <th className="p-4">Business / Client Name</th>
-                            <th className="p-4">Current Cycle Date</th>
-                            <th className="p-4">Calculated Expiry Date</th>
-                            <th className="p-4">Days Remaining</th>
-                            <th className="p-4">Active Plan Services</th>
-                            <th className="p-4">Status</th>
-                            <th className="p-4 text-right">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                          {(() => {
-                            const list = clientsList
-                              .filter(c => c.active)
-                              .filter(c => getClientPlanStatus(c).status === 'Active')
-                              .filter(c => {
-                                if (!renewalSearch) return true;
-                                const q = renewalSearch.toLowerCase();
-                                return c.businessName.toLowerCase().includes(q) || c.clientId.toLowerCase().includes(q);
-                              });
-
-                            if (list.length === 0) {
-                              return (
-                                <tr>
-                                  <td colSpan="7" className="p-8 text-center text-slate-400 italic">No active contracts found.</td>
-                                </tr>
-                              );
-                            }
-
-                            return list.map(client => {
-                              const { status, daysLeft, expiryDateStr } = getClientPlanStatus(client);
-                              return (
-                                <tr key={`active-${client.id}`} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/40 transition text-slate-700 dark:text-slate-300">
-                                  <td className="p-4">
-                                    <div className="font-bold text-slate-900 dark:text-white">{client.businessName}</div>
-                                    <div className="text-[10px] text-slate-400 mt-0.5">ID: {client.clientId} | Person: {client.clientName || 'N/A'}</div>
-                                  </td>
-                                  <td className="p-4 font-semibold">{client.joiningDate}</td>
-                                  <td className="p-4 font-semibold">{expiryDateStr || 'N/A'}</td>
-                                  <td className="p-4 font-bold">
-                                    <span className="text-slate-600 dark:text-slate-400">{daysLeft} day(s) left</span>
-                                  </td>
-                                  <td className="p-4">
-                                    <div className="font-bold text-blue-650 dark:text-blue-400">{client.services}</div>
-                                    <div className="text-[9px] text-slate-455 mt-0.5">{client.packageName}</div>
-                                  </td>
-                                  <td className="p-4">
-                                    <span className="inline-block px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-955/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/45">
-                                      Active Plan
-                                    </span>
-                                  </td>
-                                  <td className="p-4 text-right">
-                                    <span className="inline-block px-2.5 py-1 rounded-lg text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-955/30 border border-emerald-200 dark:border-emerald-900/40">
-                                      Plan Active
-                                    </span>
-                                  </td>
-                                </tr>
-                              );
-                            });
-                          })()}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-
               </div>
-            </div>
-          )}
+            );
+          })()}
           
           {/* TAB 6: CLIENT CRM */}
           {activeTab === 'clients' && (() => {
             const availableClientMonths = (() => {
-              const monthMap = new Map();
+              const monthKeysSet = new Set();
+              const today = new Date();
+              const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+              monthKeysSet.add(currentMonthKey);
+
+              for (let i = -5; i <= 3; i++) {
+                const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
+                monthKeysSet.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+              }
+
               clientsList.forEach(c => {
-                const mk = parseClientMonthKey(c);
-                if (mk && mk.length >= 7) {
-                  if (!monthMap.has(mk)) {
-                    const [yyyy, mm] = mk.split('-');
-                    const d = new Date(parseInt(yyyy, 10), parseInt(mm, 10) - 1, 1);
-                    const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-                    monthMap.set(mk, { key: mk, label, count: 0, revenue: 0 });
-                  }
-                  const item = monthMap.get(mk);
-                  item.count += 1;
-                  if (c.active) item.revenue += (c.packageAmount || 0);
-                }
+                const info = getClientPlanInfo(c);
+                if (info.cycleMonthKey) monthKeysSet.add(info.cycleMonthKey);
+                if (info.renewalMonthKey) monthKeysSet.add(info.renewalMonthKey);
               });
-              return Array.from(monthMap.values()).sort((a, b) => b.key.localeCompare(a.key));
+
+              const sortedKeys = Array.from(monthKeysSet).sort((a, b) => b.localeCompare(a));
+              return sortedKeys.map(mk => {
+                const [yyyy, mm] = mk.split('-');
+                const dateObj = new Date(parseInt(yyyy, 10), parseInt(mm, 10) - 1, 1);
+                const label = dateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+                let activeCount = 0;
+                let monthRevenue = 0;
+
+                clientsList.forEach(c => {
+                  if (c.active && isClientActiveInMonth(c, mk)) {
+                    activeCount += 1;
+                    monthRevenue += (c.packageAmount || 0);
+                  }
+                });
+
+                return { key: mk, label, count: activeCount, revenue: monthRevenue };
+              });
             })();
+
+            // Global Lifecycle Counts across ALL clients in the agency
+            const globalLifecycleCounts = {
+              all: clientsList.length,
+              active: clientsList.filter(c => c.active && getClientPlanInfo(c).status === 'Active').length,
+              expiring_soon: clientsList.filter(c => c.active && getClientPlanInfo(c).status === 'Expiring Soon').length,
+              expired: clientsList.filter(c => c.active && getClientPlanInfo(c).status === 'Expired').length,
+              renewable: clientsList.filter(c => {
+                const info = getClientPlanInfo(c);
+                return info.isRenewed || (c.active && (info.status === 'Expired' || info.status === 'Expiring Soon'));
+              }).length,
+              inactive: clientsList.filter(c => !c.active).length
+            };
 
             const filteredClients = clientsList.filter(c => {
               const query = searchQuery.toLowerCase();
@@ -4062,9 +4914,34 @@ export default function AdminDashboard() {
               );
               if (!matchesQuery) return false;
 
-              if (clientMonthFilter !== 'all') {
-                const mk = parseClientMonthKey(c);
-                if (mk !== clientMonthFilter) return false;
+              const planInfo = getClientPlanInfo(c);
+
+              // 1. Lifecycle Status Filter
+              if (clientLifecycleFilter !== 'all') {
+                if (clientLifecycleFilter === 'active') {
+                  if (!c.active || planInfo.status !== 'Active') return false;
+                } else if (clientLifecycleFilter === 'expiring_soon') {
+                  if (!c.active || planInfo.status !== 'Expiring Soon') return false;
+                } else if (clientLifecycleFilter === 'expired') {
+                  if (!c.active || planInfo.status !== 'Expired') return false;
+                } else if (clientLifecycleFilter === 'renewable') {
+                  const isRenewable = planInfo.isRenewed || (c.active && (planInfo.status === 'Expired' || planInfo.status === 'Expiring Soon'));
+                  if (!isRenewable) return false;
+                } else if (clientLifecycleFilter === 'inactive') {
+                  if (c.active) return false;
+                }
+              }
+
+              // 2. Month Scope Filter:
+              // When clientFilterScope === 'all_clients' (and a specific status filter is active), we show across ALL clients.
+              // Otherwise, we filter by the selected month or custom range.
+              const shouldApplyMonth = clientLifecycleFilter === 'all' || clientFilterScope === 'month';
+              if (shouldApplyMonth) {
+                if (clientStartDate || clientEndDate) {
+                  if (!isClientActiveInMonth(c, null, clientStartDate, clientEndDate)) return false;
+                } else if (clientMonthFilter !== 'all') {
+                  if (!isClientActiveInMonth(c, clientMonthFilter)) return false;
+                }
               }
 
               if (clientPaymentFilter !== 'all') {
@@ -4152,9 +5029,11 @@ export default function AdminDashboard() {
 
             const pendingRevenue = Math.max(0, expectedRevenue - actualRevenue);
             const actualPercent = expectedRevenue > 0 ? Math.round((actualRevenue / expectedRevenue) * 100) : 0;
-            const currentMonthLabel = clientMonthFilter === 'all' 
-              ? 'All Months (All-Time)' 
-              : (availableClientMonths.find(m => m.key === clientMonthFilter)?.label || clientMonthFilter);
+            const currentMonthLabel = (clientStartDate || clientEndDate)
+              ? `📅 ${clientStartDate || 'Start'} to ${clientEndDate || 'End'}`
+              : (clientMonthFilter === 'all' 
+                  ? 'All Months (All-Time)' 
+                  : (availableClientMonths.find(m => m.key === clientMonthFilter)?.label || clientMonthFilter));
 
             const totalRenewalPool = renewalsExpected + notRenewedExpected;
             const renewalPercent = totalRenewalPool > 0 ? Math.round((renewalsExpected / totalRenewalPool) * 100) : (renewalsCount > 0 ? 100 : 0);
@@ -4318,6 +5197,101 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
+                {/* Unified Lifecycle Status Filter Row across ALL clients */}
+                <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-400 mr-1">
+                        Lifecycle Status:
+                      </span>
+                      {[
+                        { key: 'all', label: 'All Clients', count: globalLifecycleCounts.all, color: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200' },
+                        { key: 'active', label: 'Active Plans', count: globalLifecycleCounts.active, color: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300' },
+                        { key: 'expiring_soon', label: 'Expiring Soon (7d)', count: globalLifecycleCounts.expiring_soon, color: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300' },
+                        { key: 'expired', label: 'Expired / Due', count: globalLifecycleCounts.expired, color: 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300' },
+                        { key: 'renewable', label: 'Renewable / Renewed', count: globalLifecycleCounts.renewable, color: 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300' },
+                        { key: 'inactive', label: 'Inactive Accounts', count: globalLifecycleCounts.inactive, color: 'bg-slate-100 dark:bg-slate-800 text-slate-500' }
+                      ].map(pill => {
+                        const isSelected = clientLifecycleFilter === pill.key;
+                        return (
+                          <button
+                            key={pill.key}
+                            onClick={() => {
+                              setClientLifecycleFilter(pill.key);
+                              if (pill.key !== 'all') {
+                                setClientFilterScope('all_clients');
+                              }
+                            }}
+                            className={`px-3 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${
+                              isSelected
+                                ? 'bg-blue-600 text-white shadow-sm'
+                                : 'bg-slate-50 dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                            }`}
+                          >
+                            <span>{pill.label}</span>
+                            <span className={`px-1.5 py-0.2 rounded-md text-[9px] font-black ${
+                              isSelected ? 'bg-white/20 text-white' : pill.color
+                            }`}>
+                              {pill.count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Scope Selector: All Clients (Global) vs Selected Month */}
+                    <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px] font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setClientFilterScope('all_clients')}
+                        className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                          clientFilterScope === 'all_clients'
+                            ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs font-black'
+                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                        }`}
+                        title="Search and filter across entire client base (all months)"
+                      >
+                        🌐 All Clients (Global)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setClientFilterScope('month')}
+                        className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                          clientFilterScope === 'month'
+                            ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs font-black'
+                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                        }`}
+                        title="Filter within the selected calendar month"
+                      >
+                        📅 Month Specific
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Active filter informational breadcrumb */}
+                  {clientLifecycleFilter !== 'all' && (
+                    <div className="flex items-center justify-between text-[11px] bg-blue-50/70 dark:bg-blue-950/30 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-900/40 text-blue-800 dark:text-blue-300">
+                      <span>
+                        Showing <strong>{
+                          clientLifecycleFilter === 'active' ? 'Active Plans' :
+                          clientLifecycleFilter === 'expiring_soon' ? 'Expiring Soon (Within 7 Days)' :
+                          clientLifecycleFilter === 'expired' ? 'Expired / Renewal Due' :
+                          clientLifecycleFilter === 'renewable' ? 'Renewable / Renewed Subscriptions' : 'Inactive Accounts'
+                        }</strong> from {clientFilterScope === 'all_clients' ? '🌐 All Clients in the agency (not restricted by month)' : `📅 ${currentMonthLabel}`}.
+                      </span>
+                      <button
+                        onClick={() => {
+                          setClientLifecycleFilter('all');
+                          setClientFilterScope('all_clients');
+                        }}
+                        className="font-bold underline hover:text-blue-950 dark:hover:text-white cursor-pointer ml-2"
+                      >
+                        Show All
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 {/* Action Toolbar with Filters */}
                 <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1 flex-wrap">
@@ -4336,7 +5310,7 @@ export default function AdminDashboard() {
                     <div className="flex items-center gap-1.5">
                       <select
                         value={clientMonthFilter}
-                        onChange={(e) => setClientMonthFilter(e.target.value)}
+                        onChange={(e) => handleMonthRangeChange(e.target.value, setClientMonthFilter, setClientStartDate, setClientEndDate)}
                         className="px-3 py-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-sm"
                       >
                         <option value="all">📅 All Months</option>
@@ -4346,6 +5320,39 @@ export default function AdminDashboard() {
                           </option>
                         ))}
                       </select>
+                    </div>
+
+                    {/* Date Range: Starting to Ending Date */}
+                    <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/80 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">From</span>
+                        <input
+                          type="date"
+                          value={clientStartDate}
+                          onChange={(e) => { setClientStartDate(e.target.value); setClientMonthFilter('custom'); }}
+                          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-inner"
+                        />
+                      </div>
+                      <span className="text-slate-400 font-bold text-xs">-</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">To</span>
+                        <input
+                          type="date"
+                          value={clientEndDate}
+                          onChange={(e) => { setClientEndDate(e.target.value); setClientMonthFilter('custom'); }}
+                          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-inner"
+                        />
+                      </div>
+                      {(clientStartDate || clientEndDate) && (
+                        <button
+                          onClick={() => { setClientStartDate(''); setClientEndDate(''); setClientMonthFilter('all'); }}
+                          className="ml-1 px-1.5 py-0.5 text-[10px] font-black text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition cursor-pointer"
+                          title="Clear Date Range"
+                        >
+                          ✕
+                        </button>
+                      )}
                     </div>
 
                     {/* Revenue Stream Filter Selector */}
@@ -4376,15 +5383,19 @@ export default function AdminDashboard() {
                       </select>
                     </div>
 
-                    {(clientMonthFilter !== 'all' || clientRevenueStreamFilter !== 'all' || clientPaymentFilter !== 'all' || searchQuery) && (
+                    {(clientMonthFilter !== 'all' || clientStartDate || clientEndDate || clientRevenueStreamFilter !== 'all' || clientPaymentFilter !== 'all' || clientLifecycleFilter !== 'all' || searchQuery) && (
                       <button
                         onClick={() => {
                           setClientMonthFilter('all');
+                          setClientStartDate('');
+                          setClientEndDate('');
                           setClientRevenueStreamFilter('all');
                           setClientPaymentFilter('all');
+                          setClientLifecycleFilter('all');
+                          setClientFilterScope('all_clients');
                           setSearchQuery('');
                         }}
-                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-semibold transition"
+                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-semibold transition cursor-pointer"
                       >
                         Reset
                       </button>
@@ -4403,14 +5414,14 @@ export default function AdminDashboard() {
                 {/* Table List */}
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="min-w-[850px] w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase tracking-wider">
                           <th className="p-4">ID</th>
                           <th className="p-4">Business / Client Name</th>
                           <th className="p-4">Service & Plan Stream</th>
                           <th className="p-4">Amount & Payment</th>
-                          <th className="p-4">Joined Date</th>
+                          <th className="p-4">Plan Cycle & Expiry</th>
                           <th className="p-4 text-center">Page Ready?</th>
                           <th className="p-4 text-center">Active?</th>
                           <th className="p-4 text-right">Actions</th>
@@ -4427,6 +5438,7 @@ export default function AdminDashboard() {
                           filteredClients.map((client) => {
                             const stream = getClientRevenueStream(client, clientMonthFilter);
                             const pInfo = getClientPaymentInfo(client);
+                            const planInfo = getClientPlanInfo(client);
                             return (
                               <tr key={client.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/40 transition">
                                 <td className="p-4 font-bold text-slate-450">{client.clientId}</td>
@@ -4440,6 +5452,14 @@ export default function AdminDashboard() {
                                     <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${stream.badgeClass}`}>
                                       {stream.badge}
                                     </span>
+                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/40">
+                                      {planInfo.durationLabel}
+                                    </span>
+                                    {planInfo.isRenewed && (
+                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40">
+                                        🔄 Cycle #{(client.renewalHistory?.length || 0) + 1}
+                                      </span>
+                                    )}
                                   </div>
                                   <div className="text-[9px] text-slate-400 mt-0.5">{client.packageName}</div>
                                 </td>
@@ -4461,18 +5481,37 @@ export default function AdminDashboard() {
                                     </div>
                                   )}
                                 </td>
-                              <td className="p-4 text-slate-500 font-medium">{client.joiningDate}</td>
-                              <td className="p-4 text-center">
-                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${client.accountReady ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600' : 'bg-red-50 dark:bg-red-950/40 text-red-600'}`}>
-                                  {client.accountReady ? 'Yes' : 'No'}
-                                </span>
-                              </td>
-                              <td className="p-4 text-center">
-                                <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase ${client.active ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
-                                  {client.active ? 'ACTIVE' : 'INACTIVE'}
-                                </span>
-                              </td>
-                              <td className="p-4 text-right">
+                                <td className="p-4">
+                                  <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
+                                    {client.joiningDate} → {planInfo.expiryDateStr}
+                                  </div>
+                                  <div className="mt-1 flex items-center gap-1.5">
+                                    {planInfo.isExpired ? (
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/50">
+                                        Expired ({Math.abs(planInfo.daysLeft)}d ago)
+                                      </span>
+                                    ) : planInfo.isExpiringSoon ? (
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50 animate-pulse">
+                                        ⚠️ {planInfo.daysLeft}d left (Due: {planInfo.renewalDueDateStr})
+                                      </span>
+                                    ) : (
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40">
+                                        ✓ {planInfo.daysLeft}d left (Due: {planInfo.renewalDueDateStr})
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="p-4 text-center">
+                                  <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${client.accountReady ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600' : 'bg-red-50 dark:bg-red-950/40 text-red-600'}`}>
+                                    {client.accountReady ? 'Yes' : 'No'}
+                                  </span>
+                                </td>
+                                <td className="p-4 text-center">
+                                  <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase ${client.active ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
+                                    {client.active ? 'ACTIVE' : 'INACTIVE'}
+                                  </span>
+                                </td>
+                                <td className="p-4 text-right">
                                 <div className="flex gap-2 justify-end">
                                   <button
                                     onClick={() => {
@@ -4540,7 +5579,7 @@ export default function AdminDashboard() {
               
               <div>
                 <h4 className="text-sm font-bold text-blue-600 dark:text-blue-400 mb-3 border-b border-slate-200 dark:border-slate-700 pb-2">Basic & Account Info</h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   <div><span className="text-slate-400 font-bold">Email:</span> <p className="font-semibold text-slate-900 dark:text-white">{selectedUser.email}</p></div>
                   <div><span className="text-slate-400 font-bold">Mobile:</span> <p className="font-semibold text-slate-900 dark:text-white">{selectedUser.mobile || 'N/A'}</p></div>
                   <div><span className="text-slate-400 font-bold">DOB:</span> <p className="font-semibold text-slate-900 dark:text-white">{selectedUser.dob || 'N/A'}</p></div>
@@ -4550,7 +5589,7 @@ export default function AdminDashboard() {
 
               <div>
                 <h4 className="text-sm font-bold text-blue-600 dark:text-blue-400 mb-3 border-b border-slate-200 dark:border-slate-700 pb-2">Employment Details</h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   <div><span className="text-slate-400 font-bold">Department:</span> <p className="font-semibold text-slate-900 dark:text-white">{selectedUser.department}</p></div>
                   <div><span className="text-slate-400 font-bold">Designation:</span> <p className="font-semibold text-slate-900 dark:text-white">{selectedUser.designation || 'N/A'}</p></div>
                   <div><span className="text-slate-400 font-bold">Status:</span> <p className="font-semibold text-slate-900 dark:text-white">{selectedUser.status}</p></div>
@@ -4628,7 +5667,7 @@ export default function AdminDashboard() {
 
                 <div>
                   <h4 className="text-sm font-bold text-blue-600 dark:text-blue-400 mb-3 border-b border-slate-200 dark:border-slate-700 pb-2">Basic & Account Info</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     <div className="space-y-1">
                       <label className="font-bold text-slate-700 dark:text-slate-300">Name *</label>
                       <input type="text" required value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g. Charlie Brown" className="w-full p-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none" />
@@ -4662,7 +5701,7 @@ export default function AdminDashboard() {
 
                 <div>
                   <h4 className="text-sm font-bold text-blue-600 dark:text-blue-400 mb-3 border-b border-slate-200 dark:border-slate-700 pb-2">Employment Details</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="space-y-1">
                       <label className="font-bold text-slate-700 dark:text-slate-300">Department</label>
                       <select value={formDept} onChange={(e) => setFormDept(e.target.value)} className="w-full p-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none">
@@ -4797,7 +5836,7 @@ export default function AdminDashboard() {
 
                 <div>
                   <h4 className="text-sm font-bold text-blue-600 dark:text-blue-400 mb-3 border-b border-slate-200 dark:border-slate-700 pb-2">Basic & Account Info</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     <div className="space-y-1">
                       <label className="font-bold text-slate-700 dark:text-slate-300">Name *</label>
                       <input type="text" required value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g. Charlie Brown" className="w-full p-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none" />
@@ -4840,7 +5879,7 @@ export default function AdminDashboard() {
 
                 <div>
                   <h4 className="text-sm font-bold text-blue-600 dark:text-blue-400 mb-3 border-b border-slate-200 dark:border-slate-700 pb-2">Employment Details</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="space-y-1">
                       <label className="font-bold text-slate-700 dark:text-slate-300">Department</label>
                       <select value={formDept} onChange={(e) => setFormDept(e.target.value)} className="w-full p-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none">
@@ -4996,7 +6035,7 @@ export default function AdminDashboard() {
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-300">Assign To</label>
                     <select
@@ -5073,7 +6112,7 @@ export default function AdminDashboard() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-350">Client ID (Auto Generated)</label>
                     <input
@@ -5097,7 +6136,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-350">Client Contact Person Name</label>
                     <input
@@ -5121,7 +6160,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-350">Services Category</label>
                     <select
@@ -5198,7 +6237,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-350">Contact Number</label>
                     <input
@@ -5231,7 +6270,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-350">Business Sector</label>
                     <input
@@ -5654,7 +6693,7 @@ export default function AdminDashboard() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-355">Client ID</label>
                     <input
@@ -5677,7 +6716,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-355">Client Contact Person Name</label>
                     <input
@@ -5699,7 +6738,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-355">Services Category</label>
                     <select
@@ -5774,7 +6813,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-355">Contact Number</label>
                     <input
@@ -5804,7 +6843,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-355">Business Sector</label>
                     <input
@@ -6312,13 +7351,13 @@ export default function AdminDashboard() {
 
                 {/* Tasks Table */}
                 <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900">
-                  <div className="max-h-60 overflow-y-auto">
+                  <div className="max-h-60 overflow-y-auto overflow-x-auto">
                     {loadingTasks ? (
                       <div className="p-8 text-center text-slate-400">Loading deliverables...</div>
                     ) : selectedClientTasks.length === 0 ? (
                       <div className="p-8 text-center text-slate-400 italic">No task deliverables created.</div>
                     ) : (
-                      <table className="w-full text-left text-[11px] border-collapse">
+                      <table className="min-w-[550px] w-full text-left text-[11px] border-collapse">
                         <thead>
                           <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800">
                             <th className="p-2.5">Date & ID</th>
@@ -6416,9 +7455,9 @@ export default function AdminDashboard() {
 
       {/* Edit Campaign Delivery Modal */}
       {showEditDeliveryModal && selectedDelivery && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm text-xs">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-scale-up">
-            <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm text-xs">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-scale-up max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900 shrink-0">
               <div>
                 <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">Edit Campaign Delivery</h4>
                 <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">ID: {selectedDelivery.deliveryId}</p>
@@ -6431,7 +7470,7 @@ export default function AdminDashboard() {
               </button>
             </div>
 
-            <form onSubmit={handleEditDelivery} className="p-6 space-y-4">
+            <form onSubmit={handleEditDelivery} className="p-6 space-y-4 overflow-y-auto flex-1">
               {formError && (
                 <div className="p-3 bg-red-50 dark:bg-red-950/20 text-red-650 rounded-xl font-semibold border border-red-200 dark:border-red-900">
                   {formError}
@@ -6445,7 +7484,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[9px] font-bold text-slate-400 uppercase">Post Type</label>
                   <div className="mt-1 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-600 dark:text-slate-400 font-semibold">

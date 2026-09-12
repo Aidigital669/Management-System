@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { cookies } from 'next/headers';
+import { getPlanDurationDays } from '@/lib/planUtils';
 
 const parseDbDate = (dateStr) => {
   if (!dateStr || typeof dateStr !== 'string') return null;
@@ -74,14 +75,15 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'Client not found' }, { status: 404 });
     }
 
-    // 1. Calculate new cycle start date
+    // 1. Calculate new cycle start date using plan duration (30, 90, 180, 365 days)
     const today = new Date();
     const currentStart = parseDbDate(client.joiningDate);
     let newStart = new Date(today);
+    const planDuration = getPlanDurationDays(client.packageName, client.requirement, client.services);
 
     if (currentStart) {
       const currentExpiry = new Date(currentStart);
-      currentExpiry.setDate(currentExpiry.getDate() + 30);
+      currentExpiry.setDate(currentExpiry.getDate() + planDuration);
       
       // If previous plan is still active, start new plan the day after expiry
       if (currentExpiry >= today) {
@@ -367,12 +369,12 @@ export async function POST(request, { params }) {
 
     // 5. Create Audit Log
     const newExpiry = new Date(newStart);
-    newExpiry.setDate(newExpiry.getDate() + 30);
+    newExpiry.setDate(newExpiry.getDate() + planDuration);
     const newExpiryStr = formatDateToDb(newExpiry);
 
     await prisma.auditLog.create({
       data: {
-        action: `Renewed plan for client: ${client.businessName} (New cycle: ${newStartStr} to ${newExpiryStr})`,
+        action: `Renewed plan for client: ${client.businessName} (New ${planDuration}-day cycle: ${newStartStr} to ${newExpiryStr})`,
         performedByName: requester.name,
         performedByRole: requester.role
       }

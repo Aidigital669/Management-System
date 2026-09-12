@@ -60,7 +60,7 @@ export default function CampaignDeliveriesTable({ deliveries = [] }) {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-sm text-left">
+        <table className="w-full min-w-[750px] text-sm text-left">
           <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="px-6 py-4 font-medium">Delivery ID</th>
