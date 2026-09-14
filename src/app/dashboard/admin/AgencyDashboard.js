@@ -19,7 +19,7 @@ import {
 import { calculateEmployeePerformance } from '@/lib/performanceUtils';
 import EmployeeTasksModal from './EmployeeTasksModal';
 
-export default function AgencyDashboard({ deliveries = [], clients = [], tasks = [], employees = [], attendance = [], feedbacks = [], onSelectTab }) {
+export default function AgencyDashboard({ deliveries = [], clients = [], tasks = [], employees = [], attendance = [], feedbacks = [], onSelectTab, refreshData }) {
   const [selectedEmployeeForTasks, setSelectedEmployeeForTasks] = useState(null);
   
   const activeClients = clients.filter(c => c.active).length;
@@ -1340,7 +1340,9 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
       {selectedEmployeeForTasks && (
         <EmployeeTasksModal
           employee={selectedEmployeeForTasks}
+          employees={employees}
           onClose={() => setSelectedEmployeeForTasks(null)}
+          onTaskTransferred={refreshData}
         />
       )}
 

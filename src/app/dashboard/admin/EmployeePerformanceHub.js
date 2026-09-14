@@ -34,7 +34,8 @@ export default function EmployeePerformanceHub({
   clientDeliveries = [],
   internalTasks = [],
   attendanceLogs = [],
-  feedbacks = []
+  feedbacks = [],
+  refreshData
 }) {
   const [selectedRole, setSelectedRole] = useState(ROLE_CATEGORIES.ALL);
   const [timeRange, setTimeRange] = useState('this_month');
@@ -415,7 +416,9 @@ export default function EmployeePerformanceHub({
       {activeEmployeeModal && (
         <EmployeeTasksModal
           employee={activeEmployeeModal}
+          employees={employees}
           onClose={() => setActiveEmployeeModal(null)}
+          onTaskTransferred={refreshData}
         />
       )}
 

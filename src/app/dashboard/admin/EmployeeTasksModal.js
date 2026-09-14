@@ -14,29 +14,72 @@ import {
   TrendingUp,
   FileText,
   User,
-  Sparkles
+  Sparkles,
+  ArrowRightLeft,
+  Check,
+  Loader2,
+  UserCheck
 } from 'lucide-react';
 
-export default function EmployeeTasksModal({ employee, onClose }) {
+export default function EmployeeTasksModal({ employee, employees = [], onClose, onTaskTransferred }) {
   const [activeTab, setActiveTab] = useState('ALL'); // 'ALL' | 'OVERDUE' | 'IN_PROGRESS' | 'COMPLETED'
   const [taskTypeFilter, setTaskTypeFilter] = useState('ALL'); // 'ALL' | 'Client Task' | 'Delivery' | 'Internal Task'
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('tasks'); // 'tasks' | 'scorecard'
   const [mounted, setMounted] = useState(false);
 
+  // Task Transfer States
+  const [localTasks, setLocalTasks] = useState(employee?.allTasksList || []);
+  const [staffList, setStaffList] = useState(employees || []);
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [taskToTransfer, setTaskToTransfer] = useState(null); // null = bulk transfer of filtered tasks
+  const [selectedStaff, setSelectedStaff] = useState(null);
+  const [staffSearchQuery, setStaffSearchQuery] = useState('');
+  const [isTransferring, setIsTransferring] = useState(false);
+  const [transferFeedback, setTransferFeedback] = useState(null);
+
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
+    if (employee?.allTasksList) {
+      setLocalTasks(employee.allTasksList);
+    }
+  }, [employee]);
+
+  useEffect(() => {
+    if (employees && employees.length > 0) {
+      setStaffList(employees);
+    } else {
+      fetch('/api/users')
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setStaffList(data);
+          else if (data?.users) setStaffList(data.users);
+        })
+        .catch(() => {});
+    }
+  }, [employees]);
+
+  useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        if (transferModalOpen) {
+          setTransferModalOpen(false);
+          setTaskToTransfer(null);
+          setSelectedStaff(null);
+          setTransferFeedback(null);
+        } else {
+          onClose();
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, transferModalOpen]);
 
-  const allTasks = employee?.allTasksList || [];
+  const allTasks = localTasks;
 
   // Filter tasks - Hook called unconditionally on every render
   const filteredTasks = useMemo(() => {
@@ -64,9 +107,108 @@ export default function EmployeeTasksModal({ employee, onClose }) {
     });
   }, [allTasks, activeTab, taskTypeFilter, searchQuery, employee]);
 
+  // Filter staff list for transfer selector
+  const filteredStaffList = useMemo(() => {
+    const currentName = (employee?.name || '').toLowerCase().trim();
+    const list = staffList.filter(s => s && s.name && s.name.toLowerCase().trim() !== currentName);
+    if (!staffSearchQuery.trim()) return list;
+    const q = staffSearchQuery.toLowerCase();
+    return list.filter(s => 
+      (s.name || '').toLowerCase().includes(q) ||
+      (s.department || '').toLowerCase().includes(q) ||
+      (s.designation || '').toLowerCase().includes(q) ||
+      (s.role || '').toLowerCase().includes(q)
+    );
+  }, [staffList, staffSearchQuery, employee]);
+
   const overdueCount = allTasks.filter(t => t.status === 'Overdue').length;
   const completedCount = allTasks.filter(t => t.status === 'Completed' || t.status === 'Delivered').length;
   const inProgressCount = allTasks.length - overdueCount - completedCount;
+
+  // Handler to open transfer popup
+  const handleOpenTransferModal = (task) => {
+    setTaskToTransfer(task);
+    setSelectedStaff(null);
+    setStaffSearchQuery('');
+    setTransferFeedback(null);
+    setTransferModalOpen(true);
+  };
+
+  // Handler to submit transfer
+  const handleConfirmTransfer = async () => {
+    if (!selectedStaff) return;
+    setIsTransferring(true);
+    setTransferFeedback(null);
+
+    try {
+      let payload = {};
+      if (taskToTransfer) {
+        // Single task transfer
+        payload = {
+          taskId: taskToTransfer.taskId,
+          rawId: taskToTransfer.rawId,
+          taskType: taskToTransfer.type || taskToTransfer.rawType,
+          targetUserId: selectedStaff.id,
+          targetUserName: selectedStaff.name
+        };
+      } else {
+        // Bulk transfer of currently filtered tasks
+        payload = {
+          tasks: filteredTasks.map(t => ({
+            taskId: t.taskId,
+            rawId: t.rawId,
+            taskType: t.type || t.rawType
+          })),
+          fromUserName: employee.name,
+          targetUserId: selectedStaff.id,
+          targetUserName: selectedStaff.name
+        };
+      }
+
+      const res = await fetch('/api/admin/tasks/transfer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to transfer task(s)');
+      }
+
+      // Update local state immediately so transferred tasks disappear from this employee's list
+      if (taskToTransfer) {
+        setLocalTasks(prev => prev.filter(t => t.id !== taskToTransfer.id));
+      } else {
+        const transferredIds = new Set(filteredTasks.map(t => t.id));
+        setLocalTasks(prev => prev.filter(t => !transferredIds.has(t.id)));
+      }
+
+      setTransferFeedback({
+        type: 'success',
+        message: data.message || `Successfully transferred to ${selectedStaff.name}!`
+      });
+
+      if (onTaskTransferred) {
+        onTaskTransferred();
+      }
+
+      setTimeout(() => {
+        setTransferModalOpen(false);
+        setTaskToTransfer(null);
+        setSelectedStaff(null);
+        setTransferFeedback(null);
+      }, 1200);
+
+    } catch (err) {
+      setTransferFeedback({
+        type: 'error',
+        message: err.message || 'An error occurred while transferring the task.'
+      });
+    } finally {
+      setIsTransferring(false);
+    }
+  };
 
   // Unconditional render guard placed AFTER all hooks have executed
   if (!employee || !mounted || typeof document === 'undefined') return null;
@@ -76,7 +218,7 @@ export default function EmployeeTasksModal({ employee, onClose }) {
       className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-5 md:p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in"
       style={{ zIndex: 999999 }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget && !transferModalOpen) onClose();
       }}
     >
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-5xl lg:max-w-6xl max-h-[92vh] flex flex-col overflow-hidden relative">
@@ -163,8 +305,8 @@ export default function EmployeeTasksModal({ employee, onClose }) {
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      Total Tasks
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      All Tasks
                     </span>
                     <Layers className="w-4 h-4 text-indigo-500" />
                   </div>
@@ -184,7 +326,7 @@ export default function EmployeeTasksModal({ employee, onClose }) {
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-red-500">
+                    <span className="text-xs font-bold uppercase tracking-wider text-red-600 dark:text-red-400">
                       Overdue
                     </span>
                     <AlertTriangle className="w-4 h-4 text-red-500" />
@@ -205,7 +347,7 @@ export default function EmployeeTasksModal({ employee, onClose }) {
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-orange-500">
+                    <span className="text-xs font-bold uppercase tracking-wider text-orange-600 dark:text-orange-400">
                       In Progress
                     </span>
                     <Clock className="w-4 h-4 text-orange-500" />
@@ -226,7 +368,7 @@ export default function EmployeeTasksModal({ employee, onClose }) {
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                       Completed
                     </span>
                     <CheckCircle2 className="w-4 h-4 text-emerald-500" />
@@ -238,7 +380,7 @@ export default function EmployeeTasksModal({ employee, onClose }) {
 
               </div>
 
-              {/* 2. Filter Bar & Search Box */}
+              {/* 2. Filter Bar, Search Box & Transfer Action */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800/50 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 shrink-0">
@@ -257,22 +399,40 @@ export default function EmployeeTasksModal({ employee, onClose }) {
                   </select>
                 </div>
 
-                <div className="relative flex-grow max-w-sm">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    placeholder={`Search ${employee.name}'s tasks by client, title, ID...`}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-4 py-1.5 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
+                <div className="flex items-center gap-2.5 flex-grow max-w-lg">
+                  <div className="relative flex-grow">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder={`Search ${employee.name}'s tasks by client, title, ID...`}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-4 py-1.5 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  {/* Bulk Transfer Button */}
+                  <button
+                    type="button"
+                    disabled={filteredTasks.length === 0}
+                    onClick={() => handleOpenTransferModal(null)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-xs shrink-0 cursor-pointer ${
+                      filteredTasks.length === 0
+                        ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white active:scale-95'
+                    }`}
+                    title={`Transfer all ${filteredTasks.length} filtered tasks to another staff member`}
+                  >
+                    <ArrowRightLeft className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Transfer Filtered</span> ({filteredTasks.length})
+                  </button>
                 </div>
               </div>
 
               {/* 3. Filtered Tasks Table */}
               <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs">
                 <div className="overflow-x-auto">
-                  <table className="min-w-[700px] w-full text-left text-sm border-collapse">
+                  <table className="min-w-[750px] w-full text-left text-sm border-collapse">
                     <thead>
                       <tr className="bg-slate-50 dark:bg-slate-800/80 text-slate-400 font-bold border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase tracking-wider">
                         <th className="p-3.5 pl-5">Task Details</th>
@@ -281,7 +441,7 @@ export default function EmployeeTasksModal({ employee, onClose }) {
                         <th className="p-3.5 text-center">Due Date</th>
                         <th className="p-3.5 text-center">Priority</th>
                         <th className="p-3.5 text-center">Status</th>
-                        <th className="p-3.5 pr-5 text-right">Work Sample</th>
+                        <th className="p-3.5 pr-5 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -364,21 +524,30 @@ export default function EmployeeTasksModal({ employee, onClose }) {
                                 </span>
                               </td>
 
-                              {/* Work Sample / External Link */}
+                              {/* Actions: Work Sample + Transfer Button */}
                               <td className="p-3.5 pr-5 text-right">
-                                {t.workSampleUrl ? (
-                                  <a
-                                    href={t.workSampleUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                                <div className="inline-flex items-center justify-end gap-2">
+                                  {t.workSampleUrl && (
+                                    <a
+                                      href={t.workSampleUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline mr-1"
+                                      title="View Work Sample"
+                                    >
+                                      <ExternalLink className="w-3.5 h-3.5" />
+                                    </a>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenTransferModal(t)}
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800 transition cursor-pointer shadow-2xs active:scale-95"
+                                    title={`Transfer this task from ${employee.name} to another staff member`}
                                   >
-                                    View Work
-                                    <ExternalLink className="w-3 h-3" />
-                                  </a>
-                                ) : (
-                                  <span className="text-[11px] text-slate-400">-</span>
-                                )}
+                                    <ArrowRightLeft className="w-3 h-3 text-indigo-500" />
+                                    Transfer
+                                  </button>
+                                </div>
                               </td>
 
                             </tr>
@@ -393,33 +562,44 @@ export default function EmployeeTasksModal({ employee, onClose }) {
           ) : (
             /* Scorecard View */
             <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-4 bg-indigo-50/70 dark:bg-indigo-950/30 rounded-2xl border border-indigo-200 dark:border-indigo-800/80">
+                <div className="flex items-center gap-2 text-indigo-900 dark:text-indigo-300 font-extrabold text-sm mb-1">
+                  <Sparkles className="w-4 h-4 text-indigo-500" />
+                  Scorecard Calculation Formula
+                </div>
+                <p className="text-xs text-indigo-700 dark:text-indigo-400 leading-relaxed font-medium">
+                  The composite score of <strong>{employee.compositeScore}/100</strong> is weighted from four core performance pillars:
+                  On-Time Delivery (40%), Task Volume (30%), Attendance & Punctuality (15%), and Quality/Client Approvals (15%).
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 
-                {/* 1. Timeliness */}
+                {/* 1. On-Time Delivery */}
                 <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700/60">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                       <Clock className="w-4 h-4 text-indigo-500" />
-                      1. On-Time Delivery Rate (40% Weight)
+                      1. On-Time Delivery (40% Weight)
                     </span>
                     <span className="text-sm font-black text-slate-900 dark:text-white">
                       {employee.onTimeRate}%
                     </span>
                   </div>
                   <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden mb-2">
-                    <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${employee.onTimeRate}%` }}></div>
+                    <div className="bg-indigo-600 h-2 rounded-full" style={{ width: `${employee.onTimeRate}%` }}></div>
                   </div>
                   <div className="text-[11px] text-slate-400 font-medium">
-                    Completed On-Time: {employee.completedOnTime} | Overdue Penalty: -{employee.overdueCount * 5}%
+                    {employee.completedOnTime} completed on schedule vs {employee.completedLate} delivered late.
                   </div>
                 </div>
 
-                {/* 2. Completion */}
+                {/* 2. Volume Completion */}
                 <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700/60">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                      2. Completion & Volume (30% Weight)
+                      <TrendingUp className="w-4 h-4 text-emerald-500" />
+                      2. Volume Completion (30% Weight)
                     </span>
                     <span className="text-sm font-black text-slate-900 dark:text-white">
                       {employee.completionRate}%
@@ -429,7 +609,7 @@ export default function EmployeeTasksModal({ employee, onClose }) {
                     <div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${employee.completionRate}%` }}></div>
                   </div>
                   <div className="text-[11px] text-slate-400 font-medium">
-                    Finished {employee.completedCount} out of {employee.totalAssigned} deliverables.
+                    {employee.completedTasks} completed out of {employee.totalAssigned} assigned work items.
                   </div>
                 </div>
 
@@ -437,18 +617,18 @@ export default function EmployeeTasksModal({ employee, onClose }) {
                 <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700/60">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                      <User className="w-4 h-4 text-amber-500" />
-                      3. Attendance & Punctuality (15% Weight)
+                      <Calendar className="w-4 h-4 text-purple-500" />
+                      3. Attendance & Reliability (15% Weight)
                     </span>
                     <span className="text-sm font-black text-slate-900 dark:text-white">
                       {employee.attendanceScore}%
                     </span>
                   </div>
                   <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden mb-2">
-                    <div className="bg-amber-500 h-2 rounded-full" style={{ width: `${employee.attendanceScore}%` }}></div>
+                    <div className="bg-purple-500 h-2 rounded-full" style={{ width: `${employee.attendanceScore}%` }}></div>
                   </div>
                   <div className="text-[11px] text-slate-400 font-medium">
-                    Present: {employee.attendanceSummary?.presentDays || 0} days | Late: {employee.attendanceSummary?.lateDays || 0}
+                    {employee.presentDays} active present days recorded in this timeframe.
                   </div>
                 </div>
 
@@ -492,8 +672,188 @@ export default function EmployeeTasksModal({ employee, onClose }) {
         </div>
 
       </div>
+
+      {/* Pop-up Transfer Task Dialog */}
+      {transferModalOpen && (
+        <div
+          className="fixed inset-0 z-[1000000] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isTransferring) {
+              setTransferModalOpen(false);
+              setTaskToTransfer(null);
+            }
+          }}
+        >
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl flex flex-col max-h-[88vh] overflow-hidden">
+            
+            {/* Transfer Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                  <ArrowRightLeft className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-base font-black text-slate-900 dark:text-white">
+                    {taskToTransfer ? 'Transfer Single Task' : `Bulk Transfer Tasks (${filteredTasks.length})`}
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                    Reassign from <span className="font-bold text-slate-700 dark:text-slate-200">{employee.name}</span> to another employee or TL
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isTransferring}
+                onClick={() => {
+                  setTransferModalOpen(false);
+                  setTaskToTransfer(null);
+                }}
+                className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Task Summary Box */}
+            <div className="mt-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 text-xs shrink-0">
+              {taskToTransfer ? (
+                <div className="space-y-1">
+                  <div className="font-bold text-slate-900 dark:text-white line-clamp-1">
+                    {taskToTransfer.title}
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-[11px] flex-wrap">
+                    <span>Client: <strong className="text-slate-700 dark:text-slate-200">{taskToTransfer.client}</strong></span>
+                    <span>•</span>
+                    <span>ID: <strong className="font-mono">{taskToTransfer.taskId}</strong></span>
+                    <span>•</span>
+                    <span>Due: <strong>{taskToTransfer.date || 'N/A'}</strong></span>
+                  </div>
+                </div>
+              ) : (
+                <div className="font-bold text-indigo-600 dark:text-indigo-400">
+                  Transferring all {filteredTasks.length} currently filtered tasks of {employee.name}
+                </div>
+              )}
+            </div>
+
+            {/* Staff Search Box */}
+            <div className="mt-4 relative shrink-0">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search staff by name, role, department..."
+                value={staffSearchQuery}
+                onChange={(e) => setStaffSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
+            {/* Staff Selection List */}
+            <div className="mt-3 overflow-y-auto flex-grow max-h-[260px] space-y-1.5 pr-1 divide-y divide-slate-100 dark:divide-slate-800/40">
+              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                Choose New Staff Member ({filteredStaffList.length}):
+              </div>
+              {filteredStaffList.length === 0 ? (
+                <div className="p-4 text-center text-xs text-slate-400 font-medium">
+                  No staff members match the search.
+                </div>
+              ) : (
+                filteredStaffList.map((staff) => {
+                  const isSelected = selectedStaff?.id === staff.id;
+                  return (
+                    <button
+                      key={staff.id}
+                      type="button"
+                      onClick={() => setSelectedStaff(staff)}
+                      className={`w-full p-2.5 rounded-xl border text-left flex items-center justify-between transition cursor-pointer ${
+                        isSelected
+                          ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-400 dark:border-indigo-600 shadow-xs'
+                          : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-850'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                          {staff.name.charAt(0)}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                            {staff.name}
+                          </div>
+                          <div className="text-[10px] text-slate-400 truncate">
+                            {staff.department || 'Staff'} {staff.designation ? `• ${staff.designation}` : ''}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="px-2 py-0.5 rounded text-[9px] font-extrabold uppercase bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                          {staff.role}
+                        </span>
+                        {isSelected && (
+                          <div className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center">
+                            <Check className="w-3 h-3" />
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Feedback Message */}
+            {transferFeedback && (
+              <div className={`mt-3 p-3 rounded-xl text-xs font-bold shrink-0 ${
+                transferFeedback.type === 'success'
+                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                  : 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400 border border-red-200 dark:border-red-800'
+              }`}>
+                {transferFeedback.message}
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2 shrink-0">
+              <button
+                type="button"
+                disabled={isTransferring}
+                onClick={() => {
+                  setTransferModalOpen(false);
+                  setTaskToTransfer(null);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!selectedStaff || isTransferring}
+                onClick={handleConfirmTransfer}
+                className={`px-5 py-2 rounded-xl text-xs font-bold text-white transition flex items-center gap-1.5 shadow-sm cursor-pointer ${
+                  !selectedStaff || isTransferring
+                    ? 'bg-indigo-300 dark:bg-indigo-900/50 cursor-not-allowed'
+                    : 'bg-indigo-600 hover:bg-indigo-700 active:scale-95'
+                }`}
+              >
+                {isTransferring ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Transferring...
+                  </>
+                ) : (
+                  <>
+                    <ArrowRightLeft className="w-3.5 h-3.5" />
+                    {selectedStaff ? `Transfer to ${selectedStaff.name}` : 'Choose Staff'}
+                  </>
+                )}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>,
     document.body
   );
 }
-

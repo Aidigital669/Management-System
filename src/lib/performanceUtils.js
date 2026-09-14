@@ -178,7 +178,11 @@ export function calculateEmployeePerformance({
 
       const taskItem = {
         id: `ct-${t.id || t.taskId}`,
+        rawId: t.id,
         taskId: t.taskId,
+        rawType: 'ClientTask',
+        workingOn: t.workingOn,
+        assignTo: t.assignTo,
         title: t.taskTitle,
         client: t.businessName || t.clientId,
         clientId: t.clientId,
@@ -236,7 +240,10 @@ export function calculateEmployeePerformance({
 
       const deliveryItem = {
         id: `cd-${d.id || d.deliveryId}`,
+        rawId: d.id,
         taskId: d.deliveryId,
+        rawType: 'ClientDelivery',
+        workingOn: d.workingOn,
         title: `${d.postType || 'Delivery'} for ${d.clientName || d.clientId}`,
         client: d.clientName || d.clientId,
         clientId: d.clientId,
@@ -281,7 +288,11 @@ export function calculateEmployeePerformance({
 
       const internalItem = {
         id: `it-${t.id}`,
+        rawId: t.id,
         taskId: `INT-${t.id}`,
+        rawType: 'Task',
+        workingOn: t.workingOn || t.assignedTo?.name,
+        assignedToId: t.assignedToId,
         title: t.title,
         client: 'Internal Duties',
         clientId: 'INTERNAL',
@@ -291,7 +302,8 @@ export function calculateEmployeePerformance({
         priority: t.priority || 'Normal',
         status: normalizedStatus,
         rawStatus: t.status,
-        workSampleUrl: t.workSampleUrl
+        workSampleUrl: t.workSampleUrl,
+        notes: t.description
       };
 
       allTasksList.push(internalItem);

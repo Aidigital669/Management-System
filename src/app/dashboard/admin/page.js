@@ -2212,6 +2212,7 @@ export default function AdminDashboard() {
               attendance={attendanceLogs}
               feedbacks={feedbacksList}
               onSelectTab={handleSelectTab}
+              refreshData={refreshData}
             />
           )}
 
@@ -2224,6 +2225,7 @@ export default function AdminDashboard() {
               internalTasks={tasksList}
               attendanceLogs={attendanceLogs}
               feedbacks={feedbacksList}
+              refreshData={refreshData}
             />
           )}
 
