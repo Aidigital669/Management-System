@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import { 
   Users, DollarSign, FileText, CheckCircle, Clock, Truck, FileCheck, Target,
-  ChevronDown, ChevronUp, BarChart2, AlertCircle, Layers, RefreshCw, AlertTriangle, TrendingUp, Tag
+  ChevronDown, ChevronUp, BarChart2, AlertCircle, Layers, RefreshCw, AlertTriangle, TrendingUp, Tag,
+  Award, Trophy, Star, Sparkles, ChevronRight
 } from 'lucide-react';
 import {
   parseDbDate,
@@ -15,8 +16,11 @@ import {
   getClientRevenueStream,
   getClientMonthKey
 } from '@/lib/planUtils';
+import { calculateEmployeePerformance } from '@/lib/performanceUtils';
+import EmployeeTasksModal from './EmployeeTasksModal';
 
-export default function AgencyDashboard({ deliveries = [], clients = [], tasks = [] }) {
+export default function AgencyDashboard({ deliveries = [], clients = [], tasks = [], employees = [], attendance = [], feedbacks = [], onSelectTab }) {
+  const [selectedEmployeeForTasks, setSelectedEmployeeForTasks] = useState(null);
   
   const activeClients = clients.filter(c => c.active).length;
   const totalClients = clients.length;
@@ -403,6 +407,20 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
   const employeeData = Object.values(empMap)
     .filter(emp => !NON_EMPLOYEE_NAMES.includes(emp.name.trim().toLowerCase()))
     .sort((a, b) => b.total - a.total);
+
+  // Synthesize employees for performance calculation if full employee records not provided
+  const employeesToEvaluate = employees && employees.length > 0
+    ? employees
+    : employeeData.map((e, idx) => ({ id: idx + 1, name: e.name, department: 'General', designation: 'Specialist', status: 'ACTIVE' }));
+
+  const performanceOverview = calculateEmployeePerformance({
+    employees: employeesToEvaluate,
+    clientTasks: tasks,
+    clientDeliveries: deliveries,
+    attendanceLogs: attendance,
+    feedbacks,
+    timeRange: 'this_month'
+  });
 
   // Sum up actual employee stats from rows
   const employeeTaskDone = employeeData.reduce((sum, emp) => sum + emp.done, 0);
@@ -1025,57 +1043,132 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
         {/* Employee Tracker Table */}
         <div className="lg:col-span-8 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
           <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-850/50">
-            <h4 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-              <Users className="w-5 h-5 text-indigo-500" />
-              Employee Task Tracker
-            </h4>
-            <div className="flex gap-4 text-xs font-bold text-slate-500">
-              <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> Done ({topLevelMetrics.employeeTaskDone})</span>
-              <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-orange-500"></div> Pending ({topLevelMetrics.employeeTaskPending})</span>
+            <div>
+              <h4 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                <Users className="w-5 h-5 text-indigo-500" />
+                Employee Performance & Task Tracker
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                Live performance ratings based on on-time delivery, output volume, and attendance.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              {onSelectTab && (
+                <button
+                  type="button"
+                  onClick={() => onSelectTab('employee-performance')}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 text-xs font-bold rounded-xl transition border border-indigo-200 dark:border-indigo-800"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                  Full Performance Hub
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           </div>
           
           <div className="overflow-x-auto">
-            <table className="min-w-[520px] w-full text-left text-sm border-collapse">
+            <table className="min-w-[620px] w-full text-left text-sm border-collapse">
               <thead>
                 <tr className="bg-white dark:bg-slate-900 text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800 text-[10px] uppercase tracking-wider">
                   <th className="p-4 pl-6">Employee</th>
-                  <th className="p-4 text-center">Pending Tasks</th>
+                  <th className="p-4 text-center">Score</th>
+                  <th className="p-4 text-center">On-Time</th>
+                  <th className="p-4 text-center">Pending</th>
                   <th className="p-4 text-center">Completed</th>
-                  <th className="p-4 pr-6 text-right">Total Assigned</th>
+                  <th className="p-4 text-center">Overdue</th>
+                  <th className="p-4 pr-6 text-right">Tasks Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
-                {employeeData.length === 0 ? (
+                {(performanceOverview.employees.length === 0 && employeeData.length === 0) ? (
                   <tr>
-                    <td colSpan={4} className="p-8 text-center text-slate-400 font-medium">
+                    <td colSpan={7} className="p-8 text-center text-slate-400 font-medium">
                       No active employee tracking data found
                     </td>
                   </tr>
                 ) : (
-                  employeeData.map((emp, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/40 transition">
-                      <td className="p-4 pl-6 font-bold text-slate-900 dark:text-white flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900 dark:to-purple-900 text-indigo-700 dark:text-indigo-300 flex items-center justify-center text-xs border border-indigo-200 dark:border-indigo-800">
-                          {emp.name.charAt(0)}
-                        </div>
-                        {emp.name}
-                      </td>
-                      <td className="p-4 text-center">
-                        <span className={`inline-block px-3 py-1 font-bold rounded-lg min-w-[3rem] ${emp.pending > 30 ? 'bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400' : 'bg-orange-50 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400'}`}>
-                          {emp.pending}
-                        </span>
-                      </td>
-                      <td className="p-4 text-center">
-                        <span className="inline-block px-3 py-1 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 font-bold rounded-lg min-w-[3rem]">
-                          {emp.done}
-                        </span>
-                      </td>
-                      <td className="p-4 pr-6 text-right font-extrabold text-slate-700 dark:text-slate-300">
-                        {emp.total}
-                      </td>
-                    </tr>
-                  ))
+                  (performanceOverview.employees.length > 0 ? performanceOverview.employees : employeeData).map((emp, idx) => {
+                    const score = emp.compositeScore ?? (emp.total > 0 ? Math.round((emp.done / emp.total) * 100) : 0);
+                    const tierBadge = emp.tier?.badge ?? (score >= 80 ? '🌟 Star' : score >= 60 ? '🟢 High' : '🟡 Average');
+                    const tierBadgeColor = emp.tier?.badgeColor ?? 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                    const onTimeRate = emp.onTimeRate ?? (emp.total > 0 ? Math.round((emp.done / emp.total) * 100) : 100);
+                    const pendingCount = emp.inProgressCount ?? emp.pending ?? 0;
+                    const doneCount = emp.completedCount ?? emp.done ?? 0;
+                    const overdueCount = emp.overdueCount ?? 0;
+                    const totalTasksCount = emp.allTasksList ? emp.allTasksList.length : (emp.totalAssigned || emp.total || 0);
+
+                    return (
+                      <tr
+                        key={emp.id ? `emp-row-${emp.id}-${idx}` : `emp-row-${emp.name}-${idx}`}
+                        onClick={() => setSelectedEmployeeForTasks(emp)}
+                        className="hover:bg-indigo-50/40 dark:hover:bg-slate-800/60 transition cursor-pointer group"
+                        title="Click to view all tasks filtered for this employee"
+                      >
+                        <td className="p-4 pl-6 font-bold text-slate-900 dark:text-white flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900 dark:to-purple-900 text-indigo-700 dark:text-indigo-300 flex items-center justify-center text-xs border border-indigo-200 dark:border-indigo-800 group-hover:scale-105 transition-transform">
+                            {emp.name.charAt(0)}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">{emp.name}</span>
+                              <span className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-black border ${tierBadgeColor}`}>
+                                {tierBadge}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-normal">
+                              {emp.department || 'Specialist'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-4 text-center">
+                          <div className="inline-flex items-baseline gap-0.5">
+                            <span className="font-black text-xs text-slate-900 dark:text-white">{score}</span>
+                            <span className="text-[9px] text-slate-400">/100</span>
+                          </div>
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className={`inline-block px-2 py-0.5 font-extrabold text-xs rounded-lg ${onTimeRate >= 80 ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40' : 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40'}`}>
+                            {onTimeRate}%
+                          </span>
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className={`inline-block px-2.5 py-0.5 font-bold rounded-lg text-xs ${pendingCount > 20 ? 'bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400' : 'bg-orange-50 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400'}`}>
+                            {pendingCount}
+                          </span>
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className="inline-block px-2.5 py-0.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 font-bold rounded-lg text-xs">
+                            {doneCount}
+                          </span>
+                        </td>
+                        <td className="p-4 text-center">
+                          {overdueCount > 0 ? (
+                            <span className="inline-block px-2 py-0.5 bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400 font-black text-[11px] rounded-md border border-red-200 dark:border-red-900">
+                              {overdueCount} Overdue
+                            </span>
+                          ) : (
+                            <span className="text-xs font-bold text-slate-400">0</span>
+                          )}
+                        </td>
+                        <td className="p-4 pr-6 text-right">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedEmployeeForTasks(emp);
+                            }}
+                            className="px-2.5 py-1 text-[11px] font-bold rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 transition shadow-xs inline-flex items-center gap-1.5"
+                          >
+                            <span>Tasks</span>
+                            <span className="bg-indigo-200/70 dark:bg-indigo-800 text-indigo-800 dark:text-indigo-200 px-1.5 py-0.2 rounded-full text-[10px] font-black">
+                              {totalTasksCount}
+                            </span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -1210,11 +1303,46 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {todayEmployeeList.map((emp) => (
-              <EmployeeTaskCard key={emp.name} emp={emp} />
+              <EmployeeTaskCard
+                key={emp.name}
+                emp={emp}
+                onOpenTasksModal={(employeeCard) => {
+                  const matched = performanceOverview.employees.find(e => e.name.toLowerCase() === employeeCard.name.toLowerCase());
+                  if (matched) {
+                    setSelectedEmployeeForTasks(matched);
+                  } else {
+                    setSelectedEmployeeForTasks({
+                      name: employeeCard.name,
+                      department: 'Specialist',
+                      designation: 'Specialist',
+                      allTasksList: employeeCard.tasks.map(t => ({
+                        id: t.id || t.taskId || t.deliveryId,
+                        taskId: t.taskId || t.deliveryId || `T-${t.id}`,
+                        title: t.taskTitle || t.postType || 'Task',
+                        client: t.businessName || t.clientName || t.clientId,
+                        date: t.date || t.postDate || t.dueDate,
+                        type: t._type === 'delivery' ? 'Delivery' : 'Client Task',
+                        category: t.postType || t.service || 'Creative Work',
+                        priority: t.priority || 'Normal',
+                        status: t.status === 'DONE' || t.status === 'Delivered' || t.status === 'Completed' ? 'Completed' : (t.overdue ? 'Overdue' : 'Working On It'),
+                        workSampleUrl: t.workSampleUrl
+                      }))
+                    });
+                  }
+                }}
+              />
             ))}
           </div>
         )}
       </div>
+
+      {/* Employee Total Tasks Filtered Modal */}
+      {selectedEmployeeForTasks && (
+        <EmployeeTasksModal
+          employee={selectedEmployeeForTasks}
+          onClose={() => setSelectedEmployeeForTasks(null)}
+        />
+      )}
 
     </div>
   );
@@ -1231,16 +1359,18 @@ const STATUS_CONFIG = {
   'Client Review':{ label: 'Client Review',color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',      dot: 'bg-amber-500'  },
   'Revision':    { label: 'Revision',    color: 'bg-red-105 text-red-700 dark:bg-red-900/40 dark:text-red-300',              dot: 'bg-red-500'    },
   'Completion':  { label: 'Posted / Completed', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300', dot: 'bg-emerald-500' },
-  'Overdue':     { label: 'Overdue',     color: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',          dot: 'bg-rose-500'   },
+  'Overdue':     { label: 'Overdue',     color: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',           dot: 'bg-rose-500'   },
+  'Approval':    { label: 'Approval',    color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',     dot: 'bg-purple-500' },
 };
 
 const PRIORITY_CONFIG = {
-  'High':   { color: 'text-red-500',    bg: 'bg-red-50 dark:bg-red-900/30'    },
+  'Urgent': { color: 'text-rose-600',   bg: 'bg-rose-50 dark:bg-rose-900/30'   },
+  'High':   { color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-900/30' },
   'Normal': { color: 'text-slate-500',  bg: 'bg-slate-50 dark:bg-slate-800'   },
   'Low':    { color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-900/30' },
 };
 
-function EmployeeTaskCard({ emp }) {
+function EmployeeTaskCard({ emp, onOpenTasksModal }) {
   const [expanded, setExpanded] = useState(true);
   const completionPct = emp.tasks.length > 0 ? Math.round((emp.done / emp.tasks.length) * 100) : 0;
 
@@ -1282,6 +1412,19 @@ function EmployeeTaskCard({ emp }) {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          {onOpenTasksModal && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenTasksModal(emp);
+              }}
+              className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800 transition shadow-xs"
+              title={`View all tasks for ${emp.name}`}
+            >
+              All Tasks
+            </button>
+          )}
           <span className="text-xs font-black text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-lg">{emp.tasks.length}</span>
           {expanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
         </div>

@@ -6,7 +6,9 @@ import AgencyDashboard from './AgencyDashboard';
 import CampaignDeliveriesTable from './CampaignDeliveriesTable';
 import AdminSellerDashboard from './AdminSellerDashboard';
 import ClientOnboardingInspector from '../employee/ClientOnboardingInspector';
+import EmployeePerformanceHub from './EmployeePerformanceHub';
 import {
+  Award,
   Users,
   CheckSquare,
   Clock,
@@ -1960,6 +1962,18 @@ export default function AdminDashboard() {
             </button>
 
             <button
+              onClick={() => handleSelectTab('employee-performance')}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
+                activeTab === 'employee-performance'
+                  ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 font-bold'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Award className="w-4 h-4 text-indigo-500" />
+              Employee Performance
+            </button>
+
+            <button
               onClick={() => handleSelectTab('seller-dashboard')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'seller-dashboard'
@@ -2190,7 +2204,27 @@ export default function AdminDashboard() {
           
           {/* TAB 0: AGENCY DASHBOARD */}
           {activeTab === 'agency-dashboard' && (
-            <AgencyDashboard deliveries={allClientDeliveries} clients={clientsList} tasks={allClientTasks} />
+            <AgencyDashboard
+              deliveries={allClientDeliveries}
+              clients={clientsList}
+              tasks={allClientTasks}
+              employees={employeesList}
+              attendance={attendanceLogs}
+              feedbacks={feedbacksList}
+              onSelectTab={handleSelectTab}
+            />
+          )}
+
+          {/* TAB: EMPLOYEE PERFORMANCE */}
+          {activeTab === 'employee-performance' && (
+            <EmployeePerformanceHub
+              employees={employeesList}
+              clientTasks={allClientTasks}
+              clientDeliveries={allClientDeliveries}
+              internalTasks={tasksList}
+              attendanceLogs={attendanceLogs}
+              feedbacks={feedbacksList}
+            />
           )}
 
           {/* TAB: CAMPAIGN DELIVERIES */}
@@ -3150,8 +3184,8 @@ export default function AdminDashboard() {
                             <td colSpan="7" className="p-8 text-center text-slate-400 italic">No deliverable tasks found matching date/search criteria.</td>
                           </tr>
                         ) : (
-                          filteredDeliverables.map((task) => (
-                          <tr key={task.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/40 transition">
+                          filteredDeliverables.map((task, idx) => (
+                          <tr key={task.taskId ? `${task.taskId}-${task.id || idx}` : `deliv-${task.id || idx}-${idx}`} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/40 transition">
                             <td className="p-4 font-bold text-slate-450">
                               <div>
                                 {task.postType === 'Posting' || (task.taskTitle && task.taskTitle.toLowerCase().startsWith('post ')) ? (
@@ -7505,8 +7539,8 @@ export default function AdminDashboard() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                          {selectedClientTasks.map((task) => (
-                            <tr key={task.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/30 transition">
+                          {selectedClientTasks.map((task, idx) => (
+                            <tr key={task.taskId ? `${task.taskId}-${task.id || idx}` : `sct-${task.id || idx}-${idx}`} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/30 transition">
                               <td className="p-2.5 font-semibold">
                                 <div className="text-slate-800 dark:text-slate-200">
                                   {task.postType === 'Posting' || (task.taskTitle && task.taskTitle.toLowerCase().startsWith('post ')) ? (
