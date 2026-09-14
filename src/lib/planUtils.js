@@ -351,3 +351,81 @@ export const getClientRevenueStream = (client, selectedMonth = 'all') => {
 
   return { type: 'ActiveRetainer', label: 'Active Retainer', badge: '💼 Retainer' };
 };
+
+// Dedicated Social Media / Digital Marketing Executives in the agency
+export const VALID_SM_EXECUTIVES = ['preet', 'pujan'];
+
+export const isSocialMediaExecutive = (name) => {
+  if (!name || typeof name !== 'string') return false;
+  const nameLower = name.trim().toLowerCase();
+  return VALID_SM_EXECUTIVES.some(sm => nameLower.includes(sm));
+};
+
+/**
+ * Helper to determine the dedicated Social Media Executive for a client/company.
+ * Strictly limited to actual Social Media / Digital Marketing Executives (Preet & Pujan).
+ * Video Editors (e.g. Masoom, Nouman) will NEVER be recognized as Social Media Executives.
+ */
+export const getClientSmExecutive = (client, tasks = [], deliveries = []) => {
+  if (!client) return '';
+
+  const clientId = client.clientId;
+
+  // 1. Check client notes for explicitly assigned staff
+  if (client.notes) {
+    try {
+      const parsed = JSON.parse(client.notes);
+      const smCandidate = parsed.staffAssignments?.sm || parsed.sm;
+      if (isSocialMediaExecutive(smCandidate)) {
+        return smCandidate;
+      }
+    } catch (e) {
+      // not json
+    }
+  }
+
+  // 2. Check client tasks assigned to an actual SM Executive (Preet or Pujan)
+  if (Array.isArray(tasks) && tasks.length > 0) {
+    const clientTasks = tasks.filter(t => t.clientId === clientId);
+
+    // Priority A: tasks for Reports, Access Collection, Onboarding, Page Setup, or Ads Run
+    const reportTask = clientTasks.find(t => 
+      isSocialMediaExecutive(t.workingOn) &&
+      (
+        (t.postType && (
+          t.postType.toLowerCase().includes('report') || 
+          t.postType.toLowerCase().includes('onboarding') || 
+          t.postType.toLowerCase().includes('access') || 
+          t.postType.toLowerCase().includes('setup') || 
+          t.postType.toLowerCase().includes('ads')
+        )) ||
+        (t.taskTitle && (
+          t.taskTitle.toLowerCase().includes('report') || 
+          t.taskTitle.toLowerCase().includes('access') || 
+          t.taskTitle.toLowerCase().includes('page') || 
+          t.taskTitle.toLowerCase().includes('ads run') || 
+          t.taskTitle.toLowerCase().includes('calendar')
+        )) ||
+        (t.assignTo && (
+          t.assignTo.toLowerCase().includes('social media') || 
+          t.assignTo.toLowerCase().includes('digital marketing')
+        ))
+      )
+    );
+    if (reportTask?.workingOn) return reportTask.workingOn;
+
+    // Priority B: any task assigned to Preet or Pujan on this client account
+    const smTask = clientTasks.find(t => isSocialMediaExecutive(t.workingOn));
+    if (smTask?.workingOn) return smTask.workingOn;
+  }
+
+  // 3. Check client deliveries assigned to Preet or Pujan
+  if (Array.isArray(deliveries) && deliveries.length > 0) {
+    const clientDels = deliveries.filter(d => d.clientId === clientId);
+    const smDel = clientDels.find(d => isSocialMediaExecutive(d.workingOn));
+    if (smDel?.workingOn) return smDel.workingOn;
+  }
+
+  return '';
+};
+

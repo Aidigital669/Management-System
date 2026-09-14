@@ -15,8 +15,8 @@ This file contains the email IDs and passwords for all user accounts configured 
 ## 2. Admin Account
 - **Role:** ADMIN
 - **Department:** HR
-- **Email:** `praveen@aidigital.com`
-- **Password:** `Admin@#123`
+- **Email:** `admin@workforce.com`
+- **Password:** `admin123`
 
 ---
 

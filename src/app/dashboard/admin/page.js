@@ -52,7 +52,8 @@ import {
   isClientExpiringInMonth,
   isClientStartingInMonth,
   getClientRevenueStream,
-  getClientMonthKey
+  getClientMonthKey,
+  getClientSmExecutive
 } from '@/lib/planUtils';
 
 const SERVICES_PRICING = {
@@ -4452,6 +4453,7 @@ export default function AdminDashboard() {
                           <thead>
                             <tr className="bg-slate-50/50 dark:bg-slate-800/20 text-slate-500 font-semibold border-b border-slate-200 dark:border-slate-800 text-[9px] uppercase tracking-wider">
                               <th className="p-4">Business / Client Name</th>
+                              <th className="p-4">Social Media Exec</th>
                               <th className="p-4">Current Cycle Date</th>
                               <th className="p-4">Expiry Date</th>
                               <th className="p-4">Renewal Due Date & Month</th>
@@ -4468,13 +4470,14 @@ export default function AdminDashboard() {
                                 .filter(c => {
                                   if (!renewalSearch) return true;
                                   const q = renewalSearch.toLowerCase();
-                                  return c.businessName.toLowerCase().includes(q) || c.clientId.toLowerCase().includes(q);
+                                  const sm = getClientSmExecutive(c, allClientTasks, allClientDeliveries);
+                                  return c.businessName.toLowerCase().includes(q) || c.clientId.toLowerCase().includes(q) || (sm && sm.toLowerCase().includes(q));
                                 });
 
                               if (list.length === 0) {
                                 return (
                                   <tr>
-                                    <td colSpan="8" className="p-8 text-center text-slate-400 italic">No expired contracts matching calendar/search filter.</td>
+                                    <td colSpan="9" className="p-8 text-center text-slate-400 italic">No expired contracts matching calendar/search filter.</td>
                                   </tr>
                                 );
                               }
@@ -4482,6 +4485,7 @@ export default function AdminDashboard() {
                               return list.map(client => {
                                 const info = getClientRenewalInfo(client);
                                 const { cycleStartStr, expiryDateStr, renewalDueStr, renewalMonthLabel, overdueDays, displayText } = info;
+                                const smExec = getClientSmExecutive(client, allClientTasks, allClientDeliveries);
                                 return (
                                   <tr key={`renew-${client.id}`} className="hover:bg-red-50/30 dark:hover:bg-red-950/20 transition text-slate-700 dark:text-slate-300">
                                     <td className="p-4">
@@ -4492,6 +4496,35 @@ export default function AdminDashboard() {
                                         </span>
                                       </div>
                                       <div className="text-[10px] text-slate-400 mt-0.5">ID: {client.clientId} | Person: {client.clientName || 'N/A'}</div>
+                                      {smExec && (
+                                        <div className="mt-1 flex items-center gap-1">
+                                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8.5px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
+                                            <UserCheck className="w-2.5 h-2.5 text-emerald-500" />
+                                            <span>SM: {smExec}</span>
+                                          </span>
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td className="p-4">
+                                      {smExec ? (
+                                        <div className="flex items-center gap-1.5">
+                                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-black text-[10px] flex items-center justify-center shadow-xs shrink-0">
+                                            {smExec.charAt(0).toUpperCase()}
+                                          </div>
+                                          <div>
+                                            <div className="font-bold text-xs text-slate-900 dark:text-white leading-tight">
+                                              {smExec}
+                                            </div>
+                                            <div className="text-[8.5px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                              Dedicated SM
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700">
+                                          Unassigned
+                                        </span>
+                                      )}
                                     </td>
                                     <td className="p-4 font-semibold">{cycleStartStr}</td>
                                     <td className="p-4 font-semibold">{expiryDateStr}</td>
@@ -4577,6 +4610,7 @@ export default function AdminDashboard() {
                           <thead>
                             <tr className="bg-slate-50/50 dark:bg-slate-800/20 text-slate-500 font-semibold border-b border-slate-200 dark:border-slate-800 text-[9px] uppercase tracking-wider">
                               <th className="p-4">Business / Client Name</th>
+                              <th className="p-4">Social Media Exec</th>
                               <th className="p-4">Current Cycle Date</th>
                               <th className="p-4">Expected End Date (Day 30)</th>
                               <th className="p-4">Renewal Due Date & Month</th>
@@ -4593,13 +4627,14 @@ export default function AdminDashboard() {
                                 .filter(c => {
                                   if (!renewalSearch) return true;
                                   const q = renewalSearch.toLowerCase();
-                                  return c.businessName.toLowerCase().includes(q) || c.clientId.toLowerCase().includes(q);
+                                  const sm = getClientSmExecutive(c, allClientTasks, allClientDeliveries);
+                                  return c.businessName.toLowerCase().includes(q) || c.clientId.toLowerCase().includes(q) || (sm && sm.toLowerCase().includes(q));
                                 });
 
                               if (list.length === 0) {
                                 return (
                                   <tr>
-                                    <td colSpan="8" className="p-8 text-center text-slate-400 italic">No contracts currently in expiring soon notice (Days 23–30).</td>
+                                    <td colSpan="9" className="p-8 text-center text-slate-400 italic">No contracts currently in expiring soon notice (Days 23–30).</td>
                                   </tr>
                                 );
                               }
@@ -4607,6 +4642,7 @@ export default function AdminDashboard() {
                               return list.map(client => {
                                 const info = getClientRenewalInfo(client);
                                 const { cycleStartStr, expiryDateStr, renewalDueStr, renewalMonthLabel, expiringSoonDay, displayText } = info;
+                                const smExec = getClientSmExecutive(client, allClientTasks, allClientDeliveries);
                                 return (
                                   <tr key={`expiring-${client.id}`} className="hover:bg-orange-50/30 dark:hover:bg-orange-955/20 transition text-slate-700 dark:text-slate-300">
                                     <td className="p-4">
@@ -4617,6 +4653,35 @@ export default function AdminDashboard() {
                                         </span>
                                       </div>
                                       <div className="text-[10px] text-slate-400 mt-0.5">ID: {client.clientId} | Person: {client.clientName || 'N/A'}</div>
+                                      {smExec && (
+                                        <div className="mt-1 flex items-center gap-1">
+                                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8.5px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
+                                            <UserCheck className="w-2.5 h-2.5 text-emerald-500" />
+                                            <span>SM: {smExec}</span>
+                                          </span>
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td className="p-4">
+                                      {smExec ? (
+                                        <div className="flex items-center gap-1.5">
+                                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-black text-[10px] flex items-center justify-center shadow-xs shrink-0">
+                                            {smExec.charAt(0).toUpperCase()}
+                                          </div>
+                                          <div>
+                                            <div className="font-bold text-xs text-slate-900 dark:text-white leading-tight">
+                                              {smExec}
+                                            </div>
+                                            <div className="text-[8.5px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                              Dedicated SM
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700">
+                                          Unassigned
+                                        </span>
+                                      )}
                                     </td>
                                     <td className="p-4 font-semibold">{cycleStartStr}</td>
                                     <td className="p-4 font-semibold">{expiryDateStr}</td>
@@ -4704,6 +4769,7 @@ export default function AdminDashboard() {
                           <thead>
                             <tr className="bg-slate-50/50 dark:bg-slate-800/20 text-slate-500 font-semibold border-b border-slate-200 dark:border-slate-800 text-[9px] uppercase tracking-wider">
                               <th className="p-4">Business / Client Name</th>
+                              <th className="p-4">Social Media Exec</th>
                               <th className="p-4">Current Cycle Date</th>
                               <th className="p-4">Calculated Expiry Date</th>
                               <th className="p-4">Renewal Due Date & Month</th>
@@ -4728,13 +4794,14 @@ export default function AdminDashboard() {
                                 .filter(c => {
                                   if (!renewalSearch) return true;
                                   const q = renewalSearch.toLowerCase();
-                                  return c.businessName.toLowerCase().includes(q) || c.clientId.toLowerCase().includes(q);
+                                  const sm = getClientSmExecutive(c, allClientTasks, allClientDeliveries);
+                                  return c.businessName.toLowerCase().includes(q) || c.clientId.toLowerCase().includes(q) || (sm && sm.toLowerCase().includes(q));
                                 });
 
                               if (list.length === 0) {
                                 return (
                                   <tr>
-                                    <td colSpan="8" className="p-8 text-center text-slate-400 italic">No active contracts found matching calendar/search filter.</td>
+                                    <td colSpan="9" className="p-8 text-center text-slate-400 italic">No active contracts found matching calendar/search filter.</td>
                                   </tr>
                                 );
                               }
@@ -4743,6 +4810,7 @@ export default function AdminDashboard() {
                                 const info = getClientRenewalInfo(client);
                                 const { cycleStartStr, expiryDateStr, renewalDueStr, renewalMonthLabel, daysLeft, status } = info;
                                 const isExpiringSoon = status === 'Expiring Soon';
+                                const smExec = getClientSmExecutive(client, allClientTasks, allClientDeliveries);
 
                                 return (
                                   <tr key={`active-${client.id}`} className={`hover:bg-slate-50/50 dark:hover:bg-slate-850/40 transition text-slate-700 dark:text-slate-300 ${isExpiringSoon ? 'bg-amber-50/20 dark:bg-amber-950/10' : ''}`}>
@@ -4756,6 +4824,35 @@ export default function AdminDashboard() {
                                         )}
                                       </div>
                                       <div className="text-[10px] text-slate-400 mt-0.5">ID: {client.clientId} | Person: {client.clientName || 'N/A'}</div>
+                                      {smExec && (
+                                        <div className="mt-1 flex items-center gap-1">
+                                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8.5px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
+                                            <UserCheck className="w-2.5 h-2.5 text-emerald-500" />
+                                            <span>SM: {smExec}</span>
+                                          </span>
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td className="p-4">
+                                      {smExec ? (
+                                        <div className="flex items-center gap-1.5">
+                                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-black text-[10px] flex items-center justify-center shadow-xs shrink-0">
+                                            {smExec.charAt(0).toUpperCase()}
+                                          </div>
+                                          <div>
+                                            <div className="font-bold text-xs text-slate-900 dark:text-white leading-tight">
+                                              {smExec}
+                                            </div>
+                                            <div className="text-[8.5px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                              Dedicated SM
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700">
+                                          Unassigned
+                                        </span>
+                                      )}
                                     </td>
                                     <td className="p-4 font-semibold">{cycleStartStr}</td>
                                     <td className="p-4 font-semibold">{expiryDateStr}</td>
@@ -4904,13 +5001,15 @@ export default function AdminDashboard() {
 
             const filteredClients = clientsList.filter(c => {
               const query = searchQuery.toLowerCase();
+              const smExec = getClientSmExecutive(c, allClientTasks, allClientDeliveries);
               const matchesQuery = !query || (
                 c.businessName.toLowerCase().includes(query) ||
                 c.clientId.toLowerCase().includes(query) ||
                 (c.clientName && c.clientName.toLowerCase().includes(query)) ||
                 (c.services && c.services.toLowerCase().includes(query)) ||
                 (c.sector && c.sector.toLowerCase().includes(query)) ||
-                (c.email && c.email.toLowerCase().includes(query))
+                (c.email && c.email.toLowerCase().includes(query)) ||
+                (smExec && smExec.toLowerCase().includes(query))
               );
               if (!matchesQuery) return false;
 
@@ -5419,6 +5518,7 @@ export default function AdminDashboard() {
                         <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase tracking-wider">
                           <th className="p-4">ID</th>
                           <th className="p-4">Business / Client Name</th>
+                          <th className="p-4">Social Media Exec</th>
                           <th className="p-4">Service & Plan Stream</th>
                           <th className="p-4">Amount & Payment</th>
                           <th className="p-4">Plan Cycle & Expiry</th>
@@ -5430,7 +5530,7 @@ export default function AdminDashboard() {
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                         {filteredClients.length === 0 ? (
                           <tr>
-                            <td colSpan={8} className="p-8 text-center text-slate-400 font-medium">
+                            <td colSpan={9} className="p-8 text-center text-slate-400 font-medium">
                               No clients found matching the selected filter ({currentMonthLabel}).
                             </td>
                           </tr>
@@ -5439,12 +5539,42 @@ export default function AdminDashboard() {
                             const stream = getClientRevenueStream(client, clientMonthFilter);
                             const pInfo = getClientPaymentInfo(client);
                             const planInfo = getClientPlanInfo(client);
+                            const smExec = getClientSmExecutive(client, allClientTasks, allClientDeliveries);
                             return (
                               <tr key={client.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/40 transition">
                                 <td className="p-4 font-bold text-slate-450">{client.clientId}</td>
                                 <td className="p-4">
                                   <div className="font-bold text-slate-900 dark:text-white">{client.businessName}</div>
                                   <div className="text-[10px] text-slate-400 mt-0.5">{client.clientName || 'No Contact Person'}</div>
+                                  {smExec && (
+                                    <div className="mt-1 flex items-center gap-1">
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
+                                        <UserCheck className="w-2.5 h-2.5 text-emerald-500" />
+                                        <span>SM: {smExec}</span>
+                                      </span>
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="p-4">
+                                  {smExec ? (
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-black text-[11px] flex items-center justify-center shadow-xs shrink-0">
+                                        {smExec.charAt(0).toUpperCase()}
+                                      </div>
+                                      <div>
+                                        <div className="font-bold text-xs text-slate-900 dark:text-white leading-tight">
+                                          {smExec}
+                                        </div>
+                                        <div className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                          Dedicated SM Exec
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700">
+                                      Unassigned
+                                    </span>
+                                  )}
                                 </td>
                                 <td className="p-4">
                                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -7040,7 +7170,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 border-b border-slate-100 dark:border-slate-800/60 pb-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-b border-slate-100 dark:border-slate-800/60 pb-3">
                   <div>
                     <span className="text-[10px] text-slate-400 font-extrabold uppercase">Services Category</span>
                     <p className="font-bold text-slate-900 dark:text-white text-[11px] mt-0.5">{selectedClient.services}</p>
@@ -7048,6 +7178,13 @@ export default function AdminDashboard() {
                   <div>
                     <span className="text-[10px] text-slate-400 font-extrabold uppercase">Monthly Package Cost</span>
                     <p className="font-extrabold text-blue-750 dark:text-blue-400 text-[11px] mt-0.5">₹{selectedClient.packageAmount.toLocaleString()}/mo</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-extrabold uppercase">Dedicated SM Exec</span>
+                    <p className="font-extrabold text-emerald-600 dark:text-emerald-400 text-[11px] mt-0.5 flex items-center gap-1">
+                      <UserCheck className="w-3 h-3 text-emerald-500" />
+                      {getClientSmExecutive(selectedClient, allClientTasks, allClientDeliveries) || 'Unassigned'}
+                    </p>
                   </div>
                 </div>
 

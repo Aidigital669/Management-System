@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-09-12T09:35:05.203Z",
+  "timestamp": "2026-09-14T06:04:09.585Z",
   "summary": {
     "totalClients": 58,
     "totalClientTasks": 1277,
@@ -2025,7 +2025,7 @@
       "date": "14-Sept-2026",
       "assignTo": "Graphic Designer",
       "workingOn": "Swapnil",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -11584,7 +11584,7 @@
       "date": "14-Sept-2026",
       "assignTo": "Graphic Designer",
       "workingOn": "Danish Khan",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -11848,7 +11848,7 @@
       "date": "14-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Pujan",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -12343,7 +12343,7 @@
       "date": "14-Sept-2026",
       "assignTo": "Graphic Designer",
       "workingOn": "Swapnil",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -13630,7 +13630,7 @@
       "date": "14-Sept-2026",
       "assignTo": "Graphic Designer",
       "workingOn": "Danish Khan",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -13652,7 +13652,7 @@
       "date": "15-Sept-2026",
       "assignTo": "Graphic Designer",
       "workingOn": "Danish Khan",
-      "status": "Assigned",
+      "status": "Completion",
       "postType": "Graphic"
     },
     {
@@ -14103,7 +14103,7 @@
       "date": "14-Sept-2026",
       "assignTo": "Graphic Designer",
       "workingOn": "Swapnil",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -14257,7 +14257,7 @@
       "date": "14-Sept-2026",
       "assignTo": "Graphic Designer",
       "workingOn": "Danish Khan",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -14433,7 +14433,7 @@
       "date": "14-Sept-2026",
       "assignTo": "Ai Video Editor",
       "workingOn": "Masoom",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Reel"
     },
     {
