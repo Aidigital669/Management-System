@@ -9,7 +9,7 @@ export async function OPTIONS() {
     status: 200,
     headers: {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key',
     },
   });
@@ -149,6 +149,40 @@ export async function POST(req) {
     return NextResponse.json({ call: newCall, success: true }, { status: 201, headers: corsHeaders });
   } catch (error) {
     console.error('Create call error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500, headers: corsHeaders });
+  }
+}
+
+export async function DELETE(req) {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key',
+  };
+
+  try {
+    const url = new URL(req.url);
+    const sellerId = url.searchParams.get('sellerId');
+    const wipeAll = url.searchParams.get('all') === 'true' || !sellerId || sellerId === 'ALL';
+
+    let deleteResult;
+    if (!wipeAll && sellerId) {
+      deleteResult = await prisma.callRecord.deleteMany({
+        where: { salesPersonId: parseInt(sellerId, 10) }
+      });
+    } else {
+      deleteResult = await prisma.callRecord.deleteMany({});
+    }
+
+    return NextResponse.json({
+      success: true,
+      count: deleteResult.count,
+      message: wipeAll 
+        ? `Successfully deleted all ${deleteResult.count} leads from system.`
+        : `Successfully deleted ${deleteResult.count} leads for specified seller.`
+    }, { status: 200, headers: corsHeaders });
+  } catch (error) {
+    console.error('Delete calls error:', error);
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500, headers: corsHeaders });
   }
 }

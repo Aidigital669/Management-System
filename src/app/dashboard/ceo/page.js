@@ -28,8 +28,10 @@ import {
   BarChart2,
   RefreshCw,
   Menu,
-  X
+  X,
+  FileSpreadsheet
 } from 'lucide-react';
+import ExcelImportModal from '@/components/ExcelImportModal';
 import {
   parseDbDate as parsePlanDbDate,
   formatDateToDb,
@@ -40,8 +42,7 @@ import {
   isClientExpiringInMonth,
   isClientStartingInMonth,
   getClientRevenueStream,
-  getClientMonthKey,
-  getClientSmExecutive
+  getClientMonthKey
 } from '@/lib/planUtils';
 
 export default function CeoDashboard() {
@@ -84,6 +85,8 @@ export default function CeoDashboard() {
   // Modal States
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [excelModalOpen, setExcelModalOpen] = useState(false);
+  const [excelModalType, setExcelModalType] = useState('clients');
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [clientMonthFilter, setClientMonthFilter] = useState('all');
@@ -149,7 +152,7 @@ export default function CeoDashboard() {
   const [darkMode, setDarkMode] = useState(false);
 
   useEffect(() => {
-    const isDark = localStorage.getItem('theme') === 'dark' || 
+    const isDark = localStorage.getItem('theme') === 'dark' ||
       (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
     if (isDark) {
       setDarkMode(true);
@@ -201,7 +204,7 @@ export default function CeoDashboard() {
     if (client.joiningDate) {
       const parts = client.joiningDate.split('-');
       if (parts.length === 3) {
-        const monthMap = { jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',sept:'09',oct:'10',nov:'11',dec:'12' };
+        const monthMap = { jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06', jul: '07', aug: '08', sep: '09', sept: '09', oct: '10', nov: '11', dec: '12' };
         const mm = monthMap[parts[1]?.toLowerCase()] || parts[1];
         const yyyy = parts[2]?.length === 4 ? parts[2] : `20${parts[2]}`;
         if (yyyy && mm) return `${yyyy}-${mm.padStart(2, '0')}`;
@@ -287,7 +290,7 @@ export default function CeoDashboard() {
     let isRenewed = false;
     try {
       if (client.notes && client.notes.toLowerCase().includes('renew')) isRenewed = true;
-    } catch (e) {}
+    } catch (e) { }
 
     if (createdMonth && joiningMonth && createdMonth !== joiningMonth) {
       isRenewed = true;
@@ -334,7 +337,7 @@ export default function CeoDashboard() {
           paidAmount = parsed.paidAmount !== undefined ? parseFloat(parsed.paidAmount) || 0 : (pStatus === 'Pending' ? 0 : totalAmount);
         }
       }
-    } catch (e) {}
+    } catch (e) { }
 
     const pendingBalance = Math.max(0, totalAmount - paidAmount);
     const isPartial = pStatus === 'Half' || pStatus === 'Partial' || (pendingBalance > 0 && pStatus !== 'Pending');
@@ -411,14 +414,14 @@ export default function CeoDashboard() {
       const totalEmp = fetchedUsers.filter(u => u.role === 'EMPLOYEE').length;
       const activeAdm = fetchedUsers.filter(u => u.role === 'ADMIN').length;
       const payroll = fetchedUsers.reduce((sum, u) => sum + u.salary, 0);
-      
+
       const doneTasks = fetchedTasks.filter(t => t.status === 'DONE').length;
       const rate = fetchedTasks.length > 0 ? Math.round((doneTasks / fetchedTasks.length) * 100) : 0;
 
       // Active Clients Calculation
       const activeClientsCount = (clientsData.clients || []).filter(c => c.active).length;
       const totalClientsCount = (clientsData.clients || []).length;
-      
+
       // 3-Way Revenue Breakdown (Actual, Expected, Pending)
       let actualRevenue = 0;
       let expectedRevenue = 0;
@@ -435,7 +438,7 @@ export default function CeoDashboard() {
         }
       });
       const pendingRevenue = Math.max(0, expectedRevenue - actualRevenue);
-      
+
       // Tasks Pipeline Calculation
       const ctArray = ctData.tasks || [];
       const completedTasksCount = ctArray.filter(t => t.status === 'Completed' || t.status === 'Done').length;
@@ -669,11 +672,11 @@ export default function CeoDashboard() {
     setFormLoading(true);
     setFormError('');
     try {
-      const url = clientTaskEditMode 
-        ? `/api/client-tasks/${selectedClientTask.id}` 
+      const url = clientTaskEditMode
+        ? `/api/client-tasks/${selectedClientTask.id}`
         : `/api/clients/${selectedClient.id}/tasks`;
       const method = clientTaskEditMode ? 'PUT' : 'POST';
-      
+
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -843,7 +846,7 @@ export default function CeoDashboard() {
 
     const willDeactivate = currentStatus === 'ACTIVE';
     const actionText = willDeactivate ? 'deactivate' : 'reactivate';
-    const confirmMessage = willDeactivate 
+    const confirmMessage = willDeactivate
       ? `Are you sure you want to deactivate ${name}? All records (tasks, attendance, payroll, documents) will be permanently preserved in the system, but the user cannot log in.`
       : `Are you sure you want to reactivate ${name}? They will regain account access.`;
 
@@ -893,8 +896,8 @@ export default function CeoDashboard() {
   const inactiveUsersCount = usersList.filter(u => u.status === 'INACTIVE').length;
 
   const filteredUsers = usersList.filter(u => {
-    const matchesSearch = 
-      u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    const matchesSearch =
+      u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
       u.department.toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;
@@ -905,12 +908,12 @@ export default function CeoDashboard() {
 
   return (
     <div className={`min-h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 transition-colors duration-300`}>
-      
+
       {/* Toast Alert */}
       {toast.message && (
         <div className={`fixed bottom-5 right-5 z-50 p-4 rounded-xl shadow-2xl flex items-center gap-3 animate-slide-in border text-sm font-semibold
-          ${toast.type === 'success' 
-            ? 'bg-emerald-50 dark:bg-emerald-950/80 border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-300' 
+          ${toast.type === 'success'
+            ? 'bg-emerald-50 dark:bg-emerald-950/80 border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-300'
             : 'bg-red-50 dark:bg-red-950/80 border-red-200 dark:border-red-900 text-red-800 dark:text-red-300'
           }`}
         >
@@ -921,16 +924,15 @@ export default function CeoDashboard() {
 
       {/* Mobile Backdrop Overlay */}
       {mobileSidebarOpen && (
-        <div 
+        <div
           onClick={() => setMobileSidebarOpen(false)}
           className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40 lg:hidden transition-opacity duration-300"
         />
       )}
 
       {/* Responsive Sidebar Panel */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between shrink-0 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static ${
-        mobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
-      }`}>
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between shrink-0 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static ${mobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
+        }`}>
         <div className="overflow-y-auto flex-1">
           {/* Header Brand */}
           <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
@@ -942,7 +944,7 @@ export default function CeoDashboard() {
                 WorkForce OS
               </span>
             </div>
-            <button 
+            <button
               onClick={() => setMobileSidebarOpen(false)}
               className="lg:hidden p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-lg transition"
               title="Close Menu"
@@ -968,23 +970,21 @@ export default function CeoDashboard() {
           <nav className="p-3 sm:p-4 flex flex-col gap-1">
             <button
               onClick={() => handleSelectTab('overview')}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === 'overview'
-                  ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
-              }`}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === 'overview'
+                ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
+                }`}
             >
               <Activity className="w-4 h-4" />
               Overview
             </button>
-            
+
             <button
               onClick={() => handleSelectTab('users')}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === 'users'
-                  ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
-              }`}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === 'users'
+                ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
+                }`}
             >
               <Users className="w-4 h-4" />
               Manage Directory
@@ -992,11 +992,10 @@ export default function CeoDashboard() {
 
             <button
               onClick={() => handleSelectTab('clients')}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === 'clients'
-                  ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
-              }`}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === 'clients'
+                ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
+                }`}
             >
               <Building className="w-4 h-4" />
               Client CRM
@@ -1004,11 +1003,10 @@ export default function CeoDashboard() {
 
             <button
               onClick={() => handleSelectTab('deliverables')}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === 'deliverables'
-                  ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
-              }`}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === 'deliverables'
+                ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
+                }`}
             >
               <CheckSquare className="w-4 h-4" />
               CRM Deliverables
@@ -1016,11 +1014,10 @@ export default function CeoDashboard() {
 
             <button
               onClick={() => handleSelectTab('campaign-deliveries')}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === 'campaign-deliveries'
-                  ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
-              }`}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === 'campaign-deliveries'
+                ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
+                }`}
             >
               <Send className="w-4 h-4" />
               Campaign Deliveries
@@ -1028,11 +1025,10 @@ export default function CeoDashboard() {
 
             <button
               onClick={() => handleSelectTab('audits')}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === 'audits'
-                  ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
-              }`}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === 'audits'
+                ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
+                }`}
             >
               <FileText className="w-4 h-4" />
               System Audit Logs
@@ -1040,11 +1036,10 @@ export default function CeoDashboard() {
 
             <button
               onClick={() => handleSelectTab('payroll')}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === 'payroll'
-                  ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
-              }`}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === 'payroll'
+                ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
+                }`}
             >
               <DollarSign className="w-4 h-4" />
               Financial Controls
@@ -1066,7 +1061,7 @@ export default function CeoDashboard() {
 
       {/* Main Content Area */}
       <main className="flex-grow flex flex-col min-w-0 overflow-y-auto h-screen">
-        
+
         {/* Main Panel Header */}
         <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-3 sm:px-6 lg:px-8 shrink-0 transition-colors duration-300">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -1082,10 +1077,10 @@ export default function CeoDashboard() {
               {activeTab === 'overview' ? 'Executive Dashboard' : activeTab.replace('-', ' ')}
             </h2>
           </div>
-          
+
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Dark Mode toggle */}
-            <button 
+            <button
               onClick={toggleDarkMode}
               className="px-2.5 sm:px-3 py-1.5 border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur-md rounded-xl flex items-center gap-1.5 sm:gap-2 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-xs hover:shadow-md transition-all duration-300 transform active:scale-95 cursor-pointer"
               title="Toggle Dark / Light Mode"
@@ -1113,13 +1108,13 @@ export default function CeoDashboard() {
 
         {/* Panel Main Content Container */}
         <div className="p-3 sm:p-5 lg:p-8 flex-grow overflow-x-hidden">
-          
+
           {/* TAB 1: OVERVIEW */}
           {activeTab === 'overview' && (
             <div className="space-y-8 animate-fade-in">
               {/* Metric grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
-                
+
                 {/* Active Clients Card */}
                 <div className="relative bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] transition duration-200 group">
                   <div className="absolute -right-6 -top-6 w-24 h-24 bg-blue-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
@@ -1205,11 +1200,11 @@ export default function CeoDashboard() {
 
               {/* Graphics and lists panel */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                
+
                 {/* Task and stats breakdown */}
                 <div className="lg:col-span-8 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
                   <h4 className="text-base font-extrabold text-slate-900 dark:text-white mb-6">Staff Salary Breakdown</h4>
-                  
+
                   <div className="space-y-5">
                     {usersList.length === 0 ? (
                       <p className="text-sm text-slate-400">No staff loaded.</p>
@@ -1224,7 +1219,7 @@ export default function CeoDashboard() {
                             <span className="text-slate-600 dark:text-slate-400">${user.salary.toLocaleString()}/mo</span>
                           </div>
                           <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                            <div 
+                            <div
                               className="bg-blue-600 h-full rounded-full transition-all duration-500"
                               style={{ width: `${Math.min((user.salary / 250000) * 100, 100)}%` }}
                             ></div>
@@ -1239,7 +1234,7 @@ export default function CeoDashboard() {
                 <div className="lg:col-span-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm flex flex-col justify-between">
                   <div>
                     <h4 className="text-base font-extrabold text-slate-900 dark:text-white mb-6">Latest Security Audits</h4>
-                    
+
                     <div className="space-y-4">
                       {auditLogs.slice(0, 4).map((log) => (
                         <div key={log.id} className="flex gap-3 text-xs">
@@ -1253,7 +1248,7 @@ export default function CeoDashboard() {
                     </div>
                   </div>
 
-                  <button 
+                  <button
                     onClick={() => setActiveTab('audits')}
                     className="w-full mt-6 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl transition"
                   >
@@ -1269,7 +1264,7 @@ export default function CeoDashboard() {
           {activeTab === 'users' && (
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden animate-fade-in">
               <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between">
-                
+
                 {/* Search Bar & Status Filter Control */}
                 <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto flex-1 max-w-2xl">
                   <div className="relative flex items-center w-full max-w-xs">
@@ -1288,22 +1283,20 @@ export default function CeoDashboard() {
                     <button
                       type="button"
                       onClick={() => setUserStatusFilter('ALL')}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
-                        userStatusFilter === 'ALL'
-                          ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                      }`}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition ${userStatusFilter === 'ALL'
+                        ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                        }`}
                     >
                       All ({usersList.length})
                     </button>
                     <button
                       type="button"
                       onClick={() => setUserStatusFilter('ACTIVE')}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
-                        userStatusFilter === 'ACTIVE'
-                          ? 'bg-emerald-600 text-white shadow-sm'
-                          : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
-                      }`}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${userStatusFilter === 'ACTIVE'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
+                        }`}
                     >
                       <UserCheck className="w-3 h-3" />
                       Active ({activeUsersCount})
@@ -1311,17 +1304,24 @@ export default function CeoDashboard() {
                     <button
                       type="button"
                       onClick={() => setUserStatusFilter('INACTIVE')}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
-                        userStatusFilter === 'INACTIVE'
-                          ? 'bg-amber-600 text-white shadow-sm'
-                          : 'text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30'
-                      }`}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${userStatusFilter === 'INACTIVE'
+                        ? 'bg-amber-600 text-white shadow-sm'
+                        : 'text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30'
+                        }`}
                     >
                       <UserX className="w-3 h-3" />
                       Inactive ({inactiveUsersCount})
                     </button>
                   </div>
                 </div>
+
+                <button
+                  onClick={() => { setExcelModalType('employees'); setExcelModalOpen(true); }}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/10 shrink-0 transition cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  Import via Excel
+                </button>
 
                 <button
                   onClick={openAddModal}
@@ -1361,11 +1361,11 @@ export default function CeoDashboard() {
                           <td className="p-4 text-slate-500">{user.email}</td>
                           <td className="p-4">
                             <span className={`px-2 py-1 rounded-full text-[10px] font-extrabold tracking-wide uppercase
-                              ${user.role === 'CEO' 
-                                ? 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400' 
-                                : user.role === 'ADMIN' 
-                                ? 'bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-400' 
-                                : 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400'}`}
+                              ${user.role === 'CEO'
+                                ? 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400'
+                                : user.role === 'ADMIN'
+                                  ? 'bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-400'
+                                  : 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400'}`}
                             >
                               {user.role}
                             </span>
@@ -1374,8 +1374,8 @@ export default function CeoDashboard() {
                           <td className="p-4 font-bold text-slate-900 dark:text-white">${user.salary.toLocaleString()}/mo</td>
                           <td className="p-4">
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase
-                              ${user.status === 'ACTIVE' 
-                                ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' 
+                              ${user.status === 'ACTIVE'
+                                ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
                                 : 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800'}`}
                             >
                               <span className={`w-1.5 h-1.5 rounded-full ${user.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
@@ -1384,7 +1384,7 @@ export default function CeoDashboard() {
                           </td>
                           <td className="p-4 text-right">
                             <div className="flex gap-2 justify-end">
-                              <button 
+                              <button
                                 onClick={() => openEditModal(user)}
                                 className="p-1.5 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg text-slate-500 dark:text-slate-400 transition"
                                 title="Edit staff profile"
@@ -1392,7 +1392,7 @@ export default function CeoDashboard() {
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
                               {user.status === 'ACTIVE' ? (
-                                <button 
+                                <button
                                   onClick={() => handleToggleUserStatus(user.id, user.name, user.status)}
                                   disabled={user.id === currentUser.id}
                                   className="p-1.5 border border-slate-200 dark:border-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/20 text-amber-600 dark:text-amber-400 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition"
@@ -1401,7 +1401,7 @@ export default function CeoDashboard() {
                                   <UserX className="w-3.5 h-3.5" />
                                 </button>
                               ) : (
-                                <button 
+                                <button
                                   onClick={() => handleToggleUserStatus(user.id, user.name, user.status)}
                                   disabled={user.id === currentUser.id}
                                   className="p-1.5 border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition"
@@ -1477,7 +1477,7 @@ export default function CeoDashboard() {
                     <h4 className="text-base font-extrabold text-slate-900 dark:text-white">Active Payroll Reconciliations</h4>
                     <p className="text-xs text-slate-400 mt-1">Review organizational salary budgets by department.</p>
                   </div>
-                  <button 
+                  <button
                     onClick={handleApprovePayroll}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 px-5 rounded-xl shadow-md shadow-emerald-500/10 transition"
                   >
@@ -1515,7 +1515,7 @@ export default function CeoDashboard() {
           {/* TAB 7: GLOBAL DELIVERABLES BOARD */}
           {activeTab === 'deliverables' && (
             <div className="space-y-6 animate-fade-in text-xs">
-              
+
               {/* Deliverables Stats */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
@@ -1523,7 +1523,7 @@ export default function CeoDashboard() {
                   <div className="text-xl font-bold text-slate-900 dark:text-white mt-1">{allClientTasks.length}</div>
                   <span className="text-[9px] text-slate-400 font-medium">All campaigns deliverables</span>
                 </div>
-                
+
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
                   <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Completed Tasks</span>
                   <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
@@ -1614,11 +1614,11 @@ export default function CeoDashboard() {
                             <td className="p-4 font-semibold text-slate-900 dark:text-white">{task.workingOn || 'Unassigned'}</td>
                             <td className="p-4">
                               <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-bold uppercase
-                                ${task.status === 'Complete Task' 
-                                  ? 'bg-emerald-500 text-white' 
-                                  : task.status === 'Working On It' 
-                                  ? 'bg-orange-500 text-white' 
-                                  : 'bg-slate-200 dark:bg-slate-800 text-slate-650 dark:text-slate-400'}`}
+                                ${task.status === 'Complete Task'
+                                  ? 'bg-emerald-500 text-white'
+                                  : task.status === 'Working On It'
+                                    ? 'bg-orange-500 text-white'
+                                    : 'bg-slate-200 dark:bg-slate-800 text-slate-650 dark:text-slate-400'}`}
                               >
                                 {task.status}
                               </span>
@@ -1656,7 +1656,7 @@ export default function CeoDashboard() {
           {/* TAB 8: GLOBAL CAMPAIGN DELIVERIES */}
           {activeTab === 'campaign-deliveries' && (
             <div className="space-y-6 animate-fade-in text-xs">
-              
+
               {/* Campaign Deliveries Stats */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
@@ -1664,7 +1664,7 @@ export default function CeoDashboard() {
                   <div className="text-xl font-bold text-slate-900 dark:text-white mt-1">{allClientDeliveries.length}</div>
                   <span className="text-[9px] text-slate-400 font-medium">All campaigns scheduled posts</span>
                 </div>
-                
+
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
                   <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Pending Release</span>
                   <div className="text-xl font-bold text-orange-500 mt-1">
@@ -1780,10 +1780,10 @@ export default function CeoDashboard() {
                             <td className="p-4">
                               <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-bold uppercase
                                 ${delivery.status === 'Posted' || delivery.status === 'Completed'
-                                  ? 'bg-emerald-500 text-white' 
-                                  : delivery.status === 'Pending' 
-                                  ? 'bg-orange-500 text-white' 
-                                  : 'bg-slate-200 dark:bg-slate-800 text-slate-655 dark:text-slate-400'}`}
+                                  ? 'bg-emerald-500 text-white'
+                                  : delivery.status === 'Pending'
+                                    ? 'bg-orange-500 text-white'
+                                    : 'bg-slate-200 dark:bg-slate-800 text-slate-655 dark:text-slate-400'}`}
                               >
                                 {delivery.status}
                               </span>
@@ -1852,15 +1852,13 @@ export default function CeoDashboard() {
 
             const filteredClients = clientsList.filter(c => {
               const query = searchQuery.toLowerCase();
-              const smExec = getClientSmExecutive(c, allClientTasks, allClientDeliveries);
               const matchesQuery = !query || (
                 c.businessName.toLowerCase().includes(query) ||
                 c.clientId.toLowerCase().includes(query) ||
                 (c.clientName && c.clientName.toLowerCase().includes(query)) ||
                 (c.services && c.services.toLowerCase().includes(query)) ||
                 (c.sector && c.sector.toLowerCase().includes(query)) ||
-                (c.email && c.email.toLowerCase().includes(query)) ||
-                (smExec && smExec.toLowerCase().includes(query))
+                (c.email && c.email.toLowerCase().includes(query))
               );
               if (!matchesQuery) return false;
 
@@ -1982,9 +1980,9 @@ export default function CeoDashboard() {
             const actualPercent = expectedRevenue > 0 ? Math.round((actualRevenue / expectedRevenue) * 100) : 0;
             const currentMonthLabel = (clientStartDate || clientEndDate)
               ? `📅 ${clientStartDate || 'Start'} to ${clientEndDate || 'End'}`
-              : (clientMonthFilter === 'all' 
-                  ? 'All Months (All-Time)' 
-                  : (availableClientMonths.find(m => m.key === clientMonthFilter)?.label || clientMonthFilter));
+              : (clientMonthFilter === 'all'
+                ? 'All Months (All-Time)'
+                : (availableClientMonths.find(m => m.key === clientMonthFilter)?.label || clientMonthFilter));
 
             const totalRenewalPool = renewalsExpected + notRenewedExpected;
             const renewalPercent = totalRenewalPool > 0 ? Math.round((renewalsExpected / totalRenewalPool) * 100) : (renewalsCount > 0 ? 100 : 0);
@@ -1992,7 +1990,7 @@ export default function CeoDashboard() {
 
             return (
               <div className="space-y-6 animate-fade-in text-xs">
-                
+
                 {/* Client Metrics Divided into Actual, Expected & Pending with Stream Breakdown */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Total / Active Clients */}
@@ -2124,7 +2122,7 @@ export default function CeoDashboard() {
 
                     <div className="w-full bg-slate-100 dark:bg-slate-800 h-6 rounded-xl overflow-hidden flex shadow-inner p-1 gap-1">
                       {renewalsExpected > 0 && (
-                        <div 
+                        <div
                           className="bg-gradient-to-r from-purple-500 to-indigo-600 h-full rounded-lg transition-all duration-1000 ease-out flex items-center justify-center text-[9px] font-black text-white px-2 shadow-sm"
                           style={{ width: `${Math.max(renewalPercent, 10)}%` }}
                         >
@@ -2132,7 +2130,7 @@ export default function CeoDashboard() {
                         </div>
                       )}
                       {notRenewedExpected > 0 && (
-                        <div 
+                        <div
                           className="bg-gradient-to-r from-rose-500 to-red-600 h-full rounded-lg transition-all duration-1000 ease-out flex items-center justify-center text-[9px] font-black text-white px-2 shadow-sm"
                           style={{ width: `${Math.max(notRenewedPercent, 10)}%` }}
                         >
@@ -2173,16 +2171,14 @@ export default function CeoDashboard() {
                                 setClientFilterScope('all_clients');
                               }
                             }}
-                            className={`px-3 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${
-                              isSelected
-                                ? 'bg-blue-600 text-white shadow-sm'
-                                : 'bg-slate-50 dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-                            }`}
+                            className={`px-3 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${isSelected
+                              ? 'bg-blue-600 text-white shadow-sm'
+                              : 'bg-slate-50 dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                              }`}
                           >
                             <span>{pill.label}</span>
-                            <span className={`px-1.5 py-0.2 rounded-md text-[9px] font-black ${
-                              isSelected ? 'bg-white/20 text-white' : pill.color
-                            }`}>
+                            <span className={`px-1.5 py-0.2 rounded-md text-[9px] font-black ${isSelected ? 'bg-white/20 text-white' : pill.color
+                              }`}>
                               {pill.count}
                             </span>
                           </button>
@@ -2195,11 +2191,10 @@ export default function CeoDashboard() {
                       <button
                         type="button"
                         onClick={() => setClientFilterScope('all_clients')}
-                        className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
-                          clientFilterScope === 'all_clients'
-                            ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs font-black'
-                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                        }`}
+                        className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${clientFilterScope === 'all_clients'
+                          ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs font-black'
+                          : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                          }`}
                         title="Search and filter across entire client base (all months)"
                       >
                         🌐 All Clients (Global)
@@ -2207,11 +2202,10 @@ export default function CeoDashboard() {
                       <button
                         type="button"
                         onClick={() => setClientFilterScope('month')}
-                        className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
-                          clientFilterScope === 'month'
-                            ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs font-black'
-                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                        }`}
+                        className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${clientFilterScope === 'month'
+                          ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs font-black'
+                          : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                          }`}
                         title="Filter within the selected calendar month"
                       >
                         📅 Month Specific
@@ -2225,9 +2219,9 @@ export default function CeoDashboard() {
                       <span>
                         Showing <strong>{
                           clientLifecycleFilter === 'active' ? 'Active Plans' :
-                          clientLifecycleFilter === 'expiring_soon' ? 'Expiring Soon (Within 7 Days)' :
-                          clientLifecycleFilter === 'expired' ? 'Expired / Renewal Due' :
-                          clientLifecycleFilter === 'renewable' ? 'Renewable / Renewed Subscriptions' : 'Inactive Accounts'
+                            clientLifecycleFilter === 'expiring_soon' ? 'Expiring Soon (Within 7 Days)' :
+                              clientLifecycleFilter === 'expired' ? 'Expired / Renewal Due' :
+                                clientLifecycleFilter === 'renewable' ? 'Renewable / Renewed Subscriptions' : 'Inactive Accounts'
                         }</strong> from {clientFilterScope === 'all_clients' ? '🌐 All Clients in the agency (not restricted by month)' : `📅 ${currentMonthLabel}`}.
                       </span>
                       <button
@@ -2352,7 +2346,15 @@ export default function CeoDashboard() {
                       </button>
                     )}
                   </div>
-                  
+
+                  <button
+                    onClick={() => { setExcelModalType('clients'); setExcelModalOpen(true); }}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-4 rounded-xl font-bold flex items-center justify-center gap-1.5 transition text-xs shadow-md shadow-emerald-500/10 shrink-0 cursor-pointer"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    Import via Excel
+                  </button>
+
                   <button
                     onClick={() => { resetClientForm(); setShowAddClientModal(true); }}
                     className="bg-blue-800 hover:bg-blue-900 text-white py-2.5 px-4 rounded-xl font-bold flex items-center justify-center gap-1.5 transition text-xs shadow-md shadow-blue-500/10 shrink-0"
@@ -2370,7 +2372,6 @@ export default function CeoDashboard() {
                         <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase tracking-wider">
                           <th className="p-4">ID</th>
                           <th className="p-4">Business / Client Name</th>
-                          <th className="p-4">Social Media Exec</th>
                           <th className="p-4">Service & Plan Stream</th>
                           <th className="p-4">Amount & Payment</th>
                           <th className="p-4">Plan Cycle & Expiry</th>
@@ -2382,7 +2383,7 @@ export default function CeoDashboard() {
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                         {filteredClients.length === 0 ? (
                           <tr>
-                            <td colSpan={9} className="p-8 text-center text-slate-400 font-medium">
+                            <td colSpan={8} className="p-8 text-center text-slate-400 font-medium">
                               No clients found matching the selected filter ({currentMonthLabel}).
                             </td>
                           </tr>
@@ -2391,42 +2392,12 @@ export default function CeoDashboard() {
                             const stream = getClientRevenueStream(client, clientMonthFilter);
                             const pInfo = getClientPaymentInfo(client);
                             const planInfo = getClientPlanInfo(client);
-                            const smExec = getClientSmExecutive(client, allClientTasks, allClientDeliveries);
                             return (
                               <tr key={client.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/40 transition">
                                 <td className="p-4 font-bold text-slate-450">{client.clientId}</td>
                                 <td className="p-4">
                                   <div className="font-bold text-slate-900 dark:text-white">{client.businessName}</div>
                                   <div className="text-[10px] text-slate-400 mt-0.5">{client.clientName || 'No Contact Person'}</div>
-                                  {smExec && (
-                                    <div className="mt-1 flex items-center gap-1">
-                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
-                                        <UserCheck className="w-2.5 h-2.5 text-emerald-500" />
-                                        <span>SM: {smExec}</span>
-                                      </span>
-                                    </div>
-                                  )}
-                                </td>
-                                <td className="p-4">
-                                  {smExec ? (
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-black text-[11px] flex items-center justify-center shadow-xs shrink-0">
-                                        {smExec.charAt(0).toUpperCase()}
-                                      </div>
-                                      <div>
-                                        <div className="font-bold text-xs text-slate-900 dark:text-white leading-tight">
-                                          {smExec}
-                                        </div>
-                                        <div className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">
-                                          Dedicated SM Exec
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700">
-                                      Unassigned
-                                    </span>
-                                  )}
                                 </td>
                                 <td className="p-4">
                                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -2494,47 +2465,47 @@ export default function CeoDashboard() {
                                   </span>
                                 </td>
                                 <td className="p-4 text-right">
-                                <div className="flex gap-2 justify-end">
-                                  <button
-                                    onClick={() => {
-                                      setSelectedClient(client);
-                                      setShowClientDetailModal(true);
-                                      refreshClientTasks(client.id);
-                                      setClientTaskFormId(`${client.clientId}-TASK-01`);
-                                      setClientTaskFormTitle('');
-                                      setClientTaskFormDate(new Date().toISOString().split('T')[0]);
-                                      setClientTaskFormAssignTo('Graphic Designer');
-                                      setClientTaskFormWorkingOn('');
-                                      setClientTaskFormStatus('Not Started');
-                                      setClientTaskFormPostType('Graphic');
-                                      setClientTaskFormNotes('');
-                                      setClientTaskEditMode(false);
-                                    }}
-                                    className="py-1 px-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-850 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-lg transition"
-                                  >
-                                    Details
-                                  </button>
-                                  <button
-                                    onClick={() => { resetClientForm(client); setShowEditClientModal(true); }}
-                                    className="p-1.5 border border-slate-200 dark:border-slate-855 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition"
-                                    title="Edit"
-                                  >
-                                    <Edit2 className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteClient(client.id, client.businessName)}
-                                    className="p-1.5 border border-slate-200 dark:border-slate-855 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg text-red-650 transition"
-                                    title="Delete"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
+                                  <div className="flex gap-2 justify-end">
+                                    <button
+                                      onClick={() => {
+                                        setSelectedClient(client);
+                                        setShowClientDetailModal(true);
+                                        refreshClientTasks(client.id);
+                                        setClientTaskFormId(`${client.clientId}-TASK-01`);
+                                        setClientTaskFormTitle('');
+                                        setClientTaskFormDate(new Date().toISOString().split('T')[0]);
+                                        setClientTaskFormAssignTo('Graphic Designer');
+                                        setClientTaskFormWorkingOn('');
+                                        setClientTaskFormStatus('Not Started');
+                                        setClientTaskFormPostType('Graphic');
+                                        setClientTaskFormNotes('');
+                                        setClientTaskEditMode(false);
+                                      }}
+                                      className="py-1 px-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-850 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-lg transition"
+                                    >
+                                      Details
+                                    </button>
+                                    <button
+                                      onClick={() => { resetClientForm(client); setShowEditClientModal(true); }}
+                                      className="p-1.5 border border-slate-200 dark:border-slate-855 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition"
+                                      title="Edit"
+                                    >
+                                      <Edit2 className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteClient(client.id, client.businessName)}
+                                      className="p-1.5 border border-slate-200 dark:border-slate-855 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg text-red-650 transition"
+                                      title="Delete"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
                     </table>
                   </div>
                 </div>
@@ -2553,7 +2524,7 @@ export default function CeoDashboard() {
               <h3 className="font-extrabold text-sm text-slate-950 dark:text-white">Add New Staff Member</h3>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600 transition text-sm">✕</button>
             </div>
-            
+
             <form onSubmit={handleAddUser} autoComplete="off" className="flex flex-col flex-1 overflow-hidden">
               <div className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1">
                 {formError && (
@@ -2686,7 +2657,7 @@ export default function CeoDashboard() {
               <h3 className="font-extrabold text-sm text-slate-950 dark:text-white">Modify Staff Profile</h3>
               <button onClick={() => setShowEditModal(false)} className="text-slate-400 hover:text-slate-600 transition text-sm">✕</button>
             </div>
-            
+
             <form onSubmit={handleEditUser} autoComplete="off" className="flex flex-col flex-1 overflow-hidden">
               <div className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1">
                 {formError && (
@@ -2828,7 +2799,7 @@ export default function CeoDashboard() {
               <h3 className="font-extrabold text-sm text-slate-950 dark:text-white">Onboard New Client Account</h3>
               <button onClick={() => setShowAddClientModal(false)} className="text-slate-400 hover:text-slate-650 transition text-sm">✕</button>
             </div>
-            
+
             <form onSubmit={handleAddClient} className="flex flex-col flex-1 overflow-hidden">
               <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
                 {formError && (
@@ -3043,7 +3014,7 @@ export default function CeoDashboard() {
               <h3 className="font-extrabold text-sm text-slate-950 dark:text-white">Modify Client Profile</h3>
               <button onClick={() => setShowEditClientModal(false)} className="text-slate-400 hover:text-slate-655 transition text-sm">✕</button>
             </div>
-            
+
             <form onSubmit={handleEditClient} className="flex flex-col flex-1 overflow-hidden">
               <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
                 {formError && (
@@ -3252,9 +3223,9 @@ export default function CeoDashboard() {
               </div>
               <button onClick={() => setShowClientDetailModal(false)} className="text-slate-400 hover:text-slate-655 transition text-sm">✕</button>
             </div>
-            
+
             <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-y-auto flex-1">
-              
+
               {/* Left Column: Client Details */}
               <div className="lg:col-span-5 space-y-4 border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-slate-800/60 pb-6 lg:pb-0 pr-0 lg:pr-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-b border-slate-100 dark:border-slate-800/60 pb-3">
@@ -3268,7 +3239,7 @@ export default function CeoDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-b border-slate-100 dark:border-slate-800/60 pb-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-b border-slate-100 dark:border-slate-800/60 pb-3">
                   <div>
                     <span className="text-[10px] text-slate-400 font-extrabold uppercase">Services Category</span>
                     <p className="font-bold text-slate-900 dark:text-white text-[11px] mt-0.5">{selectedClient.services}</p>
@@ -3276,13 +3247,6 @@ export default function CeoDashboard() {
                   <div>
                     <span className="text-[10px] text-slate-400 font-extrabold uppercase">Monthly Package Cost</span>
                     <p className="font-extrabold text-blue-750 dark:text-blue-400 text-[11px] mt-0.5">₹{selectedClient.packageAmount.toLocaleString()}/mo</p>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 font-extrabold uppercase">Dedicated SM Exec</span>
-                    <p className="font-extrabold text-emerald-600 dark:text-emerald-400 text-[11px] mt-0.5 flex items-center gap-1">
-                      <UserCheck className="w-3 h-3 text-emerald-500" />
-                      {getClientSmExecutive(selectedClient, allClientTasks, allClientDeliveries) || 'Unassigned'}
-                    </p>
                   </div>
                 </div>
 
@@ -3507,11 +3471,11 @@ export default function CeoDashboard() {
                               </td>
                               <td className="p-2.5">
                                 <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase
-                                  ${task.status === 'Complete Task' 
-                                    ? 'bg-emerald-500 text-white' 
-                                    : task.status === 'Working On It' 
-                                    ? 'bg-orange-500 text-white' 
-                                    : 'bg-slate-200 dark:bg-slate-800 text-slate-650 dark:text-slate-400'}`}
+                                  ${task.status === 'Complete Task'
+                                    ? 'bg-emerald-500 text-white'
+                                    : task.status === 'Working On It'
+                                      ? 'bg-orange-500 text-white'
+                                      : 'bg-slate-200 dark:bg-slate-800 text-slate-650 dark:text-slate-400'}`}
                                 >
                                   {task.status}
                                 </span>
@@ -3561,6 +3525,17 @@ export default function CeoDashboard() {
           </div>
         </div>
       )}
+
+      {/* Excel Sheet Bulk Upload Modal */}
+      <ExcelImportModal
+        isOpen={excelModalOpen}
+        onClose={() => setExcelModalOpen(false)}
+        panelType={excelModalType}
+        onSuccess={() => {
+          refreshData();
+          showToast('Data imported successfully!', 'success');
+        }}
+      />
 
     </div>
   );

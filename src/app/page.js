@@ -60,12 +60,14 @@ export default function LoginPage() {
     async function checkSession() {
       try {
         const res = await fetch('/api/auth/me');
-        const data = await res.json();
-        if (data.user) {
-          router.push('/dashboard');
-        } else {
-          setCheckingSession(false);
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.user) {
+            router.push('/dashboard');
+            return;
+          }
         }
+        setCheckingSession(false);
       } catch (err) {
         setCheckingSession(false);
       }

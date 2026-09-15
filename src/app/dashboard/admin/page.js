@@ -41,8 +41,10 @@ import {
   PhoneCall,
   TrendingUp,
   Tag,
-  Menu
+  Menu,
+  FileSpreadsheet
 } from 'lucide-react';
+import ExcelImportModal from '@/components/ExcelImportModal';
 import { uploadFileAction } from '@/app/actions/uploadAction';
 import {
   parseDbDate as parsePlanDbDate,
@@ -143,6 +145,8 @@ export default function AdminDashboard() {
   const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [showViewUserModal, setShowViewUserModal] = useState(false);
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
+  const [excelModalOpen, setExcelModalOpen] = useState(false);
+  const [excelModalType, setExcelModalType] = useState('clients');
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [clientMonthFilter, setClientMonthFilter] = useState('all');
@@ -2513,6 +2517,14 @@ export default function AdminDashboard() {
                 </div>
 
                 <button
+                  onClick={() => { setExcelModalType('employees'); setExcelModalOpen(true); }}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/10 shrink-0 transition cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  Import via Excel
+                </button>
+
+                <button
                   onClick={openAddUserModal}
                   className="bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/10 shrink-0 transition"
                 >
@@ -2672,6 +2684,14 @@ export default function AdminDashboard() {
                         </button>
                       )}
                     </div>
+
+                    <button
+                      onClick={() => { setExcelModalType('tasks'); setExcelModalOpen(true); }}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shrink-0 cursor-pointer shadow-md shadow-emerald-500/10"
+                    >
+                      <FileSpreadsheet className="w-4 h-4" />
+                      Import via Excel
+                    </button>
 
                     <button
                       onClick={() => { setFormError(''); setShowAddTaskModal(true); }}
@@ -5538,6 +5558,14 @@ export default function AdminDashboard() {
                   </div>
                   
                   <button
+                    onClick={() => { setExcelModalType('clients'); setExcelModalOpen(true); }}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-4 rounded-xl font-bold flex items-center justify-center gap-1.5 transition text-xs shadow-md shadow-emerald-500/10 shrink-0 cursor-pointer"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    Import via Excel
+                  </button>
+
+                  <button
                     onClick={() => { resetClientForm(); setShowAddClientModal(true); }}
                     className="bg-blue-800 hover:bg-blue-900 text-white py-2.5 px-4 rounded-xl font-bold flex items-center justify-center gap-1.5 transition text-xs shadow-md shadow-blue-500/10 shrink-0"
                   >
@@ -7735,6 +7763,17 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* Excel Sheet Bulk Upload Modal */}
+      <ExcelImportModal
+        isOpen={excelModalOpen}
+        onClose={() => setExcelModalOpen(false)}
+        panelType={excelModalType}
+        onSuccess={() => {
+          refreshData();
+          showToast('Data imported successfully!', 'success');
+        }}
+      />
 
     </div>
   );
