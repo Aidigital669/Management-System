@@ -106,12 +106,15 @@ def fetch_clients_from_db() -> list:
     try:
         import psycopg2
         import psycopg2.extras
-        conn = psycopg2.connect(DATABASE_URL)
+        db_conn_str = DATABASE_URL
+        if "sslmode=verify-full" in db_conn_str:
+            db_conn_str = db_conn_str.replace("sslmode=verify-full", "sslmode=require")
+        conn = psycopg2.connect(db_conn_str)
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("""
             SELECT id, "clientId", "businessName", "clientName", "joiningDate",
                    "services", "packageName", "packageAmount", "contact", "email",
-                   "active", "notes"
+                   "active", "notes", "extensionDays", "extensionExpiryDate"
             FROM "Client"
             WHERE active = true;
         """)
@@ -161,8 +164,10 @@ def identify_expiring_clients(reference_date=None) -> list:
         if not start_date:
             continue
 
+        extension_days = int(c.get("extensionDays") or 0)
         duration_days, duration_label = get_plan_duration_days(c)
-        expiry_date = start_date + timedelta(days=duration_days)
+        base_expiry = start_date + timedelta(days=duration_days)
+        expiry_date = base_expiry + timedelta(days=extension_days)
         days_remaining = (expiry_date - today).days
 
         # Only clients expiring in 0 to 7 days

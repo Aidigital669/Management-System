@@ -147,9 +147,16 @@ export const getClientPlanInfo = (client, referenceDate = new Date()) => {
     };
   }
 
-  // Exact expiry calculation using plan duration (30, 90, 180, 365 days)
-  const expiry = new Date(start);
-  expiry.setDate(expiry.getDate() + durationDays);
+  // Base expiry calculation using plan duration (30, 90, 180, 365 days)
+  const baseExpiry = new Date(start);
+  baseExpiry.setDate(baseExpiry.getDate() + durationDays);
+
+  // Extension days (granted by Admin up to max 10 days, requested by TL max 7 days)
+  const extensionDays = parseInt(client.extensionDays || 0, 10);
+  const expiry = new Date(baseExpiry);
+  if (extensionDays > 0) {
+    expiry.setDate(expiry.getDate() + extensionDays);
+  }
 
   // Renewal starts the next day after expiry
   const renewalDue = new Date(expiry);
@@ -158,6 +165,7 @@ export const getClientPlanInfo = (client, referenceDate = new Date()) => {
   const today = new Date(referenceDate);
   today.setHours(0, 0, 0, 0);
   start.setHours(0, 0, 0, 0);
+  baseExpiry.setHours(0, 0, 0, 0);
   expiry.setHours(0, 0, 0, 0);
   renewalDue.setHours(0, 0, 0, 0);
 
@@ -166,6 +174,7 @@ export const getClientPlanInfo = (client, referenceDate = new Date()) => {
   const daysPassed = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
 
   const cycleStartStr = formatDateToDb(start);
+  const baseExpiryDateStr = formatDateToDb(baseExpiry);
   const expiryDateStr = formatDateToDb(expiry);
   const renewalDueStr = formatDateToDb(renewalDue);
 
@@ -200,10 +209,17 @@ export const getClientPlanInfo = (client, referenceDate = new Date()) => {
   let expiringSoonDays = 0;
   let displayText = 'Active';
 
-  if (diffDays <= 0) {
+  if (client.active === false) {
+    status = 'Inactive';
+    overdueDays = diffDays <= 0 ? Math.abs(diffDays) + 1 : 0;
+    displayText = 'Inactive (Deactivated)';
+  } else if (diffDays <= 0) {
     status = 'Expired';
     overdueDays = Math.abs(diffDays) + 1;
-    displayText = `Overdue (${overdueDays}d)`;
+    displayText = extensionDays > 0 ? `Extension Expired (${overdueDays}d overdue)` : `Overdue (${overdueDays}d)`;
+  } else if (extensionDays > 0) {
+    status = 'Extended';
+    displayText = `Extended (${diffDays}d left)`;
   } else if (diffDays <= 7) {
     status = 'Expiring Soon';
     expiringSoonDays = 7 - diffDays;
@@ -217,11 +233,15 @@ export const getClientPlanInfo = (client, referenceDate = new Date()) => {
     status,
     durationDays,
     durationLabel,
+    extensionDays,
+    isExtended: extensionDays > 0,
     cycleStart: start,
     cycleStartStr,
+    baseExpiryDate: baseExpiry,
+    baseExpiryDateStr,
     expiryDate: expiry,
     expiryDateStr,
-    isExpired: status === 'Expired',
+    isExpired: status === 'Expired' || status === 'Inactive',
     isExpiringSoon: status === 'Expiring Soon',
     renewalDueDate: renewalDue,
     renewalDueStr,
@@ -447,3 +467,50 @@ export const getClientSmExecutive = (client, tasks = [], deliveries = []) => {
   return '';
 };
 
+/**
+ * Checks active clients whose plan or approved extension has expired.
+ * If extension days (or grace period) have elapsed without renewal,
+ * sets client.active = false (deactivated/inactive).
+ */
+export const checkAndDeactivateExpiredClients = async (prismaClient) => {
+  if (!prismaClient) return { deactivatedCount: 0, deactivatedIds: [] };
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  try {
+    const activeClients = await prismaClient.client.findMany({
+      where: { active: true }
+    });
+
+    const deactivatedIds = [];
+
+    for (const client of activeClients) {
+      const info = getClientPlanInfo(client, today);
+      // Auto-deactivate:
+      // 1. If client had an extension approved (extensionDays > 0) and the extended expiry has passed (diffDays <= 0)
+      // 2. Or if standard plan is overdue by more than 7 days without an extension/renewal
+      if (info.isExpired && (client.extensionDays > 0 || info.daysLeft <= -7)) {
+        await prismaClient.client.update({
+          where: { id: client.id },
+          data: { active: false }
+        });
+        deactivatedIds.push(client.id);
+
+        try {
+          await prismaClient.auditLog.create({
+            data: {
+              action: `AUTO_DEACTIVATE: Client "${client.businessName}" (${client.clientId}) deactivated due to expired plan/extension without renewal.`,
+              performedByName: 'SYSTEM',
+              performedByRole: 'SYSTEM'
+            }
+          });
+        } catch (auditErr) {}
+      }
+    }
+
+    return { deactivatedCount: deactivatedIds.length, deactivatedIds };
+  } catch (err) {
+    console.error('Error in checkAndDeactivateExpiredClients:', err);
+    return { deactivatedCount: 0, deactivatedIds: [] };
+  }
+};

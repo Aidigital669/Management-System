@@ -21,6 +21,7 @@ import {
   UserCheck,
   Search,
   CheckCircle,
+  Check,
   FileText,
   AlertCircle,
   Briefcase,
@@ -219,6 +220,12 @@ export default function AdminDashboard() {
   const [paymentStatus, setPaymentStatus] = useState('Full');
   const [paidAmount, setPaidAmount] = useState('19499');
   const [actualNotes, setActualNotes] = useState('');
+
+  // Plan Renewal & Extension Approval States
+  const [renewalRequestsList, setRenewalRequestsList] = useState([]);
+  const [adminExtensionDaysMap, setAdminExtensionDaysMap] = useState({});
+  const [adminNoteMap, setAdminNoteMap] = useState({});
+  const [processingRequestId, setProcessingRequestId] = useState(null);
 
   // Responsive Navigation & Sidebar States
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -629,7 +636,8 @@ export default function AdminDashboard() {
         clientsRes,
         ctRes,
         cdRes,
-        fbRes
+        fbRes,
+        renewalsRes
       ] = await Promise.all([
         fetchJson('/api/users'),
         fetchJson('/api/tasks'),
@@ -638,7 +646,8 @@ export default function AdminDashboard() {
         fetchJson('/api/clients'),
         fetchJson('/api/client-tasks'),
         fetchJson('/api/client-deliveries'),
-        fetchJson('/api/client/feedback')
+        fetchJson('/api/client/feedback'),
+        fetchJson('/api/renewal-requests')
       ]);
 
       const fetchedUsers = usersRes.data.users || [];
@@ -664,6 +673,7 @@ export default function AdminDashboard() {
       setAllClientDeliveries(cdRes.data.deliveries || []);
 
       setFeedbacksList(fbRes.data.feedbacks || []);
+      setRenewalRequestsList(renewalsRes.data?.requests || []);
 
       // Calculate Metrics
       const totalStaff = fetchedUsers.filter(u => u.role === 'EMPLOYEE' || u.role === 'SALES').length;
@@ -1463,6 +1473,65 @@ export default function AdminDashboard() {
       alert(err.message);
     } finally {
       setFormLoading(false);
+    }
+  };
+
+  const handleApproveRenewalRequest = async (req) => {
+    const isExtension = req.requestType === 'EXTENSION';
+    const chosenDays = adminExtensionDaysMap[req.id] || req.requestedDays || 7;
+
+    if (isExtension) {
+      if (chosenDays > 10) {
+        alert('Admin can grant a maximum of 10 days extension. Please select 10 days or fewer.');
+        return;
+      }
+      if (!confirm(`Are you sure you want to approve a ${chosenDays}-day extension for "${req.businessName}"? (Requested by TL: ${req.requestedByName})`)) return;
+    } else {
+      if (!confirm(`Are you sure you want to approve the plan renewal for "${req.businessName}"? (Requested by TL: ${req.requestedByName})`)) return;
+    }
+
+    setProcessingRequestId(req.id);
+    try {
+      const res = await fetch(`/api/renewal-requests/${req.id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          approvedDays: chosenDays,
+          adminNote: adminNoteMap[req.id] || ''
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to approve request');
+
+      showToast(data.message || 'Request approved successfully!');
+      await refreshData();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setProcessingRequestId(null);
+    }
+  };
+
+  const handleRejectRenewalRequest = async (req) => {
+    const reason = prompt(`Enter rejection reason / note for "${req.businessName}":`, adminNoteMap[req.id] || 'Rejected by Admin.');
+    if (reason === null) return;
+
+    setProcessingRequestId(req.id);
+    try {
+      const res = await fetch(`/api/renewal-requests/${req.id}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminNote: reason })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to reject request');
+
+      showToast(data.message || 'Request rejected.');
+      await refreshData();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setProcessingRequestId(null);
     }
   };
 
@@ -4550,6 +4619,144 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="overflow-x-auto p-4 space-y-6">
+                    {/* Team Leader Renewal & Extension Approvals Queue */}
+                    {(() => {
+                      const pendingRequests = renewalRequestsList.filter(r => r.status === 'PENDING');
+                      
+                      return (
+                        <div className="border border-blue-200 dark:border-blue-900/60 rounded-xl overflow-hidden shadow-sm bg-gradient-to-r from-blue-50/40 via-indigo-50/20 to-white dark:from-slate-900 dark:via-blue-950/20 dark:to-slate-900">
+                          <div className="p-3.5 bg-blue-100/60 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-900/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="p-1.5 rounded-lg bg-blue-600 text-white shadow-sm">
+                                <RefreshCw className="w-3.5 h-3.5" />
+                              </span>
+                              <div>
+                                <span className="text-[11px] font-black uppercase tracking-wider text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
+                                  Plan Renewal & Extension Approvals (Team Leader Requests)
+                                </span>
+                                <p className="text-[10px] text-blue-700/80 dark:text-blue-300/80 font-medium">
+                                  TL limit: <strong>max 7 days</strong> • Admin approval limit: <strong>max 10 days</strong>. If extension days elapse without renewal, pack automatically expires and deactivates.
+                                </p>
+                              </div>
+                            </div>
+                            <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-sm ${
+                              pendingRequests.length > 0
+                                ? 'bg-amber-500 text-white animate-pulse'
+                                : 'bg-emerald-600 text-white'
+                            }`}>
+                              {pendingRequests.length > 0 ? `${pendingRequests.length} Pending Approval` : 'All Processed'}
+                            </span>
+                          </div>
+
+                          {pendingRequests.length === 0 ? (
+                            <div className="p-5 text-center text-slate-500 dark:text-slate-400 text-xs flex items-center justify-center gap-2">
+                              <CheckCircle className="w-4 h-4 text-emerald-500" />
+                              <span>No pending renewal or extension requests from Team Leaders.</span>
+                            </div>
+                          ) : (
+                            <div className="overflow-x-auto p-3">
+                              <table className="w-full text-left border-collapse text-xs min-w-[850px]">
+                                <thead>
+                                  <tr className="border-b border-slate-200 dark:border-slate-800 text-[9px] uppercase tracking-wider font-extrabold text-slate-500 bg-white/60 dark:bg-slate-800/40">
+                                    <th className="p-3">Client / Business</th>
+                                    <th className="p-3">Request Type</th>
+                                    <th className="p-3">Requested By (TL)</th>
+                                    <th className="p-3">TL Reason / Justification</th>
+                                    <th className="p-3">Admin Duration Control</th>
+                                    <th className="p-3 text-right">Admin Action</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                  {pendingRequests.map(req => {
+                                    const isExtension = req.requestType === 'EXTENSION';
+                                    const selectedDays = adminExtensionDaysMap[req.id] !== undefined ? adminExtensionDaysMap[req.id] : (req.requestedDays || 7);
+
+                                    return (
+                                      <tr key={`pending-req-${req.id}`} className="hover:bg-blue-50/50 dark:hover:bg-blue-950/30 transition">
+                                        <td className="p-3">
+                                          <div className="font-bold text-slate-900 dark:text-white">{req.businessName}</div>
+                                          <div className="text-[10px] text-slate-400">ID: {req.clientId}</div>
+                                        </td>
+
+                                        <td className="p-3">
+                                          {isExtension ? (
+                                            <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                                              Extension ({req.requestedDays}d TL Request)
+                                            </span>
+                                          ) : (
+                                            <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                              Plan Renewal
+                                            </span>
+                                          )}
+                                        </td>
+
+                                        <td className="p-3">
+                                          <div className="font-semibold text-slate-800 dark:text-slate-200">{req.requestedByName}</div>
+                                          <div className="text-[10px] text-slate-400 font-medium">{new Date(req.createdAt).toLocaleDateString()}</div>
+                                        </td>
+
+                                        <td className="p-3 max-w-xs">
+                                          <p className="text-[11px] text-slate-700 dark:text-slate-300 italic bg-white/70 dark:bg-slate-800/60 p-2 rounded-lg border border-slate-200/60 dark:border-slate-700/60">
+                                            "{req.reason || 'No remarks specified'}"
+                                          </p>
+                                        </td>
+
+                                        <td className="p-3">
+                                          {isExtension ? (
+                                            <div className="space-y-1">
+                                              <div className="flex items-center gap-1.5">
+                                                <label className="text-[10px] font-bold text-slate-500">Approve:</label>
+                                                <select
+                                                  value={selectedDays}
+                                                  onChange={(e) => setAdminExtensionDaysMap(prev => ({ ...prev, [req.id]: parseInt(e.target.value, 10) }))}
+                                                  className="px-2 py-1 bg-white dark:bg-slate-800 border border-purple-300 dark:border-purple-700 rounded-lg text-xs font-bold text-purple-700 dark:text-purple-300 focus:outline-none cursor-pointer"
+                                                >
+                                                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(d => (
+                                                    <option key={d} value={d}>
+                                                      {d} Days {d === req.requestedDays ? '(TL Requested)' : d === 10 ? '(Admin Max 10d)' : ''}
+                                                    </option>
+                                                  ))}
+                                                </select>
+                                              </div>
+                                              <span className="text-[9px] text-slate-400 block font-medium">Strict Admin Limit: 10 Days Max</span>
+                                            </div>
+                                          ) : (
+                                            <span className="text-[10px] text-slate-500 font-medium">Standard Plan Cycle</span>
+                                          )}
+                                        </td>
+
+                                        <td className="p-3 text-right">
+                                          <div className="flex items-center justify-end gap-1.5">
+                                            <button
+                                              onClick={() => handleApproveRenewalRequest(req)}
+                                              disabled={processingRequestId === req.id}
+                                              className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition flex items-center gap-1 shadow-sm disabled:opacity-50 cursor-pointer"
+                                            >
+                                              <Check className="w-3 h-3" />
+                                              <span>{isExtension ? `Approve (${selectedDays}d)` : 'Approve Renewal'}</span>
+                                            </button>
+
+                                            <button
+                                              onClick={() => handleRejectRenewalRequest(req)}
+                                              disabled={processingRequestId === req.id}
+                                              className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-red-600 hover:bg-red-700 text-white transition flex items-center gap-1 shadow-sm disabled:opacity-50 cursor-pointer"
+                                            >
+                                              ✕
+                                              <span>Reject</span>
+                                            </button>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {/* Expired / Overdue Contracts Table (Renewal Required) */}
                     {(renewalFilter === 'All' || renewalFilter === 'Expired') && (
                       <div className="border border-red-200 dark:border-red-900/50 rounded-xl overflow-hidden shadow-sm">

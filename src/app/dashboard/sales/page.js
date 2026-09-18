@@ -1722,3 +1722,4 @@ export default function SalesDashboard() {
     </div>
   );
 }
+}

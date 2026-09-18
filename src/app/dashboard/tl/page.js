@@ -8,9 +8,10 @@ import {
   Clock, CheckSquare, Calendar, LogOut, Plus, Building, UserCheck,
   CheckCircle, FileText, AlertCircle, Briefcase, Play, Check, Moon,
   Sun, DollarSign, TrendingUp, Download, Users, FileDown, Activity,
-  BarChart2, Lock, Menu, X
+  BarChart2, Lock, Menu, X, RefreshCw, Search, ShieldAlert, Sparkles, Send
 } from 'lucide-react';
 import { uploadFileAction } from '@/app/actions/uploadAction';
+import { getClientPlanInfo } from '@/lib/planUtils';
 
 const convertDbDateToIso = (dateStr) => {
   if (!dateStr) return '';
@@ -67,6 +68,17 @@ export default function TLDashboard() {
   const [allLeavesList, setAllLeavesList] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   
+  // Renewal & Extension Request States
+  const [renewalRequestsList, setRenewalRequestsList] = useState([]);
+  const [renewalModalClient, setRenewalModalClient] = useState(null);
+  const [extensionModalClient, setExtensionModalClient] = useState(null);
+  const [renewalReason, setRenewalReason] = useState('');
+  const [extensionDays, setExtensionDays] = useState(7);
+  const [extensionReason, setExtensionReason] = useState('');
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
+  const [renewalFilter, setRenewalFilter] = useState('All');
+  const [renewalSearch, setRenewalSearch] = useState('');
+
   // TL Metrics
   const [metrics, setMetrics] = useState({
     teamMembers: 0,
@@ -208,7 +220,8 @@ export default function TLDashboard() {
         attRes,
         clientsRes,
         ctRes,
-        cdRes
+        cdRes,
+        renewalsRes
       ] = await Promise.all([
         fetch('/api/users'),
         fetch('/api/tasks'),
@@ -216,7 +229,8 @@ export default function TLDashboard() {
         fetch('/api/attendance'),
         fetch('/api/clients'),
         fetch('/api/client-tasks'),
-        fetch('/api/client-deliveries')
+        fetch('/api/client-deliveries'),
+        fetch('/api/renewal-requests')
       ]);
 
       const [
@@ -226,7 +240,8 @@ export default function TLDashboard() {
         attData,
         clientsData,
         ctData,
-        cdData
+        cdData,
+        renewalsData
       ] = await Promise.all([
         usersRes.json(),
         tasksRes.json(),
@@ -234,7 +249,8 @@ export default function TLDashboard() {
         attRes.json(),
         clientsRes.json(),
         ctRes.json(),
-        cdRes.json()
+        cdRes.json(),
+        renewalsRes.json()
       ]);
 
       const fetchedUsers = usersData.users || [];
@@ -284,7 +300,7 @@ export default function TLDashboard() {
       setAllClientTasks(ctData.tasks || []);
 
       setAllClientDeliveries(cdData.deliveries || []);
-
+      setRenewalRequestsList(renewalsData.requests || []);
     } catch (err) {
       console.error('Error refreshing TL dashboard:', err);
     }
@@ -613,6 +629,96 @@ export default function TLDashboard() {
       setFormError('Connection error.');
     } finally {
       setFormLoading(false);
+    }
+  };
+
+  // Open Renewal Request Modal
+  const handleOpenRenewalModal = (client) => {
+    setRenewalModalClient(client);
+    setRenewalReason('');
+  };
+
+  // Submit Renewal Request
+  const handleSubmitRenewalRequest = async (e) => {
+    e.preventDefault();
+    if (!renewalModalClient) return;
+
+    setRequestSubmitting(true);
+    try {
+      const res = await fetch('/api/renewal-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientDbId: renewalModalClient.id,
+          requestType: 'RENEWAL',
+          reason: renewalReason
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to submit renewal request');
+
+      showToast(`Renewal request for "${renewalModalClient.businessName}" submitted! Awaiting Admin approval.`);
+      setRenewalModalClient(null);
+      setRenewalReason('');
+      await refreshData();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setRequestSubmitting(false);
+    }
+  };
+
+  // Open Extension Request Modal
+  const handleOpenExtensionModal = (client) => {
+    setExtensionModalClient(client);
+    setExtensionDays(7); // default 7 days max for TL
+    setExtensionReason('');
+  };
+
+  // Submit Extension Request (Enforcing max 7 days rule)
+  const handleSubmitExtensionRequest = async (e) => {
+    e.preventDefault();
+    if (!extensionModalClient) return;
+
+    const days = parseInt(extensionDays, 10);
+    if (isNaN(days) || days < 1) {
+      alert('Please specify at least 1 extension day.');
+      return;
+    }
+    if (days > 7) {
+      alert('Team Leader can request a maximum of 7 days extension. Please select 7 days or fewer.');
+      return;
+    }
+    if (!extensionReason.trim()) {
+      alert('Please provide a reason for the extension request.');
+      return;
+    }
+
+    setRequestSubmitting(true);
+    try {
+      const res = await fetch('/api/renewal-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientDbId: extensionModalClient.id,
+          requestType: 'EXTENSION',
+          requestedDays: days,
+          reason: extensionReason.trim()
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to submit extension request');
+
+      showToast(`Extension request (${days} days) for "${extensionModalClient.businessName}" submitted! Awaiting Admin approval.`);
+      setExtensionModalClient(null);
+      setExtensionReason('');
+      await refreshData();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setRequestSubmitting(false);
     }
   };
 
@@ -1046,6 +1152,23 @@ export default function TLDashboard() {
 
             
             <p className="px-4 text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 mt-6">Team Leader</p>
+
+            <button
+              onClick={() => handleSelectTab('client-renewals')}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
+                activeTab === 'client-renewals'
+                  ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Plan Renewals & Extensions</span>
+              {renewalRequestsList.filter(r => r.status === 'PENDING').length > 0 && (
+                <span className="ml-auto px-1.5 py-0.5 bg-amber-500 text-white rounded-full text-[9px] font-black">
+                  {renewalRequestsList.filter(r => r.status === 'PENDING').length}
+                </span>
+              )}
+            </button>
 
             <button
               onClick={() => handleSelectTab('team-tasks')}
@@ -2149,7 +2272,329 @@ export default function TLDashboard() {
               </form>
             </div>
           )}
-          
+
+          {/* TAB: CLIENT PLAN RENEWALS & EXTENSIONS */}
+          {activeTab === 'client-renewals' && (
+            <div className="space-y-8 animate-fade-in">
+              {/* Header */}
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
+                        <RefreshCw className="w-5 h-5" />
+                      </span>
+                      <h4 className="text-lg font-extrabold text-slate-900 dark:text-white">Client Plan Renewals & Extensions</h4>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 max-w-3xl">
+                      Team Leader Command Center for client contracts. When a client needs to renew, submit a <strong>Renewal Request</strong> for Admin approval. If a client needs time before renewal, you can request up to <strong>7 Days Maximum Extension</strong> (Admin approval is compulsory).
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] font-bold bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50 px-3 py-2 rounded-xl">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>TL Limit: Max 7 Days | Admin Limit: Max 10 Days</span>
+                  </div>
+                </div>
+
+                {/* Metrics Cards */}
+                {(() => {
+                  const expiringCount = clientsList.filter(c => c.active && getClientPlanInfo(c).status === 'Expiring Soon').length;
+                  const expiredCount = clientsList.filter(c => getClientPlanInfo(c).status === 'Expired' || !c.active).length;
+                  const extendedCount = clientsList.filter(c => c.active && (c.extensionDays || 0) > 0).length;
+                  const pendingCount = renewalRequestsList.filter(r => r.status === 'PENDING').length;
+
+                  return (
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
+                      <div className="p-4 rounded-xl bg-orange-50/60 dark:bg-orange-950/20 border border-orange-200/60 dark:border-orange-900/40">
+                        <span className="text-[10px] uppercase tracking-wider font-extrabold text-orange-600 dark:text-orange-400">Expiring Soon (≤ 7d)</span>
+                        <div className="text-2xl font-black text-orange-700 dark:text-orange-300 mt-1">{expiringCount}</div>
+                        <p className="text-[10px] text-orange-600/80 mt-0.5 font-medium">Eligible for renewal / extension</p>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-red-50/60 dark:bg-red-950/20 border border-red-200/60 dark:border-red-900/40">
+                        <span className="text-[10px] uppercase tracking-wider font-extrabold text-red-600 dark:text-red-400">Expired / Deactivated</span>
+                        <div className="text-2xl font-black text-red-700 dark:text-red-300 mt-1">{expiredCount}</div>
+                        <p className="text-[10px] text-red-600/80 mt-0.5 font-medium">Cycle ended or extension expired</p>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-200/60 dark:border-indigo-900/40">
+                        <span className="text-[10px] uppercase tracking-wider font-extrabold text-indigo-600 dark:text-indigo-400">Active Extensions</span>
+                        <div className="text-2xl font-black text-indigo-700 dark:text-indigo-300 mt-1">{extendedCount}</div>
+                        <p className="text-[10px] text-indigo-600/80 mt-0.5 font-medium">Approved grace periods</p>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/40">
+                        <span className="text-[10px] uppercase tracking-wider font-extrabold text-amber-600 dark:text-amber-400">Pending Admin Approval</span>
+                        <div className="text-2xl font-black text-amber-700 dark:text-amber-300 mt-1">{pendingCount}</div>
+                        <p className="text-[10px] text-amber-600/80 mt-0.5 font-medium">Awaiting Admin decision</p>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Clients Table Card */}
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row gap-4 items-center justify-between">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {[
+                      { key: 'All', label: 'All Clients' },
+                      { key: 'Expiring Soon', label: 'Expiring Soon (≤ 7d)' },
+                      { key: 'Expired', label: 'Expired' },
+                      { key: 'Extended', label: 'Extended' },
+                      { key: 'Active', label: 'Active Plans' },
+                      { key: 'Pending', label: 'Pending Requests' }
+                    ].map(btn => (
+                      <button
+                        key={btn.key}
+                        onClick={() => setRenewalFilter(btn.key)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                          renewalFilter === btn.key
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100'
+                        }`}
+                      >
+                        {btn.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="relative w-full md:w-72">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Search client or business..."
+                      value={renewalSearch}
+                      onChange={(e) => setRenewalSearch(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    />
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse min-w-[900px]">
+                    <thead>
+                      <tr className="bg-slate-50/75 dark:bg-slate-800/40 text-slate-500 text-[10px] uppercase tracking-wider font-extrabold border-b border-slate-200 dark:border-slate-800">
+                        <th className="p-4">Client / Business</th>
+                        <th className="p-4">Package & Services</th>
+                        <th className="p-4">Current Cycle Date</th>
+                        <th className="p-4">Expiry Date</th>
+                        <th className="p-4">Days Left / Overdue</th>
+                        <th className="p-4">Plan Status</th>
+                        <th className="p-4 text-right">TL Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                      {(() => {
+                        const filtered = clientsList.filter(client => {
+                          const info = getClientPlanInfo(client);
+                          const isPending = renewalRequestsList.some(r => r.clientDbId === client.id && r.status === 'PENDING');
+
+                          // Tab Filter
+                          if (renewalFilter === 'Expiring Soon' && info.status !== 'Expiring Soon') return false;
+                          if (renewalFilter === 'Expired' && info.status !== 'Expired' && client.active) return false;
+                          if (renewalFilter === 'Extended' && (!client.extensionDays || client.extensionDays <= 0)) return false;
+                          if (renewalFilter === 'Active' && info.status !== 'Active' && info.status !== 'Extended') return false;
+                          if (renewalFilter === 'Pending' && !isPending) return false;
+
+                          // Search
+                          if (renewalSearch) {
+                            const q = renewalSearch.toLowerCase();
+                            const bMatch = (client.businessName || '').toLowerCase().includes(q);
+                            const cMatch = (client.clientName || '').toLowerCase().includes(q);
+                            const idMatch = (client.clientId || '').toLowerCase().includes(q);
+                            if (!bMatch && !cMatch && !idMatch) return false;
+                          }
+
+                          return true;
+                        });
+
+                        if (filtered.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan="7" className="p-8 text-center text-slate-400 italic">
+                                No clients matching the selected filter.
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return filtered.map(client => {
+                          const info = getClientPlanInfo(client);
+                          const pendingReq = renewalRequestsList.find(r => r.clientDbId === client.id && r.status === 'PENDING');
+                          const hasExtension = (client.extensionDays || 0) > 0;
+
+                          return (
+                            <tr key={`tl-client-${client.id}`} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition">
+                              <td className="p-4">
+                                <div className="font-bold text-slate-900 dark:text-white">{client.businessName}</div>
+                                <div className="text-[11px] text-slate-400">ID: {client.clientId} • {client.clientName || 'N/A'}</div>
+                              </td>
+
+                              <td className="p-4">
+                                <div className="font-semibold text-slate-800 dark:text-slate-200">{client.packageName}</div>
+                                <div className="text-[11px] text-slate-400">{client.services} • ₹{client.packageAmount?.toLocaleString()}</div>
+                              </td>
+
+                              <td className="p-4 text-slate-600 dark:text-slate-300 font-medium">
+                                {info.cycleStartStr}
+                              </td>
+
+                              <td className="p-4">
+                                <div className="font-semibold text-slate-800 dark:text-slate-200">{info.expiryDateStr}</div>
+                                {hasExtension && (
+                                  <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold">
+                                    Approved +{client.extensionDays}d
+                                  </div>
+                                )}
+                              </td>
+
+                              <td className="p-4">
+                                {info.status === 'Expired' || !client.active ? (
+                                  <span className="text-red-600 font-bold">
+                                    Overdue ({info.overdueDays}d)
+                                  </span>
+                                ) : info.daysLeft <= 7 ? (
+                                  <span className="text-orange-600 font-bold">
+                                    {info.daysLeft} days left
+                                  </span>
+                                ) : (
+                                  <span className="text-emerald-600 font-bold">
+                                    {info.daysLeft} days left
+                                  </span>
+                                )}
+                              </td>
+
+                              <td className="p-4">
+                                {!client.active ? (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-300 dark:border-slate-700">
+                                    Inactive (Deactivated)
+                                  </span>
+                                ) : info.status === 'Expired' ? (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-300 border border-red-200 dark:border-red-900/50">
+                                    Expired
+                                  </span>
+                                ) : info.status === 'Extended' ? (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900/50">
+                                    Extended (+{client.extensionDays}d)
+                                  </span>
+                                ) : info.status === 'Expiring Soon' ? (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50">
+                                    Expiring Soon
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/50">
+                                    Active Plan
+                                  </span>
+                                )}
+                              </td>
+
+                              <td className="p-4 text-right">
+                                {pendingReq ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                                    <Clock className="w-3 h-3" />
+                                    <span>Pending Admin ({pendingReq.requestType === 'RENEWAL' ? 'Renewal' : `Extension ${pendingReq.requestedDays}d`})</span>
+                                  </span>
+                                ) : (
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <button
+                                      onClick={() => handleOpenRenewalModal(client)}
+                                      className="py-1 px-2.5 rounded-lg text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white transition flex items-center gap-1 shadow-sm cursor-pointer"
+                                      title="Request full plan renewal to Admin"
+                                    >
+                                      <RefreshCw className="w-3 h-3" />
+                                      <span>Request Renewal</span>
+                                    </button>
+
+                                    <button
+                                      onClick={() => handleOpenExtensionModal(client)}
+                                      className="py-1 px-2.5 rounded-lg text-[10px] font-bold bg-amber-500 hover:bg-amber-600 text-white transition flex items-center gap-1 shadow-sm cursor-pointer"
+                                      title="Request up to 7 days extension before renewal"
+                                    >
+                                      <Clock className="w-3 h-3" />
+                                      <span>Request Extension</span>
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Submitted Requests History */}
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden p-6">
+                <h4 className="text-sm font-extrabold text-slate-900 dark:text-white mb-1">Submitted Renewal & Extension Requests</h4>
+                <p className="text-xs text-slate-500 mb-4">Track the live approval status of requests submitted to Admin.</p>
+
+                {renewalRequestsList.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic text-center py-6">No requests submitted yet.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-50 dark:bg-slate-800/40 text-[10px] uppercase tracking-wider text-slate-500 font-extrabold border-b border-slate-200 dark:border-slate-800">
+                          <th className="p-3">Client</th>
+                          <th className="p-3">Request Type</th>
+                          <th className="p-3">Requested Days</th>
+                          <th className="p-3">TL Reason / Note</th>
+                          <th className="p-3">Status</th>
+                          <th className="p-3">Admin Response</th>
+                          <th className="p-3">Date</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {renewalRequestsList.map(req => (
+                          <tr key={`req-row-${req.id}`} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
+                            <td className="p-3 font-bold text-slate-900 dark:text-white">{req.businessName}</td>
+                            <td className="p-3">
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${
+                                req.requestType === 'RENEWAL' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' : 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
+                              }`}>
+                                {req.requestType}
+                              </span>
+                            </td>
+                            <td className="p-3 font-semibold">
+                              {req.requestType === 'EXTENSION' ? `${req.requestedDays} Days (Max 7d)` : '—'}
+                            </td>
+                            <td className="p-3 text-slate-600 dark:text-slate-300 max-w-xs truncate" title={req.reason}>
+                              {req.reason || '—'}
+                            </td>
+                            <td className="p-3">
+                              {req.status === 'PENDING' ? (
+                                <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                                  ⏳ Awaiting Admin Approval
+                                </span>
+                              ) : req.status === 'APPROVED' ? (
+                                <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                                  ✓ Approved {req.approvedDays ? `(${req.approvedDays}d)` : ''}
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300">
+                                  ✕ Rejected
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-3 text-slate-500 max-w-xs truncate" title={req.adminNote}>
+                              {req.adminNote || 'Pending review'}
+                            </td>
+                            <td className="p-3 text-slate-400 text-[10px]">
+                              {new Date(req.createdAt).toLocaleDateString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* LEAVE REQUEST MODAL (Only when showRequestModal is true) */}
           {showRequestModal && (
             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
@@ -2327,6 +2772,179 @@ export default function TLDashboard() {
                       className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl text-xs font-bold flex items-center justify-center min-w-[120px] transition disabled:opacity-70"
                     >
                       {formLoading ? 'Submitting...' : 'Update Status'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* RENEWAL REQUEST MODAL */}
+          {renewalModalClient && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-lg shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-slide-up">
+                <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400">
+                      <RefreshCw className="w-4 h-4" />
+                    </span>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-sm">Request Plan Renewal</h3>
+                  </div>
+                  <button onClick={() => setRenewalModalClient(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-sm font-bold">
+                    ✕
+                  </button>
+                </div>
+
+                <form onSubmit={handleSubmitRenewalRequest} className="p-6 space-y-4">
+                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60 space-y-1.5 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-medium">Business:</span>
+                      <strong className="text-slate-900 dark:text-white">{renewalModalClient.businessName}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-medium">Package:</span>
+                      <strong className="text-slate-800 dark:text-slate-200">{renewalModalClient.packageName} (₹{renewalModalClient.packageAmount?.toLocaleString()})</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-medium">Current Start:</span>
+                      <span className="text-slate-700 dark:text-slate-300">{renewalModalClient.joiningDate}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">
+                      TL Notes / Renewal Remarks (Optional)
+                    </label>
+                    <textarea
+                      value={renewalReason}
+                      onChange={(e) => setRenewalReason(e.target.value)}
+                      placeholder="e.g. Client confirmed renewal via WhatsApp, payment proof shared, proceed to cycle 2."
+                      rows="3"
+                      className="w-full text-xs p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    />
+                  </div>
+
+                  <div className="p-3 bg-blue-50/70 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 text-[11px] rounded-xl border border-blue-200 dark:border-blue-900/50 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                    <span>
+                      <strong>Admin Approval Required:</strong> Submitting this will place the renewal request in Admin's approval queue. Once Admin approves, new content deliverables will be generated.
+                    </span>
+                  </div>
+
+                  <div className="pt-2 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setRenewalModalClient(null)}
+                      className="flex-1 px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-600 dark:text-slate-300 font-bold text-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={requestSubmitting}
+                      className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs transition shadow-md shadow-blue-600/20 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      {requestSubmitting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                      <span>{requestSubmitting ? 'Submitting...' : 'Submit to Admin'}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* EXTENSION REQUEST MODAL */}
+          {extensionModalClient && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-lg shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-slide-up">
+                <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400">
+                      <Clock className="w-4 h-4" />
+                    </span>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-sm">Request Plan Extension (Max 7 Days)</h3>
+                  </div>
+                  <button onClick={() => setExtensionModalClient(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-sm font-bold">
+                    ✕
+                  </button>
+                </div>
+
+                <form onSubmit={handleSubmitExtensionRequest} className="p-6 space-y-4">
+                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60 space-y-1.5 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-medium">Business:</span>
+                      <strong className="text-slate-900 dark:text-white">{extensionModalClient.businessName}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-medium">Package:</span>
+                      <strong className="text-slate-800 dark:text-slate-200">{extensionModalClient.packageName}</strong>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-1.5">
+                      <label className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                        Extension Duration: <strong className="text-amber-600 text-xs">{extensionDays} Days</strong>
+                      </label>
+                      <span className="text-[10px] font-bold text-slate-400">TL Max: 7 Days</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="7"
+                      value={extensionDays}
+                      onChange={(e) => setExtensionDays(parseInt(e.target.value, 10))}
+                      className="w-full accent-amber-500 cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[10px] font-semibold text-slate-400 px-1 mt-1">
+                      <span>1 Day</span>
+                      <span>3 Days</span>
+                      <span>5 Days</span>
+                      <span className="text-amber-600 font-bold">7 Days (Max)</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">
+                      Reason for Extension <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      required
+                      value={extensionReason}
+                      onChange={(e) => setExtensionReason(e.target.value)}
+                      placeholder="Explain why the client needs this extension (e.g. Client requested 5 days to clear accounts invoice / payment processing)."
+                      rows="3"
+                      className="w-full text-xs p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    />
+                  </div>
+
+                  <div className="p-3 bg-amber-50/80 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 text-[11px] rounded-xl border border-amber-200 dark:border-amber-900/50 space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-800 dark:text-amber-300">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>Compulsory Rules:</span>
+                    </div>
+                    <p className="text-[10.5px] leading-relaxed text-amber-700 dark:text-amber-300/90">
+                      • Team Leader can request a maximum of <strong>7 days</strong>.<br />
+                      • Admin approval is <strong>compulsory</strong> (Admin can approve up to 10 days max).<br />
+                      • After approved extension days elapse without renewal, the pack will <strong>expire and automatically deactivate</strong>.
+                    </p>
+                  </div>
+
+                  <div className="pt-2 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setExtensionModalClient(null)}
+                      className="flex-1 px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-600 dark:text-slate-300 font-bold text-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={requestSubmitting}
+                      className="flex-1 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-xs transition shadow-md shadow-amber-500/20 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      {requestSubmitting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                      <span>{requestSubmitting ? 'Submitting...' : `Request ${extensionDays} Days Extension`}</span>
                     </button>
                   </div>
                 </form>

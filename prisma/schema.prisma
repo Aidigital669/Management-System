@@ -103,11 +103,14 @@ model Client {
   requirement    String?
   accountReady   Boolean          @default(false)
   active         Boolean          @default(true)
-  notes          String?
-  createdAt      DateTime         @default(now())
-  ClientDelivery ClientDelivery[]
-  ClientTask     ClientTask[]
-  ClientFeedback ClientFeedback[]
+  extensionDays       Int              @default(0)
+  extensionExpiryDate String?
+  notes               String?
+  createdAt           DateTime         @default(now())
+  ClientDelivery      ClientDelivery[]
+  ClientTask          ClientTask[]
+  ClientFeedback      ClientFeedback[]
+  RenewalRequest      RenewalRequest[]
 }
 
 model ClientDelivery {
@@ -182,4 +185,25 @@ model CallRecord {
   leadSource     String?
   salesPersonId  Int
   salesPerson    User     @relation(fields: [salesPersonId], references: [id], onDelete: Cascade)
+}
+
+model RenewalRequest {
+  id              Int      @id @default(autoincrement())
+  clientId        String
+  clientDbId      Int
+  businessName    String
+  requestType     String   // "RENEWAL" or "EXTENSION"
+  status          String   @default("PENDING") // "PENDING", "APPROVED", "REJECTED"
+  requestedDays   Int?     // For extension: 1 to 7 days (requested by TL)
+  approvedDays    Int?     // For extension: 1 to 10 days (approved by Admin)
+  reason          String?  // TL notes/reason
+  adminNote       String?  // Admin review notes
+  requestedById   Int
+  requestedByName String
+  requestedByRole String   @default("TL")
+  approvedById    Int?
+  approvedByName  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  client          Client   @relation(fields: [clientDbId], references: [id], onDelete: Cascade)
 }

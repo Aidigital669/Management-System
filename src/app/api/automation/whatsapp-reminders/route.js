@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import prisma from '@/lib/db';
 import { getClientPlanInfo, isClientPlanActive } from '@/lib/planUtils';
 import { sendWhatsAppMessage, sanitizePhoneNumber } from '@/lib/whatsapp';
 
