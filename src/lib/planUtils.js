@@ -221,8 +221,11 @@ export const getClientPlanInfo = (client, referenceDate = new Date()) => {
     cycleStartStr,
     expiryDate: expiry,
     expiryDateStr,
+    isExpired: status === 'Expired',
+    isExpiringSoon: status === 'Expiring Soon',
     renewalDueDate: renewalDue,
     renewalDueStr,
+    renewalDueDateStr: renewalDueStr,
     cycleMonthKey,
     renewalMonthKey,
     cycleMonthLabel,
@@ -235,6 +238,18 @@ export const getClientPlanInfo = (client, referenceDate = new Date()) => {
     isRenewed,
     packageName: client.packageName || 'Standard Plan'
   };
+};
+
+/**
+ * Checks whether a client is currently active:
+ * 1. client.active is true
+ * 2. Their package has NOT expired (status !== 'Expired')
+ * After renewal, joiningDate is updated and they count as active until the new expiry date.
+ */
+export const isClientPlanActive = (client, referenceDate = new Date()) => {
+  if (!client || client.active === false) return false;
+  const info = getClientPlanInfo(client, referenceDate);
+  return info.status !== 'Expired';
 };
 
 /**
@@ -263,7 +278,10 @@ export const isClientActiveInMonth = (client, monthKey, customStart = null, cust
     return true;
   }
 
-  if (!monthKey || monthKey === 'all') return true;
+  if (!monthKey || monthKey === 'all') {
+    // Only count as active if their current plan cycle has not expired
+    return info.status !== 'Expired';
+  }
 
   const parts = monthKey.split('-');
   if (parts.length !== 2) return true;

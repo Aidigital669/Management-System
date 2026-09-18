@@ -361,10 +361,13 @@ export async function POST(request, { params }) {
       }
     }
 
-    // 4. Update client's joining date
+    // 4. Update client's joining date and guarantee active status
     await prisma.client.update({
       where: { id },
-      data: { joiningDate: newStartStr }
+      data: { 
+        joiningDate: newStartStr,
+        active: true
+      }
     });
 
     // 5. Create Audit Log

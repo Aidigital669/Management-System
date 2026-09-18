@@ -38,6 +38,7 @@ import {
   getPlanDurationDays,
   getPlanDurationLabel,
   getClientPlanInfo,
+  isClientPlanActive,
   isClientActiveInMonth,
   isClientExpiringInMonth,
   isClientStartingInMonth,
@@ -411,22 +412,22 @@ export default function CeoDashboard() {
       setAllClientDeliveries(cdData.deliveries || []);
 
       // Calculate Metrics
-      const totalEmp = fetchedUsers.filter(u => u.role === 'EMPLOYEE').length;
+      const totalEmp = fetchedUsers.filter(u => u.role === 'EMPLOYEE' || u.role === 'SALES').length;
       const activeAdm = fetchedUsers.filter(u => u.role === 'ADMIN').length;
       const payroll = fetchedUsers.reduce((sum, u) => sum + u.salary, 0);
 
       const doneTasks = fetchedTasks.filter(t => t.status === 'DONE').length;
       const rate = fetchedTasks.length > 0 ? Math.round((doneTasks / fetchedTasks.length) * 100) : 0;
 
-      // Active Clients Calculation
-      const activeClientsCount = (clientsData.clients || []).filter(c => c.active).length;
+      // Active Clients Calculation (Strictly Active and Expiring Soon within contract validity)
+      const activeClientsCount = (clientsData.clients || []).filter(c => isClientPlanActive(c)).length;
       const totalClientsCount = (clientsData.clients || []).length;
 
-      // 3-Way Revenue Breakdown (Actual, Expected, Pending)
+      // 3-Way Revenue Breakdown (Actual, Expected, Pending) - strictly from active clients
       let actualRevenue = 0;
       let expectedRevenue = 0;
       (clientsData.clients || []).forEach(c => {
-        if (!c.active) return;
+        if (!isClientPlanActive(c)) return;
         const pkgAmt = c.packageAmount || 0;
         expectedRevenue += pkgAmt;
 
@@ -1840,14 +1841,14 @@ export default function CeoDashboard() {
             // Global Lifecycle Counts across ALL clients in the agency
             const globalLifecycleCounts = {
               all: clientsList.length,
-              active: clientsList.filter(c => c.active && getClientPlanInfo(c).status === 'Active').length,
+              active: clientsList.filter(c => isClientPlanActive(c)).length,
               expiring_soon: clientsList.filter(c => c.active && getClientPlanInfo(c).status === 'Expiring Soon').length,
               expired: clientsList.filter(c => c.active && getClientPlanInfo(c).status === 'Expired').length,
               renewable: clientsList.filter(c => {
                 const info = getClientPlanInfo(c);
                 return info.isRenewed || (c.active && (info.status === 'Expired' || info.status === 'Expiring Soon'));
               }).length,
-              inactive: clientsList.filter(c => !c.active).length
+              inactive: clientsList.filter(c => !c.active || getClientPlanInfo(c).status === 'Expired').length
             };
 
             const filteredClients = clientsList.filter(c => {
@@ -1867,7 +1868,7 @@ export default function CeoDashboard() {
               // 1. Lifecycle Status Filter
               if (clientLifecycleFilter !== 'all') {
                 if (clientLifecycleFilter === 'active') {
-                  if (!c.active || planInfo.status !== 'Active') return false;
+                  if (!isClientPlanActive(c)) return false;
                 } else if (clientLifecycleFilter === 'expiring_soon') {
                   if (!c.active || planInfo.status !== 'Expiring Soon') return false;
                 } else if (clientLifecycleFilter === 'expired') {
@@ -1876,7 +1877,7 @@ export default function CeoDashboard() {
                   const isRenewable = planInfo.isRenewed || (c.active && (planInfo.status === 'Expired' || planInfo.status === 'Expiring Soon'));
                   if (!isRenewable) return false;
                 } else if (clientLifecycleFilter === 'inactive') {
-                  if (c.active) return false;
+                  if (isClientPlanActive(c)) return false;
                 }
               }
 
@@ -2595,6 +2596,7 @@ export default function CeoDashboard() {
                       className="w-full p-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
                     >
                       <option value="EMPLOYEE">Employee</option>
+                      <option value="SALES">Sales Executive / Person</option>
                       <option value="ADMIN">Admin</option>
                     </select>
                   </div>
@@ -2725,6 +2727,7 @@ export default function CeoDashboard() {
                       className="w-full p-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-600 disabled:opacity-50"
                     >
                       <option value="EMPLOYEE">Employee</option>
+                      <option value="SALES">Sales Executive / Person</option>
                       <option value="ADMIN">Admin</option>
                       <option value="CEO">CEO</option>
                     </select>

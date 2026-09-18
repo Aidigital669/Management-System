@@ -19,7 +19,9 @@ import {
   MessageSquare,
   Trash2,
   Menu,
-  X
+  X,
+  Bell,
+  Loader2
 } from 'lucide-react';
 
 export default function SalesDashboard() {
@@ -312,6 +314,39 @@ export default function SalesDashboard() {
       }
     } catch (err) {
       showToast('Connection error checking WhatsApp.', 'error');
+  };
+
+  const [sendingReminderId, setSendingReminderId] = useState(null);
+
+  // Send WhatsApp Reminder via Meta Cloud API
+  const handleSendWhatsAppReminder = async (call) => {
+    if (!call?.phoneNumber) {
+      showToast('No phone number for this lead!', 'error');
+      return;
+    }
+    setSendingReminderId(call.id);
+    try {
+      const res = await fetch('/api/whatsapp/reminder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: call.id,
+          phone: call.phoneNumber,
+          clientName: call.clientName,
+          scheduledTime: call.followUpDate,
+          notes: call.notes,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`WhatsApp reminder sent to ${call.clientName || 'Client'}!`, 'success');
+      } else {
+        showToast(data.error || 'Failed to send WhatsApp reminder', 'error');
+      }
+    } catch (err) {
+      showToast('Network error sending WhatsApp reminder', 'error');
+    } finally {
+      setSendingReminderId(null);
     }
   };
 
@@ -860,7 +895,19 @@ export default function SalesDashboard() {
           <button onClick={() => handleStartCall(activeCall)} className="w-12 h-12 rounded-full border-2 border-blue-600 text-blue-600 flex items-center justify-center hover:bg-blue-50 active:scale-95 transition" title="Start Call"><PhoneCall className="w-5 h-5" /></button>
           <button onClick={() => handleStartCall(activeCall)} className="w-12 h-12 rounded-full border-2 border-blue-600 text-blue-600 flex items-center justify-center hover:bg-blue-50 active:scale-95 transition" title="Start Call"><Phone className="w-5 h-5" /></button>
           <button className="w-12 h-12 rounded-full border-2 border-blue-600 text-blue-600 flex items-center justify-center hover:bg-blue-50 transition"><Mail className="w-5 h-5" /></button>
-          <button onClick={() => handleWhatsAppClick(activeCall)} className="w-12 h-12 rounded-full border-2 border-blue-600 text-blue-600 flex items-center justify-center hover:bg-blue-50 active:scale-95 transition" title="WhatsApp"><MessageCircle className="w-5 h-5" /></button>
+          <button onClick={() => handleWhatsAppClick(activeCall)} className="w-12 h-12 rounded-full border-2 border-emerald-600 text-emerald-600 flex items-center justify-center hover:bg-emerald-50 active:scale-95 transition" title="WhatsApp"><MessageCircle className="w-5 h-5" /></button>
+          <button
+            onClick={() => handleSendWhatsAppReminder(activeCall)}
+            disabled={sendingReminderId === activeCall.id}
+            className="w-12 h-12 rounded-full border-2 border-teal-600 text-teal-600 flex items-center justify-center hover:bg-teal-50 active:scale-95 transition disabled:opacity-50"
+            title="Send WhatsApp Follow-up Reminder (Meta Cloud API)"
+          >
+            {sendingReminderId === activeCall.id ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Bell className="w-5 h-5" />
+            )}
+          </button>
           <button className="w-12 h-12 rounded-full border-2 border-blue-600 text-blue-600 flex items-center justify-center hover:bg-blue-50 transition"><Search className="w-5 h-5" /></button>
           <button className="w-12 h-12 rounded-full border-2 border-blue-600 text-blue-600 flex items-center justify-center hover:bg-blue-50 transition"><Clock className="w-5 h-5" /></button>
           <button className="w-12 h-12 rounded-full border-2 border-blue-600 text-blue-600 flex items-center justify-center hover:bg-blue-50 transition"><FileText className="w-5 h-5" /></button>

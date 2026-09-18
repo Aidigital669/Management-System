@@ -14,7 +14,8 @@ import {
   getClientPlanInfo,
   isClientActiveInMonth,
   getClientRevenueStream,
-  getClientMonthKey
+  getClientMonthKey,
+  isClientPlanActive
 } from '@/lib/planUtils';
 import { calculateEmployeePerformance } from '@/lib/performanceUtils';
 import EmployeeTasksModal from './EmployeeTasksModal';
@@ -22,7 +23,7 @@ import EmployeeTasksModal from './EmployeeTasksModal';
 export default function AgencyDashboard({ deliveries = [], clients = [], tasks = [], employees = [], attendance = [], feedbacks = [], onSelectTab, refreshData }) {
   const [selectedEmployeeForTasks, setSelectedEmployeeForTasks] = useState(null);
   
-  const activeClients = clients.filter(c => c.active).length;
+  const activeClients = clients.filter(c => isClientPlanActive(c)).length;
   const totalClients = clients.length;
   
   // Calculate delivery stats from real data
@@ -243,7 +244,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
       let activeCount = 0;
       let monthRevenue = 0;
       clients.forEach(c => {
-        if (c.active && isClientActiveInMonth(c, mk)) {
+        if (isClientPlanActive(c) && isClientActiveInMonth(c, mk)) {
           activeCount += 1;
           monthRevenue += (c.packageAmount || 0);
         }
@@ -253,13 +254,15 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
     });
   }, [clients]);
 
-  // Filter clients for selected month or date range (accurately includes clients whose plan is active in the period)
+  // Filter clients for selected month or date range (strictly restricted to active clients whose plan has not expired)
   const filteredRevenueClients = React.useMemo(() => {
     if (revenueStartDate || revenueEndDate) {
-      return clients.filter(c => isClientActiveInMonth(c, null, revenueStartDate, revenueEndDate));
+      return clients.filter(c => isClientPlanActive(c) && isClientActiveInMonth(c, null, revenueStartDate, revenueEndDate));
     }
-    if (selectedRevenueMonth === 'all') return clients;
-    return clients.filter(c => isClientActiveInMonth(c, selectedRevenueMonth));
+    if (selectedRevenueMonth === 'all') {
+      return clients.filter(c => isClientPlanActive(c));
+    }
+    return clients.filter(c => isClientPlanActive(c) && isClientActiveInMonth(c, selectedRevenueMonth));
   }, [clients, selectedRevenueMonth, revenueStartDate, revenueEndDate]);
 
   // Helper to determine plan cycle health for a client using dynamic duration (30, 90, 180, 365 days)
@@ -267,8 +270,8 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
     return getClientPlanInfo(client);
   };
 
-  // Compute revenue/billing details dynamically for the filtered month
-  let dynamicTotalRevenue = 0;       // Received revenue
+  // Compute revenue/billing details dynamically for the filtered active clients
+  let dynamicTotalRevenue = 0;       // Received revenue from active clients
   let dynamicEstimatedRevenue = 0;   // Total active package amount
   let paymentReceivedCount = 0;
   let paymentPendingCount = 0;
@@ -292,7 +295,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
   let retainersActual = 0;
 
   filteredRevenueClients.forEach(c => {
-    if (!c.active) return;
+    if (!isClientPlanActive(c)) return;
     const pkgAmt = c.packageAmount || 0;
     dynamicEstimatedRevenue += pkgAmt;
 
@@ -325,10 +328,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
     const stream = getClientRevenueStream(c, selectedRevenueMonth);
     const health = getClientPlanHealth(c);
 
-    if (health.status === 'Expired') {
-      notRenewedCount += 1;
-      notRenewedExpected += pkgAmt;
-    } else if (stream.type === 'Renewal') {
+    if (stream.type === 'Renewal') {
       renewalsCount += 1;
       renewalsExpected += pkgAmt;
       renewalsActual += actualCollected;
@@ -345,6 +345,19 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
     if (health.status === 'Expiring Soon') {
       expiringSoonCount += 1;
       expiringSoonExpected += pkgAmt;
+    }
+  });
+
+  // Track non-renewed / expired contracts in the period for the Renewals vs Non-Renewals card
+  clients.forEach(c => {
+    if (c.active === false || !isClientPlanActive(c)) {
+      const isRelevant = (revenueStartDate || revenueEndDate)
+        ? isClientActiveInMonth(c, null, revenueStartDate, revenueEndDate)
+        : (selectedRevenueMonth === 'all' ? true : isClientActiveInMonth(c, selectedRevenueMonth));
+      if (isRelevant) {
+        notRenewedCount += 1;
+        notRenewedExpected += (c.packageAmount || 0);
+      }
     }
   });
 
@@ -455,11 +468,11 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
           <div className="space-y-1.5 relative z-10">
             <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-widest font-extrabold font-sans">Active Clients</span>
             <div className="flex items-end gap-1.5">
-              <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white">{filteredRevenueClients.filter(c => c.active).length}</h3>
-              <span className="text-xs text-slate-400 font-semibold mb-0.5">/ {filteredRevenueClients.length} in period</span>
+              <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white">{filteredRevenueClients.length}</h3>
+              <span className="text-xs text-slate-400 font-semibold mb-0.5">/ {clients.length} in CRM</span>
             </div>
             <span className="text-[9px] text-blue-500 font-bold bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full border border-blue-100 dark:border-blue-800/30 block w-fit">
-              {selectedRevenueMonth === 'all' ? 'All CRM Accounts' : `${availableRevenueMonths.find(m => m.key === selectedRevenueMonth)?.label || selectedRevenueMonth}`}
+              {selectedRevenueMonth === 'all' ? 'All Active Accounts' : `${availableRevenueMonths.find(m => m.key === selectedRevenueMonth)?.label || selectedRevenueMonth}`}
             </span>
           </div>
           <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center relative z-10 shadow-inner border border-blue-100 dark:border-blue-900 shrink-0">
@@ -732,7 +745,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
                   style={{ width: `100%` }}
                 />
               </div>
-              <div className="text-[10px] text-slate-400 text-right">{filteredRevenueClients.filter(c => c.active).length} active contracts</div>
+              <div className="text-[10px] text-slate-400 text-right">{filteredRevenueClients.length} active contracts</div>
             </div>
 
             {/* 3. Pending Revenue */}

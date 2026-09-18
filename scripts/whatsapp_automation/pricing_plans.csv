@@ -1,0 +1,23 @@
+Plan_ID,Service,Plan_Name,Price_INR,Billing_Period,Creatives,AI_Videos,Reels_Shorts,Features,Status,Last_Updated
+META001,Meta Ads,Basic,"₹3,499",Per Month,3,1,1,Meta Ads Management; Weekly Report,Active,2026-09-09
+META002,Meta Ads,Standard,"₹4,999",2 Months,6,2,2,Meta Ads Management; Weekly Report,Active,2026-09-09
+META003,Meta Ads,Premium,"₹6,899",3 Months,9,3,3,Meta Ads Management; Weekly Report,Active,2026-09-09
+GOOGLE001,Google Ads,Basic,"₹4,999",Per Month,3,1,1,Google Ads Management; Weekly Report,Active,2026-09-09
+GOOGLE002,Google Ads,Standard,"₹13,499",3 Months,9,3,3,Google Ads Management; Weekly Report,Active,2026-09-09
+GOOGLE003,Google Ads,Premium,"₹23,999",6 Months,18,6,6,Google Ads Management; Weekly Report,Active,2026-09-09
+COMBO001,Meta + Google Ads,Basic,"₹6,999",Per Month,7,2,5,Meta Ads + Google Ads; Weekly Report,Active,2026-09-09
+COMBO002,Meta + Google Ads,Standard,"₹19,499",3 Months,21,6,15,Meta Ads + Google Ads; Weekly Report,Active,2026-09-09
+COMBO003,Meta + Google Ads,Premium,"₹35,999",6 Months,42,6,30,Meta Ads + Google Ads; Weekly Report,Active,2026-09-09
+WEB001,Website Development,Static,"₹7,499",One Time,N/A,N/A,N/A,Domain Name; Hosting; 1 Page Design; Maintenance,Active,2026-09-09
+WEB002,Website Development,Dynamic,"₹14,999",One Time,N/A,N/A,N/A,Domain Name; Hosting; 10 Page Design; Maintenance,Active,2026-09-09
+DESIGN001,Creative Design,Starter,₹199,One Time,1,N/A,N/A,Social Media Sizes; PNG & JPG,Active,2026-09-09
+DESIGN002,Creative Design,Growth,₹949,One Time,5,N/A,N/A,Ad Banner Formats; PNG & JPG,Active,2026-09-09
+DESIGN003,Creative Design,Value,"₹1,799",One Time,10,N/A,N/A,Brand Style Match; Source Files,Active,2026-09-09
+DESIGN004,Creative Design,Standard,"₹3,399",One Time,20,N/A,N/A,Multi-Platform Sizes; Source Files,Active,2026-09-09
+DESIGN005,Creative Design,Pro,"₹4,499",One Time,30,N/A,N/A,Complete Ad Sets; Source Files,Active,2026-09-09
+VIDEO001,AI Video,Basic,"₹1,000",One Time,N/A,1,N/A,30-35 Seconds; Perfect for getting started,Active,2026-09-09
+VIDEO002,AI Video,Starter,"₹4,749",One Time,N/A,5,N/A,30-35 Seconds; Ideal for growing brands,Active,2026-09-09
+VIDEO003,AI Video,Growth,"₹6,299",One Time,N/A,7,N/A,30-35 Seconds; Best for maximum impact,Active,2026-09-09
+VIDEO004,AI Video,Pro,"₹8,499",One Time,N/A,10,N/A,30-35 Seconds; Premium video production,Active,2026-09-09
+REAL001,Real Estate,Meta Ads,"₹5,000",Per Month,3,1,1,Targeted Campaigns; Quality Leads; More Site Visits; Increased Sales,Active,2026-09-09
+REAL002,Real Estate,Google Ads,"₹7,500",Per Month,3,1,1,Real Estate Ad Experts; High ROI Campaigns; Transparent Reporting; Dedicated Support,Active,2026-09-09

@@ -40,9 +40,11 @@ import {
   UserX,
   PhoneCall,
   TrendingUp,
-  Tag,
   Menu,
-  FileSpreadsheet
+  FileSpreadsheet,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Tag
 } from 'lucide-react';
 import ExcelImportModal from '@/components/ExcelImportModal';
 import { uploadFileAction } from '@/app/actions/uploadAction';
@@ -57,7 +59,8 @@ import {
   isClientStartingInMonth,
   getClientRevenueStream,
   getClientMonthKey,
-  getClientSmExecutive
+  getClientSmExecutive,
+  isClientPlanActive
 } from '@/lib/planUtils';
 
 const SERVICES_PRICING = {
@@ -153,7 +156,7 @@ export default function AdminDashboard() {
   const [clientStartDate, setClientStartDate] = useState('');
   const [clientEndDate, setClientEndDate] = useState('');
   const [clientPaymentFilter, setClientPaymentFilter] = useState('all');
-  const [clientLifecycleFilter, setClientLifecycleFilter] = useState('all'); // 'all', 'active', 'expiring_soon', 'expired', 'renewable', 'inactive'
+  const [clientLifecycleFilter, setClientLifecycleFilter] = useState('active'); // 'all', 'active', 'expiring_soon', 'expired', 'renewable', 'inactive'
   const [clientFilterScope, setClientFilterScope] = useState('all_clients'); // 'all_clients' (global) or 'month'
 
   // Form Fields - User
@@ -217,8 +220,25 @@ export default function AdminDashboard() {
   const [paidAmount, setPaidAmount] = useState('19499');
   const [actualNotes, setActualNotes] = useState('');
 
-  // Responsive Mobile Navigation State
+  // Responsive Navigation & Sidebar States
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('admin_sidebar_collapsed');
+      if (saved === 'true') setSidebarCollapsed(true);
+    } catch (e) {}
+  }, []);
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem('admin_sidebar_collapsed', String(next)); } catch (e) {}
+      return next;
+    });
+  };
+
   const handleSelectTab = (tab) => {
     setActiveTab(tab);
     setMobileSidebarOpen(false);
@@ -635,8 +655,8 @@ export default function AdminDashboard() {
 
       const fetchedClients = clientsRes.data.clients || [];
       setClientsList(fetchedClients);
-      // Update active client IDs set based on client.active flag
-      const activeIds = fetchedClients.filter(c => c.active).map(c => c.clientId);
+      // Update active client IDs set based on client.active flag and unexpired plan
+      const activeIds = fetchedClients.filter(c => isClientPlanActive(c)).map(c => c.clientId);
       setActiveClientIds(new Set(activeIds));
 
       setAllClientTasks(ctRes.data.tasks || []);
@@ -646,7 +666,7 @@ export default function AdminDashboard() {
       setFeedbacksList(fbRes.data.feedbacks || []);
 
       // Calculate Metrics
-      const totalStaff = fetchedUsers.filter(u => u.role === 'EMPLOYEE').length;
+      const totalStaff = fetchedUsers.filter(u => u.role === 'EMPLOYEE' || u.role === 'SALES').length;
       const activeTasks = fetchedTasks.filter(t => t.status !== 'DONE').length;
       const pendingLeaves = fetchedLeaves.filter(l => l.status === 'PENDING').length;
       
@@ -661,7 +681,7 @@ export default function AdminDashboard() {
       });
 
       // Default assignee to first employee
-      const employees = fetchedUsers.filter(u => u.role === 'EMPLOYEE');
+      const employees = fetchedUsers.filter(u => u.role === 'EMPLOYEE' || u.role === 'SALES');
       if (employees.length > 0 && !taskAssignee) {
         setTaskAssignee(employees[0].id.toString());
       }
@@ -1610,7 +1630,7 @@ export default function AdminDashboard() {
           name: formName,
           email: formEmail,
           password: formPassword,
-          role: 'EMPLOYEE', // Admins can ONLY create employees
+          role: formDept === 'Sales' ? 'SALES' : 'EMPLOYEE',
           department: formDept,
           salary: 0, // Admin cannot set salary
           avatar: formAvatar,
@@ -1844,16 +1864,19 @@ export default function AdminDashboard() {
     );
   }
 
-  // Filters for directories
-  const employeesList = usersList.filter(u => u.role === 'EMPLOYEE');
+  // Filters for directories (Sales executives and persons are employees)
+  const employeesList = usersList.filter(u => u.role === 'EMPLOYEE' || u.role === 'SALES');
   const activeEmployeesCount = employeesList.filter(u => u.status === 'ACTIVE').length;
   const inactiveEmployeesCount = employeesList.filter(u => u.status === 'INACTIVE').length;
 
   const filteredEmployees = employeesList.filter(u => {
+    const q = searchQuery.toLowerCase();
     const matchesSearch =
-      u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.department.toLowerCase().includes(searchQuery.toLowerCase());
+      (u.name && u.name.toLowerCase().includes(q)) ||
+      (u.email && u.email.toLowerCase().includes(q)) ||
+      (u.department && u.department.toLowerCase().includes(q)) ||
+      (u.designation && u.designation.toLowerCase().includes(q)) ||
+      (u.role && u.role.toLowerCase().includes(q));
     if (!matchesSearch) return false;
     if (employeeStatusFilter === 'ACTIVE') return u.status === 'ACTIVE';
     if (employeeStatusFilter === 'INACTIVE') return u.status === 'INACTIVE';
@@ -1892,7 +1915,9 @@ export default function AdminDashboard() {
       )}
 
       {/* Responsive Sidebar Panel */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between shrink-0 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static ${
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between shrink-0 transform transition-all duration-300 ease-in-out ${
+        sidebarCollapsed ? 'lg:hidden' : 'lg:translate-x-0 lg:static'
+      } ${
         mobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
       }`}>
         <div className="overflow-y-auto flex-1">
@@ -1906,12 +1931,21 @@ export default function AdminDashboard() {
                 WorkForce OS
               </span>
             </div>
+            {/* Mobile Close Button */}
             <button 
               onClick={() => setMobileSidebarOpen(false)}
-              className="lg:hidden p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-lg transition"
+              className="lg:hidden p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-lg transition cursor-pointer"
               title="Close Menu"
             >
               <X className="w-5 h-5" />
+            </button>
+            {/* Desktop Hide Sidebar Button */}
+            <button
+              onClick={toggleSidebar}
+              className="hidden lg:flex p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+              title="Hide Sidebar"
+            >
+              <PanelLeftClose className="w-5 h-5" />
             </button>
           </div>
 
@@ -2166,11 +2200,29 @@ export default function AdminDashboard() {
             {/* Hamburger Button for Mobile/Tablet */}
             <button
               onClick={() => setMobileSidebarOpen(true)}
-              className="lg:hidden p-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition shrink-0"
+              className="lg:hidden p-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition shrink-0 cursor-pointer"
               title="Open Navigation Menu"
             >
               <Menu className="w-5 h-5" />
             </button>
+
+            {/* Desktop Sidebar Hide/Show Toggle Button */}
+            <button
+              onClick={toggleSidebar}
+              className={`hidden lg:flex items-center gap-1.5 p-2 rounded-xl border transition shrink-0 cursor-pointer ${
+                sidebarCollapsed
+                  ? 'border-blue-300 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 shadow-xs'
+                  : 'border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300'
+              }`}
+              title={sidebarCollapsed ? "Show Sidebar (Expand)" : "Hide Sidebar (Collapse)"}
+            >
+              {sidebarCollapsed ? (
+                <PanelLeftOpen className="w-5 h-5" />
+              ) : (
+                <PanelLeftClose className="w-5 h-5" />
+              )}
+            </button>
+
             <h2 className="text-sm sm:text-base lg:text-xl font-bold tracking-tight text-slate-900 dark:text-white capitalize truncate">
               {activeTab === 'overview' ? 'Administration Console' : activeTab.replace('-', ' ')}
             </h2>
@@ -2563,7 +2615,16 @@ export default function AdminDashboard() {
                             </button>
                           </td>
                           <td className="p-4 text-slate-500">{user.email}</td>
-                          <td className="p-4 text-slate-500 font-semibold">{user.department}</td>
+                          <td className="p-4 text-slate-500 font-semibold">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span>{user.department || (user.role === 'SALES' ? 'Sales' : 'General')}</span>
+                              {user.role === 'SALES' && (
+                                <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/60">
+                                  Sales
+                                </span>
+                              )}
+                            </div>
+                          </td>
                           <td className="p-4">
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase
                               ${user.status === 'ACTIVE' 
@@ -2645,7 +2706,7 @@ export default function AdminDashboard() {
                         <option value="ALL">All Staff & Employees ({tasksList.length})</option>
                         <option value="SANMEET">★ Sanmeet (Reels & Social Media Lead)</option>
                         <option value="AI_VIDEO">🎬 AI Video Team (Video Editors)</option>
-                        {usersList.filter(u => u.role === 'EMPLOYEE' || u.role === 'TL').map(emp => (
+                        {usersList.filter(u => u.role === 'EMPLOYEE' || u.role === 'TL' || u.role === 'SALES').map(emp => (
                           <option key={emp.id} value={emp.name.toUpperCase()}>👤 {emp.name} ({emp.designation || emp.department || 'Staff'})</option>
                         ))}
                       </select>
@@ -5043,16 +5104,17 @@ export default function AdminDashboard() {
             })();
 
             // Global Lifecycle Counts across ALL clients in the agency
+            // Rule: Expiring Soon clients are active; Expired clients count as inactive until renewed
             const globalLifecycleCounts = {
               all: clientsList.length,
-              active: clientsList.filter(c => c.active && getClientPlanInfo(c).status === 'Active').length,
+              active: clientsList.filter(c => c.active && getClientPlanInfo(c).status !== 'Expired').length,
               expiring_soon: clientsList.filter(c => c.active && getClientPlanInfo(c).status === 'Expiring Soon').length,
               expired: clientsList.filter(c => c.active && getClientPlanInfo(c).status === 'Expired').length,
               renewable: clientsList.filter(c => {
                 const info = getClientPlanInfo(c);
                 return info.isRenewed || (c.active && (info.status === 'Expired' || info.status === 'Expiring Soon'));
               }).length,
-              inactive: clientsList.filter(c => !c.active).length
+              inactive: clientsList.filter(c => !c.active || getClientPlanInfo(c).status === 'Expired').length
             };
 
             const filteredClients = clientsList.filter(c => {
@@ -5074,7 +5136,8 @@ export default function AdminDashboard() {
               // 1. Lifecycle Status Filter
               if (clientLifecycleFilter !== 'all') {
                 if (clientLifecycleFilter === 'active') {
-                  if (!c.active || planInfo.status !== 'Active') return false;
+                  // Active clients include both on-track Active and Expiring Soon (unexpired)
+                  if (!c.active || planInfo.status === 'Expired') return false;
                 } else if (clientLifecycleFilter === 'expiring_soon') {
                   if (!c.active || planInfo.status !== 'Expiring Soon') return false;
                 } else if (clientLifecycleFilter === 'expired') {
@@ -5083,7 +5146,9 @@ export default function AdminDashboard() {
                   const isRenewable = planInfo.isRenewed || (c.active && (planInfo.status === 'Expired' || planInfo.status === 'Expiring Soon'));
                   if (!isRenewable) return false;
                 } else if (clientLifecycleFilter === 'inactive') {
-                  if (c.active) return false;
+                  // Expired counts as inactive along with manually inactive accounts
+                  const isInactive = !c.active || planInfo.status === 'Expired';
+                  if (!isInactive) return false;
                 }
               }
 
@@ -5114,7 +5179,7 @@ export default function AdminDashboard() {
               return true;
             });
 
-            const activeFilteredClients = filteredClients.filter(c => c.active);
+            const activeFilteredClients = filteredClients.filter(c => isClientPlanActive(c));
             let expectedRevenue = 0;
             let actualRevenue = 0;
             let paymentReceivedCount = 0;
@@ -5360,12 +5425,12 @@ export default function AdminDashboard() {
                         Lifecycle Status:
                       </span>
                       {[
-                        { key: 'all', label: 'All Clients', count: globalLifecycleCounts.all, color: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200' },
-                        { key: 'active', label: 'Active Plans', count: globalLifecycleCounts.active, color: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300' },
-                        { key: 'expiring_soon', label: 'Expiring Soon (7d)', count: globalLifecycleCounts.expiring_soon, color: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300' },
-                        { key: 'expired', label: 'Expired / Due', count: globalLifecycleCounts.expired, color: 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300' },
+                        { key: 'active', label: 'Active Clients', count: globalLifecycleCounts.active, color: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300' },
+                        { key: 'expiring_soon', label: 'Expiring Soon (Active)', count: globalLifecycleCounts.expiring_soon, color: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300' },
+                        { key: 'expired', label: 'Expired (Inactive)', count: globalLifecycleCounts.expired, color: 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300' },
+                        { key: 'inactive', label: 'Inactive Accounts', count: globalLifecycleCounts.inactive, color: 'bg-slate-100 dark:bg-slate-800 text-slate-500' },
                         { key: 'renewable', label: 'Renewable / Renewed', count: globalLifecycleCounts.renewable, color: 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300' },
-                        { key: 'inactive', label: 'Inactive Accounts', count: globalLifecycleCounts.inactive, color: 'bg-slate-100 dark:bg-slate-800 text-slate-500' }
+                        { key: 'all', label: 'All Clients', count: globalLifecycleCounts.all, color: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200' }
                       ].map(pill => {
                         const isSelected = clientLifecycleFilter === pill.key;
                         return (
@@ -5428,11 +5493,11 @@ export default function AdminDashboard() {
                     <div className="flex items-center justify-between text-[11px] bg-blue-50/70 dark:bg-blue-950/30 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-900/40 text-blue-800 dark:text-blue-300">
                       <span>
                         Showing <strong>{
-                          clientLifecycleFilter === 'active' ? 'Active Plans' :
-                          clientLifecycleFilter === 'expiring_soon' ? 'Expiring Soon (Within 7 Days)' :
-                          clientLifecycleFilter === 'expired' ? 'Expired / Renewal Due' :
-                          clientLifecycleFilter === 'renewable' ? 'Renewable / Renewed Subscriptions' : 'Inactive Accounts'
-                        }</strong> from {clientFilterScope === 'all_clients' ? '🌐 All Clients in the agency (not restricted by month)' : `📅 ${currentMonthLabel}`}.
+                          clientLifecycleFilter === 'active' ? 'Active Clients (Ongoing & Expiring Soon)' :
+                          clientLifecycleFilter === 'expiring_soon' ? 'Expiring Soon (Active Contracts Within 7 Days)' :
+                          clientLifecycleFilter === 'expired' ? 'Expired Contracts (Inactive - Renewal Required)' :
+                          clientLifecycleFilter === 'renewable' ? 'Renewable / Renewed Subscriptions' : 'Inactive Accounts (Expired & Disabled)'
+                        }</strong> from {clientFilterScope === 'all_clients' ? '🌐 All Clients in the agency' : `📅 ${currentMonthLabel}`}.
                       </span>
                       <button
                         onClick={() => {
@@ -5577,18 +5642,18 @@ export default function AdminDashboard() {
                 {/* Table List */}
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="min-w-[850px] w-full text-left border-collapse">
+                    <table className="min-w-[1300px] w-full text-left border-collapse text-xs">
                       <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase tracking-wider">
-                          <th className="p-4">ID</th>
-                          <th className="p-4">Business / Client Name</th>
-                          <th className="p-4">Social Media Exec</th>
-                          <th className="p-4">Service & Plan Stream</th>
-                          <th className="p-4">Amount & Payment</th>
-                          <th className="p-4">Plan Cycle & Expiry</th>
-                          <th className="p-4 text-center">Page Ready?</th>
-                          <th className="p-4 text-center">Active?</th>
-                          <th className="p-4 text-right">Actions</th>
+                        <tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-bold border-b border-slate-200 dark:border-slate-800 text-[11px] uppercase tracking-wider">
+                          <th className="py-3.5 px-4 pl-6 whitespace-nowrap min-w-[100px]">Client ID</th>
+                          <th className="py-3.5 px-4 whitespace-nowrap min-w-[220px]">Business / Client Name</th>
+                          <th className="py-3.5 px-4 whitespace-nowrap min-w-[180px]">Social Media Exec</th>
+                          <th className="py-3.5 px-4 whitespace-nowrap min-w-[240px]">Service & Plan Stream</th>
+                          <th className="py-3.5 px-4 whitespace-nowrap min-w-[150px]">Amount & Payment</th>
+                          <th className="py-3.5 px-4 whitespace-nowrap min-w-[220px]">Plan Cycle & Expiry</th>
+                          <th className="py-3.5 px-4 text-center whitespace-nowrap min-w-[110px]">Page Ready?</th>
+                          <th className="py-3.5 px-4 text-center whitespace-nowrap min-w-[100px]">Active?</th>
+                          <th className="py-3.5 px-4 pr-6 text-right whitespace-nowrap min-w-[140px]">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -5604,149 +5669,186 @@ export default function AdminDashboard() {
                             const pInfo = getClientPaymentInfo(client);
                             const planInfo = getClientPlanInfo(client);
                             const smExec = getClientSmExecutive(client, allClientTasks, allClientDeliveries);
+                            const isExpired = planInfo.status === 'Expired' || planInfo.daysLeft <= 0;
+                            const isExpiringSoon = planInfo.status === 'Expiring Soon' || (planInfo.daysLeft > 0 && planInfo.daysLeft <= 7);
+
                             return (
                               <tr key={client.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/40 transition">
-                                <td className="p-4 font-bold text-slate-450">{client.clientId}</td>
-                                <td className="p-4">
-                                  <div className="font-bold text-slate-900 dark:text-white">{client.businessName}</div>
-                                  <div className="text-[10px] text-slate-400 mt-0.5">{client.clientName || 'No Contact Person'}</div>
-                                  {smExec && (
-                                    <div className="mt-1 flex items-center gap-1">
-                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
-                                        <UserCheck className="w-2.5 h-2.5 text-emerald-500" />
-                                        <span>SM: {smExec}</span>
-                                      </span>
-                                    </div>
-                                  )}
+                                {/* Client ID Badge */}
+                                <td className="p-4 pl-6 whitespace-nowrap font-mono font-bold text-xs text-slate-700 dark:text-slate-300">
+                                  <span className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded-md border border-slate-200/60 dark:border-slate-700/60 inline-block">
+                                    {client.clientId}
+                                  </span>
                                 </td>
-                                <td className="p-4">
+
+                                {/* Business / Client Name */}
+                                <td className="p-4 min-w-[220px]">
+                                  <div className="font-bold text-sm text-slate-900 dark:text-white leading-tight">
+                                    {client.businessName}
+                                  </div>
+                                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                    {client.clientName || 'No Contact Person'}
+                                  </div>
+                                </td>
+
+                                {/* Social Media Exec */}
+                                <td className="p-4 whitespace-nowrap min-w-[180px]">
                                   {smExec ? (
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-black text-[11px] flex items-center justify-center shadow-xs shrink-0">
+                                    <div className="flex items-center gap-2.5">
+                                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-black text-xs flex items-center justify-center shadow-xs shrink-0">
                                         {smExec.charAt(0).toUpperCase()}
                                       </div>
                                       <div>
                                         <div className="font-bold text-xs text-slate-900 dark:text-white leading-tight">
                                           {smExec}
                                         </div>
-                                        <div className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">
-                                          Dedicated SM Exec
-                                        </div>
+                                        <span className="inline-flex items-center text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 whitespace-nowrap">
+                                          Dedicated Exec
+                                        </span>
                                       </div>
                                     </div>
                                   ) : (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700">
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 whitespace-nowrap">
                                       Unassigned
                                     </span>
                                   )}
                                 </td>
-                                <td className="p-4">
+
+                                {/* Service & Plan Stream */}
+                                <td className="p-4 min-w-[240px]">
                                   <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="font-semibold text-slate-800 dark:text-slate-250">{client.services}</span>
-                                    <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${stream.badgeClass}`}>
+                                    <span className="font-bold text-xs text-slate-900 dark:text-white">{client.services}</span>
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${stream.badgeClass}`}>
                                       {stream.badge}
                                     </span>
-                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/40">
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/40 whitespace-nowrap">
                                       {planInfo.durationLabel}
                                     </span>
                                     {planInfo.isRenewed && (
-                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40">
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 whitespace-nowrap">
                                         🔄 Cycle #{(client.renewalHistory?.length || 0) + 1}
                                       </span>
                                     )}
                                   </div>
-                                  <div className="text-[9px] text-slate-400 mt-0.5">{client.packageName}</div>
+                                  <div className="text-[11px] text-slate-400 font-medium mt-1">{client.packageName}</div>
                                 </td>
-                                <td className="p-4">
-                                  <div className="font-extrabold text-slate-900 dark:text-white">
-                                    ₹{client.packageAmount.toLocaleString()}
+
+                                {/* Amount & Payment */}
+                                <td className="p-4 whitespace-nowrap min-w-[150px]">
+                                  <div className="font-extrabold text-sm text-slate-900 dark:text-white">
+                                    ₹{client.packageAmount.toLocaleString('en-IN')}
                                   </div>
                                   {pInfo.pStatus === 'Full' ? (
-                                    <div className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
-                                      ✓ Full Paid (₹{pInfo.paidAmount.toLocaleString()})
+                                    <div className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                      <CheckCircle className="w-3 h-3 text-emerald-500 shrink-0" />
+                                      <span>Full Paid</span>
                                     </div>
                                   ) : (pInfo.pStatus === 'Partial' || pInfo.pStatus === 'Half') ? (
-                                    <div className="text-[9px] font-bold text-amber-600 dark:text-amber-400 mt-0.5">
-                                      Paid: ₹{pInfo.paidAmount.toLocaleString()} • Due: ₹{pInfo.pendingBalance.toLocaleString()}
+                                    <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 mt-0.5">
+                                      Paid: ₹{pInfo.paidAmount.toLocaleString('en-IN')} • Due: ₹{pInfo.pendingBalance.toLocaleString('en-IN')}
                                     </div>
                                   ) : (
-                                    <div className="text-[9px] font-bold text-red-500 mt-0.5">
-                                      ⚠️ Pending (₹{client.packageAmount.toLocaleString()})
+                                    <div className="text-[10px] font-bold text-rose-500 mt-0.5">
+                                      ⚠️ Pending (₹{client.packageAmount.toLocaleString('en-IN')})
                                     </div>
                                   )}
                                 </td>
-                                <td className="p-4">
-                                  <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
-                                    {client.joiningDate} → {planInfo.expiryDateStr}
+
+                                {/* Plan Cycle & Expiry */}
+                                <td className="p-4 whitespace-nowrap min-w-[220px]">
+                                  <div className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 whitespace-nowrap">
+                                    <span>{client.joiningDate}</span>
+                                    <span className="text-slate-400">→</span>
+                                    <span>{planInfo.expiryDateStr}</span>
                                   </div>
-                                  <div className="mt-1 flex items-center gap-1.5">
-                                    {planInfo.isExpired ? (
-                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/50">
-                                        Expired ({Math.abs(planInfo.daysLeft)}d ago)
+                                  <div className="mt-1 flex items-center gap-1.5 whitespace-nowrap">
+                                    {isExpired ? (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 whitespace-nowrap">
+                                        Expired ({planInfo.overdueDays || Math.abs(planInfo.daysLeft)}d ago)
                                       </span>
-                                    ) : planInfo.isExpiringSoon ? (
-                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50 animate-pulse">
-                                        ⚠️ {planInfo.daysLeft}d left (Due: {planInfo.renewalDueDateStr})
+                                    ) : isExpiringSoon ? (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50 whitespace-nowrap animate-pulse">
+                                        ⚠️ {planInfo.daysLeft}d left (Due: {planInfo.renewalDueStr || planInfo.expiryDateStr})
                                       </span>
                                     ) : (
-                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40">
-                                        ✓ {planInfo.daysLeft}d left (Due: {planInfo.renewalDueDateStr})
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 whitespace-nowrap">
+                                        ✓ {planInfo.daysLeft}d left (Due: {planInfo.renewalDueStr || planInfo.expiryDateStr})
                                       </span>
                                     )}
                                   </div>
                                 </td>
-                                <td className="p-4 text-center">
-                                  <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${client.accountReady ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600' : 'bg-red-50 dark:bg-red-950/40 text-red-600'}`}>
+
+                                {/* Page Ready? */}
+                                <td className="p-4 text-center whitespace-nowrap min-w-[110px]">
+                                  <span className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                                    client.accountReady 
+                                      ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40' 
+                                      : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/40'
+                                  }`}>
                                     {client.accountReady ? 'Yes' : 'No'}
                                   </span>
                                 </td>
-                                <td className="p-4 text-center">
-                                  <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase ${client.active ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
-                                    {client.active ? 'ACTIVE' : 'INACTIVE'}
-                                  </span>
+
+                                {/* Active? */}
+                                <td className="p-4 text-center whitespace-nowrap min-w-[100px]">
+                                  {client.active && !isExpired ? (
+                                    <span className={`inline-flex items-center justify-center px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                      isExpiringSoon
+                                        ? 'bg-amber-500 text-white shadow-xs'
+                                        : 'bg-emerald-500 text-white shadow-xs'
+                                    }`}>
+                                      {isExpiringSoon ? 'EXPIRING' : 'ACTIVE'}
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50">
+                                      {isExpired ? 'EXPIRED' : 'INACTIVE'}
+                                    </span>
+                                  )}
                                 </td>
-                                <td className="p-4 text-right">
-                                <div className="flex gap-2 justify-end">
-                                  <button
-                                    onClick={() => {
-                                      setSelectedClient(client);
-                                      setShowClientDetailModal(true);
-                                      refreshClientTasks(client.id);
-                                      setClientTaskFormId(`${client.clientId}-TASK-01`);
-                                      setClientTaskFormTitle('');
-                                      setClientTaskFormDate(new Date().toISOString().split('T')[0]);
-                                      setClientTaskFormAssignTo('Graphic Designer');
-                                      setClientTaskFormWorkingOn('');
-                                      setClientTaskFormStatus('Not Started');
-                                      setClientTaskFormPostType('Graphic');
-                                      setClientTaskFormNotes('');
-                                      setClientTaskEditMode(false);
-                                    }}
-                                    className="py-1 px-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-855 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-lg transition"
-                                  >
-                                    Details
-                                  </button>
-                                  <button
-                                    onClick={() => { resetClientForm(client); setShowEditClientModal(true); }}
-                                    className="p-1.5 border border-slate-200 dark:border-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition"
-                                    title="Edit"
-                                  >
-                                    <Edit2 className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteClient(client.id, client.businessName)}
-                                    className="p-1.5 border border-slate-200 dark:border-slate-850 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg text-red-650 transition"
-                                    title="Delete"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
+
+                                {/* Actions */}
+                                <td className="p-4 pr-6 text-right whitespace-nowrap min-w-[140px]">
+                                  <div className="flex items-center gap-1.5 justify-end">
+                                    <button
+                                      onClick={() => {
+                                        setSelectedClient(client);
+                                        setShowClientDetailModal(true);
+                                        refreshClientTasks(client.id);
+                                        setClientTaskFormId(`${client.clientId}-TASK-01`);
+                                        setClientTaskFormTitle('');
+                                        setClientTaskFormDate(new Date().toISOString().split('T')[0]);
+                                        setClientTaskFormAssignTo('Graphic Designer');
+                                        setClientTaskFormWorkingOn('');
+                                        setClientTaskFormStatus('Not Started');
+                                        setClientTaskFormPostType('Graphic');
+                                        setClientTaskFormNotes('');
+                                        setClientTaskEditMode(false);
+                                      }}
+                                      className="py-1 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-lg text-xs transition cursor-pointer"
+                                    >
+                                      Details
+                                    </button>
+                                    <button
+                                      onClick={() => { resetClientForm(client); setShowEditClientModal(true); }}
+                                      className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 hover:text-blue-600 transition cursor-pointer border border-transparent hover:border-slate-200 dark:border-slate-700"
+                                      title="Edit"
+                                    >
+                                      <Edit2 className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteClient(client.id, client.businessName)}
+                                      className="p-1.5 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg text-slate-400 hover:text-rose-600 transition cursor-pointer border border-transparent hover:border-rose-200 dark:hover:border-rose-800"
+                                      title="Delete"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
                     </table>
                   </div>
                 </div>
@@ -7444,7 +7546,7 @@ export default function AdminDashboard() {
                         <option value="">Select Staff / Unassigned</option>
                         <option value="AUTO">Auto Assign (First-In Round Robin)</option>
                         <optgroup label="Matching Department / Designation">
-                          {usersList.filter(e => (e.role === 'EMPLOYEE' || e.role === 'TL')).filter(e => {
+                          {usersList.filter(e => (e.role === 'EMPLOYEE' || e.role === 'TL' || e.role === 'SALES')).filter(e => {
                             const role = ((e.department || '') + ' ' + (e.designation || '')).toLowerCase();
                             const target = (clientTaskFormAssignTo || '').toLowerCase();
                             let worksArr = [];
@@ -7462,7 +7564,7 @@ export default function AdminDashboard() {
                           ))}
                         </optgroup>
                         <optgroup label="All Other Staff">
-                          {usersList.filter(e => (e.role === 'EMPLOYEE' || e.role === 'TL')).filter(e => {
+                          {usersList.filter(e => (e.role === 'EMPLOYEE' || e.role === 'TL' || e.role === 'SALES')).filter(e => {
                             const role = ((e.department || '') + ' ' + (e.designation || '')).toLowerCase();
                             const target = (clientTaskFormAssignTo || '').toLowerCase();
                             let worksArr = [];
