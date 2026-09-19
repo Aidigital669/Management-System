@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { uploadFileAction } from '@/app/actions/uploadAction';
 import { getClientPlanInfo } from '@/lib/planUtils';
+import AdminPreviewBanner from '@/components/AdminPreviewBanner';
 
 const convertDbDateToIso = (dateStr) => {
   if (!dateStr) return '';
@@ -663,7 +664,7 @@ export default function TLDashboard() {
       setRenewalReason('');
       await refreshData();
     } catch (err) {
-      alert(err.message);
+      showToast(err.message || 'Failed to submit renewal request', 'error');
     } finally {
       setRequestSubmitting(false);
     }
@@ -683,15 +684,15 @@ export default function TLDashboard() {
 
     const days = parseInt(extensionDays, 10);
     if (isNaN(days) || days < 1) {
-      alert('Please specify at least 1 extension day.');
+      showToast('Please specify at least 1 extension day.', 'error');
       return;
     }
     if (days > 7) {
-      alert('Team Leader can request a maximum of 7 days extension. Please select 7 days or fewer.');
+      showToast('Team Leader can request a maximum of 7 days extension. Please select 7 days or fewer.', 'error');
       return;
     }
     if (!extensionReason.trim()) {
-      alert('Please provide a reason for the extension request.');
+      showToast('Please provide a reason for the extension request.', 'error');
       return;
     }
 
@@ -716,7 +717,7 @@ export default function TLDashboard() {
       setExtensionReason('');
       await refreshData();
     } catch (err) {
-      alert(err.message);
+      showToast(err.message || 'Failed to submit extension request', 'error');
     } finally {
       setRequestSubmitting(false);
     }
@@ -1032,11 +1033,14 @@ export default function TLDashboard() {
   );
 
   return (
-    <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 transition-colors duration-300">
+    <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 transition-colors duration-300 overflow-hidden">
       
+      {/* Admin Preview Mode Banner */}
+      <AdminPreviewBanner currentUserName={currentUser?.name} />
+
       {/* Toast Alert */}
       {toast.message && (
-        <div className={`fixed bottom-5 right-5 z-50 p-4 rounded-xl shadow-2xl flex items-center gap-3 border text-sm font-semibold animate-slide-in
+        <div className={`fixed bottom-5 right-5 z-[70] p-4 rounded-xl shadow-2xl flex items-center gap-3 border text-sm font-semibold animate-slide-in
           ${toast.type === 'success' 
             ? 'bg-emerald-50 dark:bg-emerald-950/80 border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-300' 
             : 'bg-red-50 dark:bg-red-950/80 border-red-200 dark:border-red-900 text-red-850 dark:text-red-300'
@@ -1055,10 +1059,12 @@ export default function TLDashboard() {
         />
       )}
 
-      {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between shrink-0 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static ${
-        mobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
-      }`}>
+      {/* Dashboard Body: Sidebar + Main Content Side-by-Side */}
+      <div className="flex flex-1 min-h-0 w-full overflow-hidden relative">
+        {/* Sidebar */}
+        <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between shrink-0 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:h-full ${
+          mobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
+        }`}>
         <div className="overflow-y-auto flex-1">
           {/* Brand */}
           <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between sticky top-0 bg-white dark:bg-slate-900 z-10">
@@ -1233,8 +1239,8 @@ export default function TLDashboard() {
         </div>
       </aside>
 
-      {/* Main Panel Content */}
-      <main className="flex-grow flex flex-col min-w-0 overflow-y-auto h-screen">
+        {/* Main Panel Content */}
+        <main className="flex-grow flex flex-col min-w-0 overflow-y-auto h-full">
         
         {/* Header */}
         <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-3 sm:px-6 lg:px-8 shrink-0 sticky top-0 z-20 transition-colors">
@@ -2954,6 +2960,7 @@ export default function TLDashboard() {
 
         </div>
       </main>
+      </div>
     </div>
   );
 }

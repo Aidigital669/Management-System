@@ -45,7 +45,9 @@ import {
   FileSpreadsheet,
   PanelLeftClose,
   PanelLeftOpen,
-  Tag
+  Tag,
+  Eye,
+  Loader2
 } from 'lucide-react';
 import ExcelImportModal from '@/components/ExcelImportModal';
 import { uploadFileAction } from '@/app/actions/uploadAction';
@@ -56,6 +58,8 @@ import {
   getPlanDurationLabel,
   getClientPlanInfo,
   isClientActiveInMonth,
+  isClientContractInMonth,
+  isClientSubscriptionCoveringMonth,
   isClientExpiringInMonth,
   isClientStartingInMonth,
   getClientRevenueStream,
@@ -153,12 +157,21 @@ export default function AdminDashboard() {
   const [excelModalType, setExcelModalType] = useState('clients');
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [clientMonthFilter, setClientMonthFilter] = useState('all');
-  const [clientStartDate, setClientStartDate] = useState('');
-  const [clientEndDate, setClientEndDate] = useState('');
+
+  const now = new Date();
+  const curLiveYear = now.getFullYear();
+  const curLiveMonth = now.getMonth() + 1;
+  const currentLiveMonthKey = `${curLiveYear}-${String(curLiveMonth).padStart(2, '0')}`;
+  const currentLiveMonthLastDay = new Date(curLiveYear, curLiveMonth, 0).getDate();
+  const currentLiveMonthStart = `${curLiveYear}-${String(curLiveMonth).padStart(2, '0')}-01`;
+  const currentLiveMonthEnd = `${curLiveYear}-${String(curLiveMonth).padStart(2, '0')}-${String(currentLiveMonthLastDay).padStart(2, '0')}`;
+
+  const [clientMonthFilter, setClientMonthFilter] = useState(currentLiveMonthKey);
+  const [clientStartDate, setClientStartDate] = useState(currentLiveMonthStart);
+  const [clientEndDate, setClientEndDate] = useState(currentLiveMonthEnd);
   const [clientPaymentFilter, setClientPaymentFilter] = useState('all');
   const [clientLifecycleFilter, setClientLifecycleFilter] = useState('active'); // 'all', 'active', 'expiring_soon', 'expired', 'renewable', 'inactive'
-  const [clientFilterScope, setClientFilterScope] = useState('all_clients'); // 'all_clients' (global) or 'month'
+  const [clientFilterScope, setClientFilterScope] = useState('month'); // 'month' (active month) or 'all_clients'
 
   // Form Fields - User
   const [formName, setFormName] = useState('');
@@ -227,6 +240,100 @@ export default function AdminDashboard() {
   const [adminNoteMap, setAdminNoteMap] = useState({});
   const [processingRequestId, setProcessingRequestId] = useState(null);
 
+  // Direct Pack Extension Modal States (Admin Authority: Up to 10 days)
+  const [directExtensionModalClient, setDirectExtensionModalClient] = useState(null);
+  const [directExtensionDays, setDirectExtensionDays] = useState(10);
+  const [directExtensionReason, setDirectExtensionReason] = useState('');
+  const [directExtensionLoading, setDirectExtensionLoading] = useState(false);
+
+  // Custom Confirmation & Warning Modal State (No native browser localhost dialogs)
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    badge: '',
+    clientName: '',
+    message: '',
+    warningNotice: '',
+    confirmText: 'Confirm',
+    cancelText: 'Cancel',
+    confirmVariant: 'amber', // 'amber' | 'rose' | 'emerald' | 'blue'
+    onConfirm: null,
+    isLoading: false
+  });
+
+  const openConfirmModal = (config) => {
+    setConfirmModal({
+      isOpen: true,
+      title: config.title || 'Confirm Action',
+      badge: config.badge || '',
+      clientName: config.clientName || '',
+      message: config.message || '',
+      warningNotice: config.warningNotice || '',
+      confirmText: config.confirmText || 'Confirm',
+      cancelText: config.cancelText || 'Cancel',
+      confirmVariant: config.confirmVariant || 'amber',
+      onConfirm: config.onConfirm || null,
+      isLoading: false
+    });
+  };
+
+  const closeConfirmModal = () => {
+    setConfirmModal(prev => ({ ...prev, isOpen: false, isLoading: false, onConfirm: null }));
+  };
+
+  // Custom Success Template Modal (No browser alerts)
+  const [successNoticeModal, setSuccessNoticeModal] = useState({
+    isOpen: false,
+    title: '',
+    subtitle: '',
+    clientName: '',
+    badge: '',
+    details: [],
+    warningNote: ''
+  });
+
+  const openSuccessNotice = (config) => {
+    setSuccessNoticeModal({
+      isOpen: true,
+      title: config.title || 'Action Completed Successfully',
+      subtitle: config.subtitle || '',
+      clientName: config.clientName || '',
+      badge: config.badge || 'Completed',
+      details: config.details || [],
+      warningNote: config.warningNote || ''
+    });
+  };
+
+  const closeSuccessNotice = () => {
+    setSuccessNoticeModal(prev => ({ ...prev, isOpen: false }));
+  };
+
+  // Custom Rejection Note Modal (Replaces browser prompt dialog)
+  const [rejectRequestModal, setRejectRequestModal] = useState({
+    isOpen: false,
+    req: null,
+    reason: '',
+    isLoading: false
+  });
+
+  const openRejectRequestModal = (req) => {
+    setRejectRequestModal({
+      isOpen: true,
+      req,
+      reason: adminNoteMap[req.id] || 'Rejected by Admin.',
+      isLoading: false
+    });
+  };
+
+  const closeRejectRequestModal = () => {
+    setRejectRequestModal({
+      isOpen: false,
+      req: null,
+      reason: '',
+      isLoading: false
+    });
+  };
+
   // Responsive Navigation & Sidebar States
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -246,9 +353,48 @@ export default function AdminDashboard() {
     });
   };
 
-  const handleSelectTab = (tab) => {
+  const handleSelectTab = (tab, options = {}) => {
     setActiveTab(tab);
     setMobileSidebarOpen(false);
+
+    if (options.filterScope) {
+      setClientFilterScope(options.filterScope);
+    }
+    if (options.monthFilter) {
+      setClientMonthFilter(options.monthFilter);
+    }
+    if (options.startDate !== undefined) {
+      setClientStartDate(options.startDate);
+    }
+    if (options.endDate !== undefined) {
+      setClientEndDate(options.endDate);
+    }
+    if (options.lifecycleFilter) {
+      setClientLifecycleFilter(options.lifecycleFilter);
+      if (!options.filterScope) setClientFilterScope('all_clients');
+    }
+    if (options.revenueStreamFilter) {
+      setClientRevenueStreamFilter(options.revenueStreamFilter);
+      if (!options.filterScope) setClientFilterScope('all_clients');
+    }
+    if (options.paymentFilter) {
+      setClientPaymentFilter(options.paymentFilter);
+    }
+    if (options.renewalFilter) {
+      setRenewalFilter(options.renewalFilter);
+    }
+    if (options.paymentTabFilter) {
+      setPaymentTabFilter(options.paymentTabFilter);
+    }
+    if (options.taskStaffFilter) {
+      setTaskStaffFilter(options.taskStaffFilter);
+    }
+    if (options.taskStatusFilter) {
+      setTaskStatusFilter(options.taskStatusFilter);
+    }
+    if (options.deliverableStatusFilter) {
+      setDeliverableStatusFilter(options.deliverableStatusFilter);
+    }
   };
 
   // Deliverable Assignment States
@@ -296,11 +442,12 @@ export default function AdminDashboard() {
   const [renewalStartDate, setRenewalStartDate] = useState('');
   const [renewalEndDate, setRenewalEndDate] = useState('');
   const [renewalCalendarMode, setRenewalCalendarMode] = useState('activeMonth'); // 'activeMonth' | 'renewalMonth' | 'cycleMonth'
+  const [expiredTableScope, setExpiredTableScope] = useState('all'); // 'all' (All Overdues) | 'month' (Selected Month)
 
   // Deliverables Filters State
-  const [deliverableMonthFilter, setDeliverableMonthFilter] = useState('all');
-  const [deliverableStartDate, setDeliverableStartDate] = useState('');
-  const [deliverableEndDate, setDeliverableEndDate] = useState('');
+  const [deliverableMonthFilter, setDeliverableMonthFilter] = useState(currentLiveMonthKey);
+  const [deliverableStartDate, setDeliverableStartDate] = useState(currentLiveMonthStart);
+  const [deliverableEndDate, setDeliverableEndDate] = useState(currentLiveMonthEnd);
 
   // Client Feedbacks & Concerns states
   const [feedbacksList, setFeedbacksList] = useState([]);
@@ -310,20 +457,25 @@ export default function AdminDashboard() {
   // Pending Payments tab states
   const [paymentTabFilter, setPaymentTabFilter] = useState('All'); // 'All', 'Overdue7', 'Within7'
   const [paymentTabSearch, setPaymentTabSearch] = useState('');
-  const [paymentMonthFilter, setPaymentMonthFilter] = useState('all');
-  const [paymentStartDate, setPaymentStartDate] = useState('');
-  const [paymentEndDate, setPaymentEndDate] = useState('');
+  const [paymentMonthFilter, setPaymentMonthFilter] = useState(currentLiveMonthKey);
+  const [paymentStartDate, setPaymentStartDate] = useState(currentLiveMonthStart);
+  const [paymentEndDate, setPaymentEndDate] = useState(currentLiveMonthEnd);
   const [clientRevenueStreamFilter, setClientRevenueStreamFilter] = useState('all'); // 'all', 'NewPurchase', 'Renewal', 'ActiveRetainer'
   const [employeeStatusFilter, setEmployeeStatusFilter] = useState('ALL'); // 'ALL', 'ACTIVE', 'INACTIVE'
 
   // Campaign Deliveries tab states
-  const [deliveryMonthFilter, setDeliveryMonthFilter] = useState('all');
-  const [deliveryStartDate, setDeliveryStartDate] = useState('');
-  const [deliveryEndDate, setDeliveryEndDate] = useState('');
+  const [deliveryMonthFilter, setDeliveryMonthFilter] = useState(currentLiveMonthKey);
+  const [deliveryStartDate, setDeliveryStartDate] = useState(currentLiveMonthStart);
+  const [deliveryEndDate, setDeliveryEndDate] = useState(currentLiveMonthEnd);
 
-  // Duties / Tasks Board Date Range
-  const [taskStartDate, setTaskStartDate] = useState('');
-  const [taskEndDate, setTaskEndDate] = useState('');
+  // Deliverable Status Filter State
+  const [deliverableStatusFilter, setDeliverableStatusFilter] = useState('all'); // 'all' | 'Complete Task' | 'Working On It' | 'Not Started'
+
+  // Duties / Tasks Board Staff & Status Filters & Date Range
+  const [taskStaffFilter, setTaskStaffFilter] = useState('ALL');
+  const [taskStatusFilter, setTaskStatusFilter] = useState('ALL'); // 'ALL' | 'TODO' | 'IN_PROGRESS' | 'PENDING' | 'DONE'
+  const [taskStartDate, setTaskStartDate] = useState(currentLiveMonthStart);
+  const [taskEndDate, setTaskEndDate] = useState(currentLiveMonthEnd);
 
   const parseClientMonthKey = (client) => {
     if (!client) return null;
@@ -366,21 +518,14 @@ export default function AdminDashboard() {
   const getClientRevenueStream = (client, selectedMonthKey) => {
     if (!client || !client.active) return { type: 'Inactive', label: 'Inactive Account', badge: 'Inactive', badgeClass: 'bg-slate-100 text-slate-500' };
 
-    const joiningMonth = parseClientMonthKey(client);
-    let createdMonth = null;
-    if (client.createdAt) {
-      const cd = new Date(client.createdAt);
-      if (!isNaN(cd.getTime())) createdMonth = cd.toISOString().slice(0, 7);
-    }
-
     let isRenewed = false;
     try {
       if (client.notes && client.notes.toLowerCase().includes('renew')) isRenewed = true;
+      if (client.notes && client.notes.trim().startsWith('{')) {
+        const parsed = JSON.parse(client.notes);
+        if (parsed.isRenewed || parsed.renewalCycle || parsed.renewed) isRenewed = true;
+      }
     } catch (e) {}
-
-    if (createdMonth && joiningMonth && createdMonth !== joiningMonth) {
-      isRenewed = true;
-    }
 
     if (isRenewed) {
       return {
@@ -391,20 +536,11 @@ export default function AdminDashboard() {
       };
     }
 
-    if (createdMonth && (!selectedMonthKey || selectedMonthKey === 'all' || createdMonth === selectedMonthKey)) {
-      return {
-        type: 'NewPurchase',
-        label: 'New Plan Purchase',
-        badge: '🛒 New Plan',
-        badgeClass: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-      };
-    }
-
     return {
-      type: 'ActiveRetainer',
-      label: 'Active Retainer',
-      badge: '💼 Retainer',
-      badgeClass: 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+      type: 'NewPurchase',
+      label: 'New Plan Purchase',
+      badge: '🛒 New Plan',
+      badgeClass: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
     };
   };
 
@@ -473,51 +609,60 @@ export default function AdminDashboard() {
     };
   };
 
-  const handleMarkFullyPaid = async (client) => {
-    if (!confirm(`Mark remaining payment (₹${(client.packageAmount - (getClientPaymentInfo(client).paidAmount)).toLocaleString()}) as FULLY PAID for ${client.businessName}?`)) return;
-    setFormLoading(true);
-    try {
-      let currentActualNotes = '';
-      try {
-        if (client.notes) {
-          const parsed = JSON.parse(client.notes);
-          if (parsed && typeof parsed === 'object') {
-            currentActualNotes = parsed.actualNotes || '';
-          } else {
-            currentActualNotes = client.notes;
+  const handleMarkFullyPaid = (client) => {
+    const remainingAmt = (client.packageAmount - (getClientPaymentInfo(client).paidAmount)).toLocaleString();
+    openConfirmModal({
+      title: 'Confirm Full Payment',
+      badge: 'Payment Update',
+      clientName: client.businessName,
+      message: `Mark remaining payment (₹${remainingAmt}) as FULLY PAID for "${client.businessName}"?`,
+      warningNotice: `This will mark the client package amount of ₹${(client.packageAmount || 0).toLocaleString()} as 100% paid and clear all payment pending statuses.`,
+      confirmText: 'Mark Fully Paid',
+      confirmVariant: 'emerald',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isLoading: true }));
+        try {
+          let currentActualNotes = '';
+          try {
+            if (client.notes) {
+              const parsed = JSON.parse(client.notes);
+              if (parsed && typeof parsed === 'object') {
+                currentActualNotes = parsed.actualNotes || '';
+              } else {
+                currentActualNotes = client.notes;
+              }
+            }
+          } catch (e) {
+            currentActualNotes = client.notes || '';
           }
+
+          const updatedNotesObj = {
+            paymentStatus: 'Full',
+            paidAmount: client.packageAmount,
+            actualNotes: currentActualNotes
+          };
+
+          const res = await fetch(`/api/clients/${client.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notes: JSON.stringify(updatedNotesObj) })
+          });
+
+          closeConfirmModal();
+          if (res.ok) {
+            showToast(`Payment marked as FULLY PAID for ${client.businessName}!`, 'success');
+            await fetchClients();
+          } else {
+            showToast('Failed to update payment status.', 'error');
+          }
+        } catch (err) {
+          closeConfirmModal();
+          showToast('Error updating payment status.', 'error');
         }
-      } catch (e) {
-        currentActualNotes = client.notes || '';
       }
-
-      const updatedNotesObj = {
-        paymentStatus: 'Full',
-        paidAmount: client.packageAmount,
-        actualNotes: currentActualNotes
-      };
-
-      const res = await fetch(`/api/clients/${client.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes: JSON.stringify(updatedNotesObj) })
-      });
-
-      if (res.ok) {
-        showToast(`Payment marked as FULLY PAID for ${client.businessName}!`, 'success');
-        await fetchClients();
-      } else {
-        showToast('Failed to update payment status.', 'error');
-      }
-    } catch (err) {
-      showToast('Error updating payment status.', 'error');
-    } finally {
-      setFormLoading(false);
-    }
+    });
   };
 
-  // Staff/Department Task Filter State for Admin
-  const [taskStaffFilter, setTaskStaffFilter] = useState('ALL');
 
   // Dark Mode State
   const [darkMode, setDarkMode] = useState(false);
@@ -592,11 +737,17 @@ export default function AdminDashboard() {
     initDashboard();
   }, [router]);
 
-  // Real-time Clock-in Polling
+  // Real-time Clock-in Polling (Safe single-flight polling, pauses when tab is hidden)
   useEffect(() => {
     let lastCheckTime = new Date().toISOString();
+    let isPolling = false;
 
     const checkRecentClockIns = async () => {
+      // Do not poll if the browser tab is hidden or a request is already in-flight
+      if (typeof document !== 'undefined' && document.hidden) return;
+      if (isPolling) return;
+
+      isPolling = true;
       try {
         const { ok, data } = await fetchJson(`/api/attendance/recent?since=${encodeURIComponent(lastCheckTime)}`);
         if (!ok || !data.logs || data.logs.length === 0) return;
@@ -617,8 +768,10 @@ export default function AdminDashboard() {
         if (err instanceof TypeError && err.message === 'Failed to fetch') {
           console.warn('Polling network offline or server restarting:', err);
         } else {
-          console.error('Polling error:', err);
+          console.warn('Polling notice:', err?.message || err);
         }
+      } finally {
+        isPolling = false;
       }
     };
 
@@ -664,8 +817,8 @@ export default function AdminDashboard() {
 
       const fetchedClients = clientsRes.data.clients || [];
       setClientsList(fetchedClients);
-      // Update active client IDs set based on client.active flag and unexpired plan
-      const activeIds = fetchedClients.filter(c => isClientPlanActive(c)).map(c => c.clientId);
+      // Update active client IDs set based on client active in the current live month
+      const activeIds = fetchedClients.filter(c => isClientActiveInMonth(c, currentLiveMonthKey)).map(c => c.clientId);
       setActiveClientIds(new Set(activeIds));
 
       setAllClientTasks(ctRes.data.tasks || []);
@@ -713,11 +866,11 @@ export default function AdminDashboard() {
         await refreshData();
       } else {
         const data = await res.json();
-        alert(data.error || 'Failed to update feedback status.');
+        showToast(data.error || 'Failed to update feedback status.', 'error');
       }
     } catch (err) {
       console.error(err);
-      alert('Network error updating feedback status.');
+      showToast('Network error updating feedback status.', 'error');
     } finally {
       setFormLoading(false);
     }
@@ -1251,19 +1404,32 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteClient = async (id, name) => {
-    if (!confirm(`Are you sure you want to delete client account "${name}"?`)) return;
-    try {
-      const res = await fetch(`/api/clients/${id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.details || errData.error || 'Failed to delete client');
+  const handleDeleteClient = (id, name) => {
+    openConfirmModal({
+      title: 'Delete Client Account',
+      badge: 'Permanent Deletion',
+      clientName: name,
+      message: `Are you sure you want to delete client account "${name}"?`,
+      warningNotice: '⚠️ Warning: This will permanently delete the client, their login credentials, and all associated campaign tasks and deliverables. This action cannot be reversed.',
+      confirmText: 'Delete Client',
+      confirmVariant: 'rose',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isLoading: true }));
+        try {
+          const res = await fetch(`/api/clients/${id}`, { method: 'DELETE' });
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.details || errData.error || 'Failed to delete client');
+          }
+          closeConfirmModal();
+          showToast(`Deleted client: ${name}`);
+          await refreshData();
+        } catch (err) {
+          closeConfirmModal();
+          showToast(`Delete Error: ${err.message}`, 'error');
+        }
       }
-      showToast(`Deleted client: ${name}`);
-      await refreshData();
-    } catch (err) {
-      alert(`Delete Error: ${err.message}`);
-    }
+    });
   };
 
   const refreshClientTasks = async (clientIdVal) => {
@@ -1362,16 +1528,29 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteClientTask = async (taskDbId, title) => {
-    if (!confirm(`Are you sure you want to delete task deliverable "${title}"?`)) return;
-    try {
-      const res = await fetch(`/api/client-tasks/${taskDbId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to delete task');
-      showToast(`Deleted task: ${title}`);
-      await refreshClientTasks(selectedClient.id);
-    } catch (err) {
-      alert(err.message);
-    }
+  const handleDeleteClientTask = (taskDbId, title) => {
+    openConfirmModal({
+      title: 'Delete Task Deliverable',
+      badge: 'Deliverable',
+      clientName: selectedClient?.businessName || 'Client',
+      message: `Are you sure you want to delete task deliverable "${title}"?`,
+      warningNotice: '⚠️ This will permanently remove this scheduled deliverable task from the client schedule.',
+      confirmText: 'Delete Deliverable',
+      confirmVariant: 'rose',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isLoading: true }));
+        try {
+          const res = await fetch(`/api/client-tasks/${taskDbId}`, { method: 'DELETE' });
+          if (!res.ok) throw new Error('Failed to delete task');
+          closeConfirmModal();
+          showToast(`Deleted task: ${title}`);
+          await refreshClientTasks(selectedClient.id);
+        } catch (err) {
+          closeConfirmModal();
+          showToast(err.message || 'Failed to delete task', 'error');
+        }
+      }
+    });
   };
 
   const parseDbDate = (dateStr) => {
@@ -1455,67 +1634,126 @@ export default function AdminDashboard() {
     return getClientRenewalInfo(client);
   };
 
-  const handleRenewClientPlan = async (clientDbId, bizName) => {
-    if (!confirm(`Are you sure you want to renew the plan for "${bizName}"? Setup/onboarding tasks will be skipped; only content deliverables (Creatives, Reels, AI Videos, Weekly Reports) will be generated for the new contract cycle.`)) return;
-    
-    setFormLoading(true);
-    try {
-      const res = await fetch(`/api/clients/${clientDbId}/renew`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to renew plan');
-      
-      showToast(`Plan successfully renewed for ${bizName}! ${data.taskCount} content tasks generated starting from ${data.newJoiningDate}.`);
-      await refreshData();
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setFormLoading(false);
-    }
+  const handleRenewClientPlan = (clientDbId, bizName) => {
+    openConfirmModal({
+      title: 'Renew Client Plan',
+      badge: 'Contract Renewal',
+      clientName: bizName,
+      message: `Are you sure you want to renew the plan for "${bizName}"?`,
+      warningNotice: 'Setup and onboarding tasks will be skipped. Only content deliverables (Creatives, Reels, AI Videos, Weekly Reports) will be scheduled for the new contract cycle.',
+      confirmText: 'Renew Plan Now',
+      confirmVariant: 'emerald',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isLoading: true }));
+        try {
+          const res = await fetch(`/api/clients/${clientDbId}/renew`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Failed to renew plan');
+          
+          closeConfirmModal();
+          openSuccessNotice({
+            title: 'Plan Successfully Renewed!',
+            subtitle: `New contract cycle created for ${bizName}`,
+            clientName: bizName,
+            badge: 'Plan Renewed',
+            details: [
+              { label: 'Client', value: bizName },
+              { label: 'New Cycle Start', value: data.newJoiningDate || 'Today' },
+              { label: 'Deliverables Scheduled', value: `${data.taskCount || 0} Content Tasks` }
+            ],
+            warningNote: 'Sundays are strictly excluded from deliverable scheduling.'
+          });
+
+          showToast(`Plan successfully renewed for ${bizName}! ${data.taskCount} content tasks generated starting from ${data.newJoiningDate}.`);
+          await refreshData();
+        } catch (err) {
+          closeConfirmModal();
+          showToast(err.message || 'Failed to renew plan', 'error');
+        }
+      }
+    });
   };
 
   const handleApproveRenewalRequest = async (req) => {
     const isExtension = req.requestType === 'EXTENSION';
     const chosenDays = adminExtensionDaysMap[req.id] || req.requestedDays || 7;
 
-    if (isExtension) {
-      if (chosenDays > 10) {
-        alert('Admin can grant a maximum of 10 days extension. Please select 10 days or fewer.');
-        return;
+    if (isExtension && chosenDays > 10) {
+      showToast('Admin can grant a maximum of 10 days extension. Please select 10 days or fewer.', 'warning');
+      return;
+    }
+
+    const title = isExtension ? 'Approve Pack Extension' : 'Approve Plan Renewal';
+    const msg = isExtension 
+      ? `Are you sure you want to approve a ${chosenDays}-day extension for "${req.businessName}"? (Requested by TL: ${req.requestedByName})`
+      : `Are you sure you want to approve the plan renewal for "${req.businessName}"? (Requested by TL: ${req.requestedByName})`;
+    const warning = isExtension
+      ? `⚠️ Pack will automatically deactivate if not renewed after ${chosenDays} days.`
+      : `Setup/onboarding tasks will be skipped. Only content deliverables will be generated for the new cycle.`;
+
+    openConfirmModal({
+      title,
+      badge: isExtension ? `${chosenDays} Days Extension` : 'Renewal Approval',
+      clientName: req.businessName,
+      message: msg,
+      warningNotice: warning,
+      confirmText: isExtension ? `Approve ${chosenDays}d Extension` : 'Approve Renewal',
+      confirmVariant: isExtension ? 'amber' : 'emerald',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isLoading: true }));
+        setProcessingRequestId(req.id);
+        try {
+          const res = await fetch(`/api/renewal-requests/${req.id}/approve`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              approvedDays: chosenDays,
+              adminNote: adminNoteMap[req.id] || ''
+            })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Failed to approve request');
+
+          closeConfirmModal();
+          openSuccessNotice({
+            title: isExtension ? 'Extension Request Approved!' : 'Plan Renewal Approved!',
+            subtitle: `Approval recorded for ${req.businessName}`,
+            clientName: req.businessName,
+            badge: isExtension ? `+${chosenDays} Days Extension` : 'Renewed',
+            details: [
+              { label: 'Client', value: req.businessName },
+              { label: 'Type', value: isExtension ? 'Pack Extension' : 'Plan Renewal' },
+              { label: 'Requested By', value: req.requestedByName },
+              { label: 'Admin Note', value: adminNoteMap[req.id] || 'Approved by Admin' }
+            ],
+            warningNote: isExtension ? `⚠️ Pack will automatically deactivate if not renewed after ${chosenDays} days.` : ''
+          });
+
+          showToast(data.message || 'Request approved successfully!');
+          await refreshData();
+        } catch (err) {
+          closeConfirmModal();
+          showToast(err.message || 'Failed to approve request', 'error');
+        } finally {
+          setProcessingRequestId(null);
+        }
       }
-      if (!confirm(`Are you sure you want to approve a ${chosenDays}-day extension for "${req.businessName}"? (Requested by TL: ${req.requestedByName})`)) return;
-    } else {
-      if (!confirm(`Are you sure you want to approve the plan renewal for "${req.businessName}"? (Requested by TL: ${req.requestedByName})`)) return;
-    }
-
-    setProcessingRequestId(req.id);
-    try {
-      const res = await fetch(`/api/renewal-requests/${req.id}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          approvedDays: chosenDays,
-          adminNote: adminNoteMap[req.id] || ''
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to approve request');
-
-      showToast(data.message || 'Request approved successfully!');
-      await refreshData();
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setProcessingRequestId(null);
-    }
+    });
   };
 
-  const handleRejectRenewalRequest = async (req) => {
-    const reason = prompt(`Enter rejection reason / note for "${req.businessName}":`, adminNoteMap[req.id] || 'Rejected by Admin.');
-    if (reason === null) return;
+  const handleRejectRenewalRequest = (req) => {
+    openRejectRequestModal(req);
+  };
 
+  const handleConfirmRejectRequest = async () => {
+    if (!rejectRequestModal.req) return;
+    const req = rejectRequestModal.req;
+    const reason = rejectRequestModal.reason || 'Rejected by Admin.';
+
+    setRejectRequestModal(prev => ({ ...prev, isLoading: true }));
     setProcessingRequestId(req.id);
     try {
       const res = await fetch(`/api/renewal-requests/${req.id}/reject`, {
@@ -1526,13 +1764,83 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to reject request');
 
-      showToast(data.message || 'Request rejected.');
+      closeRejectRequestModal();
+      showToast(data.message || 'Request rejected.', 'success');
       await refreshData();
     } catch (err) {
-      alert(err.message);
+      setRejectRequestModal(prev => ({ ...prev, isLoading: false }));
+      showToast(err.message || 'Failed to reject request', 'error');
     } finally {
       setProcessingRequestId(null);
     }
+  };
+
+  const handleAdminDirectExtension = async (e) => {
+    if (e) e.preventDefault();
+    if (!directExtensionModalClient) return;
+
+    const days = parseInt(directExtensionDays, 10);
+    if (isNaN(days) || days < 1 || days > 10) {
+      showToast('Admin pack extension must be between 1 and 10 days.', 'warning');
+      return;
+    }
+
+    const client = directExtensionModalClient;
+    const clientBizName = client.businessName || 'Client';
+    const clientId = client.id;
+    const reason = directExtensionReason || 'Direct pack extension granted by Admin.';
+
+    // Open Custom Confirmation & Warning Popup Template (No localhost native confirm!)
+    openConfirmModal({
+      title: 'Grant Direct Pack Extension',
+      badge: 'Admin Direct Authority',
+      clientName: clientBizName,
+      message: `Are you sure you want to grant a ${days}-day direct pack extension to "${clientBizName}"?`,
+      warningNotice: `⚠️ Pack will deactivate if not renewed after ${days} days.`,
+      confirmText: `Grant ${days} Days Extension`,
+      cancelText: 'Cancel',
+      confirmVariant: 'amber',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isLoading: true }));
+        try {
+          const res = await fetch(`/api/clients/${clientId}/extension`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              extensionDays: days,
+              reason: reason
+            })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Failed to grant pack extension');
+
+          closeConfirmModal();
+          setDirectExtensionModalClient(null);
+          setDirectExtensionReason('');
+          setDirectExtensionDays(10);
+
+          // Open Custom Success Template Modal
+          openSuccessNotice({
+            title: 'Direct Pack Extension Granted!',
+            subtitle: `Extension active for ${clientBizName}`,
+            clientName: clientBizName,
+            badge: `+${days} Days Granted`,
+            details: [
+              { label: 'Client Name', value: clientBizName },
+              { label: 'Pack Extension', value: `+${days} Days (Admin Authority)` },
+              { label: 'Reason / Note', value: reason }
+            ],
+            warningNote: `Important: Pack will automatically deactivate after ${days} days if not renewed.`
+          });
+
+          showToast(data.message || `Successfully granted ${days} days extension of pack.`, 'success');
+          await refreshData();
+        } catch (err) {
+          closeConfirmModal();
+          showToast(err.message || 'Failed to grant extension', 'error');
+        }
+      }
+    });
   };
 
   const handleEditDelivery = async (e) => {
@@ -1563,32 +1871,57 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteDelivery = async (id, deliveryIdVal) => {
-    if (!confirm(`Are you sure you want to delete delivery record "${deliveryIdVal}"?`)) return;
-    try {
-      const res = await fetch(`/api/client-deliveries/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to delete delivery');
-      showToast(`Deleted delivery: ${deliveryIdVal}`);
-      await refreshData();
-    } catch (err) {
-      alert(err.message);
-    }
+  const handleDeleteDelivery = (id, deliveryIdVal) => {
+    openConfirmModal({
+      title: 'Delete Campaign Delivery',
+      badge: 'Delivery Record',
+      clientName: deliveryIdVal,
+      message: `Are you sure you want to delete delivery record "${deliveryIdVal}"?`,
+      warningNotice: 'This record will be permanently deleted from the database.',
+      confirmText: 'Delete Record',
+      confirmVariant: 'rose',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isLoading: true }));
+        try {
+          const res = await fetch(`/api/client-deliveries/${id}`, { method: 'DELETE' });
+          if (!res.ok) throw new Error('Failed to delete delivery');
+          closeConfirmModal();
+          showToast(`Deleted delivery: ${deliveryIdVal}`);
+          await refreshData();
+        } catch (err) {
+          closeConfirmModal();
+          showToast(err.message || 'Failed to delete delivery', 'error');
+        }
+      }
+    });
   };
 
-  const handleClearAllDeliveries = async () => {
-    if (!confirm('Are you sure you want to delete ALL campaign delivery records from the database? This action cannot be undone.')) return;
-    setFormLoading(true);
-    try {
-      const res = await fetch('/api/client-deliveries', { method: 'DELETE' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to clear deliveries');
-      showToast(data.message || 'All campaign deliveries cleared successfully!');
-      await refreshData();
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setFormLoading(false);
-    }
+  const handleClearAllDeliveries = () => {
+    openConfirmModal({
+      title: 'Clear ALL Campaign Deliveries',
+      badge: 'Database Reset',
+      clientName: 'All Campaign Delivery Records',
+      message: 'Are you sure you want to delete ALL campaign delivery records from the database?',
+      warningNotice: '⚠️ CAUTION: This action cannot be undone. All campaign tracking rows will be wiped completely.',
+      confirmText: 'Clear All Records',
+      confirmVariant: 'rose',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isLoading: true }));
+        try {
+          const res = await fetch('/api/client-deliveries', { method: 'DELETE' });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Failed to clear deliveries');
+          closeConfirmModal();
+          showToast(data.message || 'All campaign deliveries cleared successfully!');
+          await refreshData();
+        } catch (err) {
+          closeConfirmModal();
+          showToast(err.message || 'Failed to clear deliveries', 'error');
+        } finally {
+          setFormLoading(false);
+        }
+      }
+    });
   };
 
   const handleFileUpload = async (e, setter) => {
@@ -1603,10 +1936,10 @@ export default function AdminDashboard() {
         setter(uploadData.fileUrl);
         showToast('File uploaded successfully!');
       } else {
-        alert(uploadData.error || 'Upload failed');
+        showToast(uploadData.error || 'Upload failed', 'error');
       }
     } catch (err) {
-      alert('Upload failed');
+      showToast('Upload failed', 'error');
     } finally {
       setFormLoading(false);
     }
@@ -1794,31 +2127,71 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleToggleUserStatus = async (id, name, currentStatus) => {
+  // Employee Preview / Impersonation — Admin views any employee dashboard as that user
+  const [viewingAsEmployee, setViewingAsEmployee] = useState(null); // holds user id being previewed
+
+  const handleViewAsEmployee = async (user) => {
+    if (viewingAsEmployee === user.id) return;
+    setViewingAsEmployee(user.id);
+    try {
+      const dashboardUrl =
+        user.role === 'SALES'   ? '/dashboard/sales' :
+        user.role === 'TL'      ? '/dashboard/tl' :
+        '/dashboard/employee';
+
+      const res = await fetch('/api/auth/impersonate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, targetUrl: dashboardUrl })
+      });
+      const data = await res.json();
+      if (res.ok && data.redirectUrl) {
+        window.location.href = data.redirectUrl;
+      } else {
+        showToast(data.error || 'Failed to open employee dashboard.', 'error');
+        setViewingAsEmployee(null);
+      }
+    } catch (err) {
+      showToast('Connection error while switching dashboard.', 'error');
+      setViewingAsEmployee(null);
+    }
+  };
+
+  const handleToggleUserStatus = (id, name, currentStatus) => {
     const willDeactivate = currentStatus === 'ACTIVE';
-    const actionText = willDeactivate ? 'deactivate' : 'reactivate';
+    const actionText = willDeactivate ? 'Deactivate Employee' : 'Reactivate Employee';
     const confirmMessage = willDeactivate 
       ? `Are you sure you want to deactivate ${name}? Their employee records, past attendance, and assigned tasks will be permanently maintained in the system, but they will not be able to log in.`
       : `Are you sure you want to reactivate ${name}? They will regain access to log in.`;
 
-    if (!confirm(confirmMessage)) {
-      return;
-    }
+    openConfirmModal({
+      title: actionText,
+      badge: willDeactivate ? 'Access Deactivation' : 'Access Reactivation',
+      clientName: name,
+      message: confirmMessage,
+      warningNotice: willDeactivate ? 'Employee credentials will be disabled immediately. Historic data is preserved.' : 'Employee will regain portal login access.',
+      confirmText: willDeactivate ? 'Deactivate' : 'Reactivate',
+      confirmVariant: willDeactivate ? 'rose' : 'emerald',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isLoading: true }));
+        try {
+          const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+          const data = await res.json();
 
-    try {
-      const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
-      const data = await res.json();
+          closeConfirmModal();
+          if (!res.ok) {
+            showToast(data.error || `Failed to ${actionText} employee.`, 'error');
+            return;
+          }
 
-      if (!res.ok) {
-        showToast(data.error || `Failed to ${actionText} employee.`, 'error');
-        return;
+          showToast(data.message || `Employee ${name} status updated to ${data.status}. Record maintained.`);
+          await refreshData();
+        } catch (err) {
+          closeConfirmModal();
+          showToast('Connection error.', 'error');
+        }
       }
-
-      showToast(data.message || `Employee ${name} status updated to ${data.status}. Record maintained.`);
-      await refreshData();
-    } catch (err) {
-      showToast('Connection error.', 'error');
-    }
+    });
   };
 
   // Task Actions
@@ -1886,18 +2259,32 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteTask = async (taskId) => {
-    if (!confirm('Are you sure you want to delete this task?')) return;
-
-    try {
-      const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
-      if (res.ok) {
-        showToast('Task deleted.');
-        await refreshData();
+  const handleDeleteTask = (taskId) => {
+    openConfirmModal({
+      title: 'Delete Task',
+      badge: 'Task Management',
+      clientName: `Task #${taskId}`,
+      message: 'Are you sure you want to delete this task?',
+      warningNotice: '⚠️ This task assignment will be removed from the database.',
+      confirmText: 'Delete Task',
+      confirmVariant: 'rose',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isLoading: true }));
+        try {
+          const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
+          closeConfirmModal();
+          if (res.ok) {
+            showToast('Task deleted.');
+            await refreshData();
+          } else {
+            showToast('Failed to delete task.', 'error');
+          }
+        } catch (err) {
+          closeConfirmModal();
+          showToast('Failed to delete task.', 'error');
+        }
       }
-    } catch (err) {
-      showToast('Failed to delete task.', 'error');
-    }
+    });
   };
 
   // Leave approval actions
@@ -1964,14 +2351,29 @@ export default function AdminDashboard() {
       
       {/* Toast Alert */}
       {toast.message && (
-        <div className={`fixed bottom-5 right-5 z-50 p-4 rounded-xl shadow-2xl flex items-center gap-3 border text-sm font-semibold animate-slide-in
+        <div className={`fixed bottom-5 right-5 z-[120] p-4 rounded-xl shadow-2xl flex items-center gap-3 border text-sm font-semibold animate-slide-in
           ${toast.type === 'success' 
-            ? 'bg-emerald-50 dark:bg-emerald-950/80 border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-300' 
-            : 'bg-red-50 dark:bg-red-950/80 border-red-200 dark:border-red-900 text-red-800 dark:text-red-300'
+            ? 'bg-emerald-50 dark:bg-emerald-950/90 border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 shadow-emerald-500/10' 
+            : toast.type === 'warning'
+            ? 'bg-amber-50 dark:bg-amber-950/90 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 shadow-amber-500/10'
+            : 'bg-red-50 dark:bg-red-950/90 border-red-300 dark:border-red-800 text-red-900 dark:text-red-200 shadow-red-500/10'
           }`}
         >
-          <div className={`w-2 h-2 rounded-full ${toast.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+          {toast.type === 'success' ? (
+            <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          ) : toast.type === 'warning' ? (
+            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+          ) : (
+            <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
+          )}
           <span>{toast.message}</span>
+          <button 
+            type="button" 
+            onClick={() => setToast({ message: '', type: '' })}
+            className="ml-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
@@ -2704,8 +3106,25 @@ export default function AdminDashboard() {
                               {user.status || 'ACTIVE'}
                             </span>
                           </td>
-                          <td className="p-4 text-right">
-                            <div className="flex gap-2 justify-end">
+                          <td className="p-4 text-right whitespace-nowrap relative overflow-visible">
+                            <div className="flex gap-2 justify-end items-center flex-nowrap">
+                              {/* 👁 Preview Dashboard Button */}
+                              <button
+                                onClick={() => handleViewAsEmployee(user)}
+                                disabled={viewingAsEmployee === user.id}
+                                title={`Preview ${user.name}'s ${user.role === 'SALES' ? 'Sales' : user.role === 'TL' ? 'Team Leader' : 'Employee'} Dashboard`}
+                                className="p-1.5 border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-lg transition disabled:opacity-50 cursor-pointer group relative flex-shrink-0"
+                              >
+                                {viewingAsEmployee === user.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Eye className="w-3.5 h-3.5" />
+                                )}
+                                {/* Tooltip */}
+                                <span className="absolute -top-10 left-1/2 -translate-x-1/2 z-20 whitespace-nowrap bg-indigo-700 text-white text-xs font-bold px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md">
+                                  View as {user.name}
+                                </span>
+                              </button>
                               <button 
                                 onClick={() => openEditUserModal(user)}
                                 className="p-1.5 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg text-slate-500 dark:text-slate-400 transition"
@@ -2754,6 +3173,11 @@ export default function AdminDashboard() {
               if (taskStaffFilter === 'AI_VIDEO') return worker.includes('ai video') || worker.includes('video editor') || worker.includes('reel');
               return worker.includes(taskStaffFilter.toLowerCase());
             });
+
+            const todoTasks = filteredTasks.filter(t => t.status === 'TODO');
+            const inProgressTasks = filteredTasks.filter(t => t.status === 'IN_PROGRESS');
+            const pendingTasks = filteredTasks.filter(t => t.status === 'PENDING' || t.status === 'OVERDUE');
+            const doneTasks = filteredTasks.filter(t => t.status === 'DONE' || t.status === 'COMPLETED');
 
             return (
               <div className="space-y-6 animate-fade-in">
@@ -2833,20 +3257,120 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
+                {/* Tasks Status Quick-Filter Cards (Clickable) */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+                  <div 
+                    onClick={() => setTaskStatusFilter('ALL')}
+                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between hover:shadow-md hover:scale-[1.01] ${
+                      taskStatusFilter === 'ALL'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-400/20'
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-300'
+                    }`}
+                    title="Click to view all tasks"
+                  >
+                    <span className={`text-[10px] font-extrabold uppercase tracking-wider ${taskStatusFilter === 'ALL' ? 'text-blue-100' : 'text-slate-400'}`}>All Duties</span>
+                    <div className="flex items-baseline justify-between mt-1.5">
+                      <span className="text-2xl font-black">{filteredTasks.length}</span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${taskStatusFilter === 'ALL' ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>Total</span>
+                    </div>
+                  </div>
+
+                  <div 
+                    onClick={() => setTaskStatusFilter(taskStatusFilter === 'TODO' ? 'ALL' : 'TODO')}
+                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between hover:shadow-md hover:scale-[1.01] ${
+                      taskStatusFilter === 'TODO'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-400/20'
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-300'
+                    }`}
+                    title="Click to focus on To Do tasks"
+                  >
+                    <span className={`text-[10px] font-extrabold uppercase tracking-wider ${taskStatusFilter === 'TODO' ? 'text-blue-100' : 'text-slate-500'}`}>To Do</span>
+                    <div className="flex items-baseline justify-between mt-1.5">
+                      <span className={`text-2xl font-black ${taskStatusFilter === 'TODO' ? 'text-white' : 'text-slate-800 dark:text-slate-200'}`}>{todoTasks.length}</span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${taskStatusFilter === 'TODO' ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>Queued</span>
+                    </div>
+                  </div>
+
+                  <div 
+                    onClick={() => setTaskStatusFilter(taskStatusFilter === 'IN_PROGRESS' ? 'ALL' : 'IN_PROGRESS')}
+                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between hover:shadow-md hover:scale-[1.01] ${
+                      taskStatusFilter === 'IN_PROGRESS'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-400/20'
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-indigo-300'
+                    }`}
+                    title="Click to focus on In-Progress tasks"
+                  >
+                    <span className={`text-[10px] font-extrabold uppercase tracking-wider ${taskStatusFilter === 'IN_PROGRESS' ? 'text-indigo-100' : 'text-indigo-600 dark:text-indigo-400'}`}>In Progress</span>
+                    <div className="flex items-baseline justify-between mt-1.5">
+                      <span className={`text-2xl font-black ${taskStatusFilter === 'IN_PROGRESS' ? 'text-white' : 'text-indigo-600 dark:text-indigo-400'}`}>{inProgressTasks.length}</span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${taskStatusFilter === 'IN_PROGRESS' ? 'bg-white/20 text-white' : 'bg-indigo-50 dark:bg-indigo-950 text-indigo-700'}`}>Active</span>
+                    </div>
+                  </div>
+
+                  <div 
+                    onClick={() => setTaskStatusFilter(taskStatusFilter === 'PENDING' ? 'ALL' : 'PENDING')}
+                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between hover:shadow-md hover:scale-[1.01] ${
+                      taskStatusFilter === 'PENDING'
+                        ? 'bg-red-600 text-white border-red-600 shadow-md ring-2 ring-red-400/20'
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-red-300'
+                    }`}
+                    title="Click to focus on Delayed / Overdue tasks"
+                  >
+                    <span className={`text-[10px] font-extrabold uppercase tracking-wider ${taskStatusFilter === 'PENDING' ? 'text-red-100' : 'text-red-600 dark:text-red-400'}`}>Delayed / Overdue</span>
+                    <div className="flex items-baseline justify-between mt-1.5">
+                      <span className={`text-2xl font-black ${taskStatusFilter === 'PENDING' ? 'text-white' : 'text-red-600 dark:text-red-400'}`}>{pendingTasks.length}</span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${taskStatusFilter === 'PENDING' ? 'bg-white/20 text-white' : 'bg-red-50 dark:bg-red-950 text-red-700'}`}>Overdue</span>
+                    </div>
+                  </div>
+
+                  <div 
+                    onClick={() => setTaskStatusFilter(taskStatusFilter === 'DONE' ? 'ALL' : 'DONE')}
+                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between col-span-2 sm:col-span-1 hover:shadow-md hover:scale-[1.01] ${
+                      taskStatusFilter === 'DONE'
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-400/20'
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-emerald-300'
+                    }`}
+                    title="Click to focus on Completed tasks"
+                  >
+                    <span className={`text-[10px] font-extrabold uppercase tracking-wider ${taskStatusFilter === 'DONE' ? 'text-emerald-100' : 'text-emerald-600 dark:text-emerald-400'}`}>Completed</span>
+                    <div className="flex items-baseline justify-between mt-1.5">
+                      <span className={`text-2xl font-black ${taskStatusFilter === 'DONE' ? 'text-white' : 'text-emerald-600 dark:text-emerald-400'}`}>{doneTasks.length}</span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${taskStatusFilter === 'DONE' ? 'bg-white/20 text-white' : 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700'}`}>Done</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filter Notice Banner if single status chosen */}
+                {taskStatusFilter !== 'ALL' && (
+                  <div className="flex items-center justify-between p-3 bg-blue-50/70 dark:bg-blue-950/30 rounded-xl border border-blue-200 dark:border-blue-900/50 text-xs">
+                    <span className="font-bold text-blue-800 dark:text-blue-300 flex items-center gap-2">
+                      <span>Focused Column: <b>{taskStatusFilter === 'TODO' ? 'To Do' : taskStatusFilter === 'IN_PROGRESS' ? 'In Progress' : taskStatusFilter === 'PENDING' ? 'Delayed / Overdue' : 'Completed'}</b></span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setTaskStatusFilter('ALL')}
+                      className="px-2.5 py-1 bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 rounded-lg font-bold hover:bg-blue-100 dark:hover:bg-slate-700 transition cursor-pointer text-xs"
+                    >
+                      Show All 4 Columns ✕
+                    </button>
+                  </div>
+                )}
+
               {/* Kanban columns */}
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+              <div className={`grid grid-cols-1 ${taskStatusFilter === 'ALL' ? 'md:grid-cols-2 xl:grid-cols-4' : 'max-w-3xl mx-auto w-full'} gap-6`}>
                 
                 {/* Column 1: TODO */}
+                {(taskStatusFilter === 'ALL' || taskStatusFilter === 'TODO') && (
                 <div className="bg-slate-100 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 min-h-[400px] flex flex-col gap-4">
                   <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-2">
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-350">To Do</span>
                     <span className="w-5 h-5 bg-slate-200 dark:bg-slate-800 text-[10px] font-bold rounded-full flex items-center justify-center">
-                      {filteredTasks.filter(t => t.status === 'TODO').length}
+                      {todoTasks.length}
                     </span>
                   </div>
                   
                   <div className="flex flex-col gap-3">
-                    {filteredTasks.filter(t => t.status === 'TODO').map(task => (
+                    {todoTasks.map(task => (
                       <div key={task.id} className="bg-white dark:bg-slate-900 p-4 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm flex flex-col gap-2">
                         <div className="flex justify-between items-start">
                           <div className="flex flex-col gap-1">
@@ -2877,18 +3401,20 @@ export default function AdminDashboard() {
                     ))}
                   </div>
                 </div>
+                )}
 
                 {/* Column 2: IN PROGRESS */}
+                {(taskStatusFilter === 'ALL' || taskStatusFilter === 'IN_PROGRESS') && (
                 <div className="bg-slate-100 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 min-h-[400px] flex flex-col gap-4">
                   <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-2">
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-350">In Progress</span>
                     <span className="w-5 h-5 bg-slate-200 dark:bg-slate-800 text-[10px] font-bold rounded-full flex items-center justify-center">
-                      {filteredTasks.filter(t => t.status === 'IN_PROGRESS').length}
+                      {inProgressTasks.length}
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-3">
-                    {filteredTasks.filter(t => t.status === 'IN_PROGRESS').map(task => (
+                    {inProgressTasks.map(task => (
                       <div key={task.id} className="bg-white dark:bg-slate-900 p-4 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm flex flex-col gap-2">
                         <div className="flex justify-between items-start">
                           <div className="flex flex-col gap-1">
@@ -2919,18 +3445,20 @@ export default function AdminDashboard() {
                     ))}
                   </div>
                 </div>
+                )}
 
                 {/* Column 3: BLOCKED / DELAYED */}
+                {(taskStatusFilter === 'ALL' || taskStatusFilter === 'PENDING') && (
                 <div className="bg-red-50/50 dark:bg-red-950/20 p-4 rounded-2xl border border-red-100 dark:border-red-900/30 min-h-[400px] flex flex-col gap-4">
                   <div className="flex justify-between items-center border-b border-red-200 dark:border-red-900/50 pb-2">
                     <span className="text-xs font-bold uppercase tracking-wider text-red-700 dark:text-red-400">Pending / Overdue</span>
                     <span className="w-5 h-5 bg-red-100 dark:bg-red-900 text-[10px] font-bold text-red-700 dark:text-red-400 rounded-full flex items-center justify-center">
-                      {filteredTasks.filter(t => t.status === 'PENDING' || t.status === 'OVERDUE').length}
+                      {pendingTasks.length}
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-3">
-                    {filteredTasks.filter(t => t.status === 'PENDING' || t.status === 'OVERDUE').map(task => (
+                    {pendingTasks.map(task => (
                       <div key={task.id} className="bg-white dark:bg-slate-900 p-4 border border-red-200 dark:border-red-900 rounded-xl shadow-sm flex flex-col gap-2">
                         <div className="flex justify-between items-start">
                           <div className="flex flex-col gap-1">
@@ -2959,18 +3487,20 @@ export default function AdminDashboard() {
                     ))}
                   </div>
                 </div>
+                )}
 
                 {/* Column 4: DONE */}
+                {(taskStatusFilter === 'ALL' || taskStatusFilter === 'DONE') && (
                 <div className="bg-slate-100 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 min-h-[400px] flex flex-col gap-4">
                   <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-2">
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-350">Completed</span>
                     <span className="w-5 h-5 bg-slate-200 dark:bg-slate-800 text-[10px] font-bold rounded-full flex items-center justify-center">
-                      {filteredTasks.filter(t => t.status === 'DONE').length}
+                      {doneTasks.length}
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-3">
-                    {filteredTasks.filter(t => t.status === 'DONE').map(task => (
+                    {doneTasks.map(task => (
                       <div key={task.id} className="bg-white dark:bg-slate-900 p-4 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm flex flex-col gap-2 opacity-90">
                         <div className="flex justify-between items-start">
                           <div className="flex flex-col gap-1">
@@ -2990,7 +3520,7 @@ export default function AdminDashboard() {
                             <a 
                               href={task.workSampleUrl} 
                               target="_blank" 
-                              rel="noopener noreferrer"
+                              rel="noopener noreferrer" 
                               className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 hover:underline"
                             >
                               📁 View Work Sample
@@ -3016,6 +3546,7 @@ export default function AdminDashboard() {
                     ))}
                   </div>
                 </div>
+                )}
 
               </div>
             </div>
@@ -3176,7 +3707,19 @@ export default function AdminDashboard() {
               return Array.from(monthMap.values()).sort((a, b) => b.key.localeCompare(a.key));
             })();
 
-            const filteredDeliverables = allClientTasks.filter(t => {
+            const activeClientIdsInScope = new Set(
+              clientsList
+                .filter(c => (deliverableMonthFilter !== 'all' || deliverableStartDate || deliverableEndDate)
+                  ? isClientSubscriptionCoveringMonth(c, deliverableMonthFilter, deliverableStartDate, deliverableEndDate)
+                  : isClientPlanActive(c)
+                )
+                .map(c => c.clientId)
+            );
+
+            const baseDeliverables = allClientTasks.filter(t => {
+              if (deliverableMonthFilter !== 'all' || deliverableStartDate || deliverableEndDate) {
+                if (t.clientId && !activeClientIdsInScope.has(t.clientId)) return false;
+              }
               const query = searchQuery.toLowerCase();
               const matchesQuery = !query || (
                 t.businessName.toLowerCase().includes(query) ||
@@ -3198,37 +3741,78 @@ export default function AdminDashboard() {
               return true;
             });
 
+            const completedCount = baseDeliverables.filter(t => t.status === 'Complete Task').length;
+            const inProgressCount = baseDeliverables.filter(t => t.status === 'Working On It').length;
+            const notStartedCount = baseDeliverables.filter(t => t.status === 'Not Started').length;
+
+            const filteredDeliverables = baseDeliverables.filter(t => {
+              if (deliverableStatusFilter !== 'all' && t.status !== deliverableStatusFilter) return false;
+              return true;
+            });
+
             return (
               <div className="space-y-6 animate-fade-in text-xs">
                 
-                {/* Deliverables Stats */}
+                {/* Deliverables Stats Cards (Clickable) */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
-                    <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Total Deliverables</span>
-                    <div className="text-xl font-bold text-slate-900 dark:text-white mt-1">{filteredDeliverables.length}</div>
+                  {/* Card 1: Total Deliverables */}
+                  <div 
+                    onClick={() => setDeliverableStatusFilter('all')}
+                    className={`bg-white dark:bg-slate-900 border ${deliverableStatusFilter === 'all' ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-slate-200 dark:border-slate-800'} p-5 rounded-2xl shadow-sm flex flex-col gap-1 cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all`}
+                    title="Click to view all deliverables in scope"
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Total Deliverables</span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${deliverableStatusFilter === 'all' ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>All</span>
+                    </div>
+                    <div className="text-xl font-bold text-slate-900 dark:text-white mt-1">{baseDeliverables.length}</div>
                     <span className="text-[9px] text-slate-400 font-medium">Deliverables in selected scope</span>
                   </div>
                   
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
-                    <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Completed Tasks</span>
+                  {/* Card 2: Completed Tasks */}
+                  <div 
+                    onClick={() => setDeliverableStatusFilter(deliverableStatusFilter === 'Complete Task' ? 'all' : 'Complete Task')}
+                    className={`bg-white dark:bg-slate-900 border ${deliverableStatusFilter === 'Complete Task' ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-slate-200 dark:border-slate-800'} p-5 rounded-2xl shadow-sm flex flex-col gap-1 cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all`}
+                    title="Click to filter table by Completed Tasks"
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-extrabold uppercase tracking-wider">Completed Tasks</span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${deliverableStatusFilter === 'Complete Task' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700'}`}>Filter</span>
+                    </div>
                     <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
-                      {filteredDeliverables.filter(t => t.status === 'Complete Task').length}
+                      {completedCount}
                     </div>
                     <span className="text-[9px] text-slate-400 font-medium">Successfully completed</span>
                   </div>
 
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
-                    <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">In Progress</span>
+                  {/* Card 3: In Progress */}
+                  <div 
+                    onClick={() => setDeliverableStatusFilter(deliverableStatusFilter === 'Working On It' ? 'all' : 'Working On It')}
+                    className={`bg-white dark:bg-slate-900 border ${deliverableStatusFilter === 'Working On It' ? 'border-orange-500 ring-2 ring-orange-500/20' : 'border-slate-200 dark:border-slate-800'} p-5 rounded-2xl shadow-sm flex flex-col gap-1 cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all`}
+                    title="Click to filter table by In-Progress Tasks"
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-orange-600 dark:text-orange-400 font-extrabold uppercase tracking-wider">In Progress</span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${deliverableStatusFilter === 'Working On It' ? 'bg-orange-500 text-white' : 'bg-orange-50 dark:bg-orange-950 text-orange-700'}`}>Filter</span>
+                    </div>
                     <div className="text-xl font-bold text-orange-500 mt-1">
-                      {filteredDeliverables.filter(t => t.status === 'Working On It').length}
+                      {inProgressCount}
                     </div>
                     <span className="text-[9px] text-slate-400 font-medium">Under active production</span>
                   </div>
 
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
-                    <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Pending Release</span>
+                  {/* Card 4: Pending Release */}
+                  <div 
+                    onClick={() => setDeliverableStatusFilter(deliverableStatusFilter === 'Not Started' ? 'all' : 'Not Started')}
+                    className={`bg-white dark:bg-slate-900 border ${deliverableStatusFilter === 'Not Started' ? 'border-slate-500 ring-2 ring-slate-500/20' : 'border-slate-200 dark:border-slate-800'} p-5 rounded-2xl shadow-sm flex flex-col gap-1 cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all`}
+                    title="Click to filter table by Not Started Tasks"
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Pending Release</span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${deliverableStatusFilter === 'Not Started' ? 'bg-slate-700 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600'}`}>Filter</span>
+                    </div>
                     <div className="text-xl font-bold text-slate-500 mt-1">
-                      {filteredDeliverables.filter(t => t.status === 'Not Started').length}
+                      {notStartedCount}
                     </div>
                     <span className="text-[9px] text-slate-400 font-medium">Queued or not started</span>
                   </div>
@@ -3298,7 +3882,21 @@ export default function AdminDashboard() {
                       )}
                     </div>
 
-                    {(deliverableMonthFilter !== 'all' || deliverableStartDate || deliverableEndDate || searchQuery) && (
+                    {deliverableStatusFilter !== 'all' && (
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 rounded-xl border border-blue-200 dark:border-blue-800 text-xs font-bold">
+                        <span>Status: <b>{deliverableStatusFilter}</b></span>
+                        <button
+                          type="button"
+                          onClick={() => setDeliverableStatusFilter('all')}
+                          className="hover:text-red-500 font-black ml-1 cursor-pointer"
+                          title="Clear Status Filter"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
+
+                    {(deliverableMonthFilter !== 'all' || deliverableStartDate || deliverableEndDate || searchQuery || deliverableStatusFilter !== 'all') && (
                       <button
                         type="button"
                         onClick={() => {
@@ -3306,6 +3904,7 @@ export default function AdminDashboard() {
                           setDeliverableStartDate('');
                           setDeliverableEndDate('');
                           setSearchQuery('');
+                          setDeliverableStatusFilter('all');
                         }}
                         className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold transition cursor-pointer"
                       >
@@ -3393,7 +3992,7 @@ export default function AdminDashboard() {
                                     refreshClientTasks(client.id);
                                     resetClientTaskForm(task);
                                   } else {
-                                    alert('Client details not found.');
+                                    showToast('Client details not found.', 'error');
                                   }
                                 }}
                                 className="py-1 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-855 dark:hover:bg-slate-800 border border-slate-205 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-lg transition"
@@ -4117,7 +4716,7 @@ export default function AdminDashboard() {
                                       setShowClientDetailModal(true);
                                       refreshClientTasks(client.id);
                                     } else {
-                                      alert('Client CRM details not found.');
+                                      showToast('Client CRM details not found.', 'error');
                                     }
                                   }}
                                   className="font-bold text-slate-900 dark:text-white hover:underline text-left"
@@ -4188,7 +4787,7 @@ export default function AdminDashboard() {
               const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
               monthKeys.add(curKey);
 
-              clientsList.filter(c => c.active).forEach(c => {
+              clientsList.forEach(c => {
                 const info = getClientRenewalInfo(c);
                 if (info.cycleMonthKey) monthKeys.add(info.cycleMonthKey);
                 if (info.renewalMonthKey) monthKeys.add(info.renewalMonthKey);
@@ -4208,7 +4807,7 @@ export default function AdminDashboard() {
                 let cycleStartCount = 0;
                 let monthRevenue = 0;
 
-                clientsList.filter(c => c.active).forEach(c => {
+                clientsList.forEach(c => {
                   if (isClientActiveInMonth(c, mk)) {
                     activePlansCount += 1;
                     monthRevenue += (c.packageAmount || 0);
@@ -4237,64 +4836,97 @@ export default function AdminDashboard() {
               });
             })();
 
-            // Filter active clients by calendar month or custom date range if selected
-            const filteredRenewalClients = clientsList
-              .filter(c => c.active)
-              .filter(c => {
-                // If custom date range manually picked:
-                if (renewalStartDate || renewalEndDate) {
-                  return isClientActiveInMonth(c, null, renewalStartDate, renewalEndDate);
-                }
-                // If all months:
-                if (!renewalMonthFilter || renewalMonthFilter === 'all') {
-                  return true;
-                }
-                // If specific month selected from dropdown:
-                if (renewalCalendarMode === 'activeMonth') {
-                  return isClientActiveInMonth(c, renewalMonthFilter);
-                }
-                if (renewalCalendarMode === 'cycleMonth') {
-                  return isClientStartingInMonth(c, renewalMonthFilter);
-                }
-                return isClientExpiringInMonth(c, renewalMonthFilter);
-              });
+            // 1. All Overdue & Expired Clients across the agency (unrenewed expired contracts)
+            const allUnrenewedExpiredClients = clientsList.filter(c => {
+              const info = getClientRenewalInfo(c);
+              return info.status === 'Expired' || info.isExpired || info.overdueDays > 0;
+            });
+
+            // 2. Expired clients specifically expiring in the selected month or date range
+            const monthScopedExpiredClients = allUnrenewedExpiredClients.filter(c => {
+              if (renewalStartDate || renewalEndDate) {
+                const info = getClientRenewalInfo(c);
+                if (!info.expiryDate) return false;
+                const expTime = info.expiryDate.getTime();
+                const rStart = renewalStartDate ? parsePlanDbDate(renewalStartDate) : null;
+                const rEnd = renewalEndDate ? parsePlanDbDate(renewalEndDate) : null;
+                if (rStart && expTime < rStart.getTime()) return false;
+                if (rEnd && expTime > rEnd.getTime()) return false;
+                return true;
+              }
+              if (!renewalMonthFilter || renewalMonthFilter === 'all') return true;
+              return isClientExpiringInMonth(c, renewalMonthFilter);
+            });
+
+            // 3. Active / Ongoing clients in scope for the selected month or date range
+            const filteredActiveClients = clientsList.filter(c => {
+              if (c.active === false) return false;
+              const info = getClientRenewalInfo(c);
+              if (info.status === 'Expired' || info.isExpired) return false;
+
+              if (renewalStartDate || renewalEndDate) {
+                return isClientActiveInMonth(c, null, renewalStartDate, renewalEndDate);
+              }
+              if (!renewalMonthFilter || renewalMonthFilter === 'all') {
+                return true;
+              }
+              if (renewalCalendarMode === 'activeMonth') {
+                return isClientActiveInMonth(c, renewalMonthFilter);
+              }
+              if (renewalCalendarMode === 'cycleMonth') {
+                return isClientStartingInMonth(c, renewalMonthFilter);
+              }
+              return isClientExpiringInMonth(c, renewalMonthFilter);
+            });
+
+            const activeOnTrackClients = filteredActiveClients.filter(c => {
+              const s = getClientRenewalInfo(c).status;
+              return s === 'Active' || s === 'Extended';
+            });
+            const expiringSoonClients = filteredActiveClients.filter(c => {
+              return getClientRenewalInfo(c).status === 'Expiring Soon';
+            });
+
+            // Combined list for compatibility
+            const filteredRenewalClients = [...filteredActiveClients, ...allUnrenewedExpiredClients];
 
             let activeExpected = 0;
             let activeActual = 0;
-            let activeCount = 0;
+            let activeCount = activeOnTrackClients.length;
 
             let expiredExpected = 0;
             let expiredActual = 0;
-            let expiredCount = 0;
+            let expiredCount = allUnrenewedExpiredClients.length;
 
             let expiringSoonExpected = 0;
             let expiringSoonActual = 0;
-            let expiringSoonCount = 0;
+            let expiringSoonCount = expiringSoonClients.length;
 
-            filteredRenewalClients.forEach(c => {
+            activeOnTrackClients.forEach(c => {
               const pkgAmt = c.packageAmount || 0;
-              const planStatus = getClientRenewalInfo(c);
               const pInfo = getClientPaymentInfo(c);
+              activeExpected += pkgAmt;
+              activeActual += pInfo.paidAmount;
+            });
 
-              if (planStatus.status === 'Expired') {
-                expiredCount += 1;
-                expiredExpected += pkgAmt;
-                expiredActual += pInfo.paidAmount;
-              } else if (planStatus.status === 'Expiring Soon') {
-                expiringSoonCount += 1;
-                expiringSoonExpected += pkgAmt;
-                expiringSoonActual += pInfo.paidAmount;
-              } else {
-                activeCount += 1;
-                activeExpected += pkgAmt;
-                activeActual += pInfo.paidAmount;
-              }
+            expiringSoonClients.forEach(c => {
+              const pkgAmt = c.packageAmount || 0;
+              const pInfo = getClientPaymentInfo(c);
+              expiringSoonExpected += pkgAmt;
+              expiringSoonActual += pInfo.paidAmount;
+            });
+
+            allUnrenewedExpiredClients.forEach(c => {
+              const pkgAmt = c.packageAmount || 0;
+              const pInfo = getClientPaymentInfo(c);
+              expiredExpected += pkgAmt;
+              expiredActual += pInfo.paidAmount;
             });
 
             const totalOngoingCount = activeCount + expiringSoonCount;
             const totalOngoingExpected = activeExpected + expiringSoonExpected;
             const totalOngoingActual = activeActual + expiringSoonActual;
-            const totalAllContracts = filteredRenewalClients.length;
+            const totalAllContracts = totalOngoingCount + expiredCount;
             const totalPoolRevenue = totalOngoingExpected + expiredExpected;
 
             const activePercent = totalPoolRevenue > 0 ? Math.round((totalOngoingExpected / totalPoolRevenue) * 100) : (totalOngoingCount > 0 ? 100 : 0);
@@ -4475,18 +5107,20 @@ export default function AdminDashboard() {
                     <div className="w-full bg-slate-100 dark:bg-slate-800 h-7 rounded-2xl overflow-hidden flex shadow-inner p-1 gap-1">
                       {totalOngoingExpected > 0 && (
                         <div 
-                          className="bg-gradient-to-r from-purple-500 to-indigo-600 h-full rounded-xl transition-all duration-1000 ease-out flex items-center justify-center text-[10px] font-black text-white px-2 shadow-sm"
+                          onClick={() => setRenewalFilter('Active')}
+                          className="bg-gradient-to-r from-purple-500 to-indigo-600 h-full rounded-xl transition-all duration-1000 ease-out flex items-center justify-center text-[10px] font-black text-white px-2 shadow-sm cursor-pointer hover:opacity-90 active:scale-[0.99]"
                           style={{ width: `${Math.max(activePercent, 12)}%` }}
-                          title={`Active & On-Track: ₹${totalOngoingExpected.toLocaleString()} (${totalOngoingCount} accounts)`}
+                          title={`Click to filter Active & On-Track contracts: ₹${totalOngoingExpected.toLocaleString()} (${totalOngoingCount} accounts)`}
                         >
                           {activePercent}% Active / On-Track (₹{totalOngoingExpected.toLocaleString()})
                         </div>
                       )}
                       {expiredExpected > 0 && (
                         <div 
-                          className="bg-gradient-to-r from-rose-500 to-red-600 h-full rounded-xl transition-all duration-1000 ease-out flex items-center justify-center text-[10px] font-black text-white px-2 shadow-sm"
+                          onClick={() => setRenewalFilter('Expired')}
+                          className="bg-gradient-to-r from-rose-500 to-red-600 h-full rounded-xl transition-all duration-1000 ease-out flex items-center justify-center text-[10px] font-black text-white px-2 shadow-sm cursor-pointer hover:opacity-90 active:scale-[0.99]"
                           style={{ width: `${Math.max(expiredPercent, 12)}%` }}
-                          title={`Not Renewed / Expired: ₹${expiredExpected.toLocaleString()} (${expiredCount} accounts)`}
+                          title={`Click to filter Not Renewed / Expired contracts: ₹${expiredExpected.toLocaleString()} (${expiredCount} accounts)`}
                         >
                           {expiredPercent}% Not Renewed (₹{expiredExpected.toLocaleString()})
                         </div>
@@ -4499,14 +5133,25 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  {/* 4 Detail Metric Cards */}
-                  {/* 4 Detail Metric Cards */}
+                  {/* 4 Detail Metric Cards (Clickable) */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 text-xs">
                     {/* Card 1: Active Contracts (Total Ongoing) */}
-                    <div className="p-3 bg-purple-50/70 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-800/40 rounded-xl">
+                    <div 
+                      onClick={() => setRenewalFilter(renewalFilter === 'Active' ? 'All' : 'Active')}
+                      className={`p-3 rounded-xl border transition-all cursor-pointer hover:shadow-md hover:scale-[1.01] ${
+                        renewalFilter === 'Active'
+                          ? 'bg-purple-100/90 dark:bg-purple-950/50 border-purple-400 ring-2 ring-purple-400/30 shadow-sm'
+                          : 'bg-purple-50/70 dark:bg-purple-950/20 border-purple-100 dark:border-purple-800/40 hover:border-purple-300'
+                      }`}
+                      title="Click to toggle Active Ongoing contracts filter"
+                    >
                       <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-purple-700 dark:text-purple-400">
                         <span>🔄 Active Contracts (Total)</span>
-                        <span className="px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/60 font-black">{totalOngoingCount} Accounts</span>
+                        <span className={`px-2 py-0.5 rounded-full font-black ${
+                          renewalFilter === 'Active'
+                            ? 'bg-purple-600 text-white shadow-xs'
+                            : 'bg-purple-100 dark:bg-purple-900/60'
+                        }`}>{totalOngoingCount} Accounts</span>
                       </div>
                       <div className="text-base font-black text-purple-700 dark:text-purple-300 mt-1">
                         ₹{totalOngoingExpected.toLocaleString()}
@@ -4517,10 +5162,22 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* Card 2: Expiring Soon (Within 7 Days) */}
-                    <div className="p-3 bg-amber-50/70 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-800/40 rounded-xl">
+                    <div 
+                      onClick={() => setRenewalFilter(renewalFilter === 'Expiring Soon' ? 'All' : 'Expiring Soon')}
+                      className={`p-3 rounded-xl border transition-all cursor-pointer hover:shadow-md hover:scale-[1.01] ${
+                        renewalFilter === 'Expiring Soon'
+                          ? 'bg-amber-100/90 dark:bg-amber-950/50 border-amber-400 ring-2 ring-amber-400/30 shadow-sm'
+                          : 'bg-amber-50/70 dark:bg-amber-950/20 border-amber-100 dark:border-amber-800/40 hover:border-amber-300'
+                      }`}
+                      title="Click to toggle Expiring Soon (7 Days) filter"
+                    >
                       <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-amber-700 dark:text-amber-400">
                         <span>⏳ Expiring Soon (7 Days)</span>
-                        <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/60 font-black">{expiringSoonCount} Accounts</span>
+                        <span className={`px-2 py-0.5 rounded-full font-black ${
+                          renewalFilter === 'Expiring Soon'
+                            ? 'bg-amber-600 text-white shadow-xs'
+                            : 'bg-amber-100 dark:bg-amber-900/60'
+                        }`}>{expiringSoonCount} Accounts</span>
                       </div>
                       <div className="text-base font-black text-amber-600 dark:text-amber-400 mt-1">
                         ₹{expiringSoonExpected.toLocaleString()}
@@ -4531,10 +5188,22 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* Card 3: Expired (Renewal Due) */}
-                    <div className="p-3 bg-rose-50/70 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-800/40 rounded-xl">
+                    <div 
+                      onClick={() => setRenewalFilter(renewalFilter === 'Expired' ? 'All' : 'Expired')}
+                      className={`p-3 rounded-xl border transition-all cursor-pointer hover:shadow-md hover:scale-[1.01] ${
+                        renewalFilter === 'Expired'
+                          ? 'bg-rose-100/90 dark:bg-rose-950/50 border-rose-400 ring-2 ring-rose-400/30 shadow-sm'
+                          : 'bg-rose-50/70 dark:bg-rose-950/20 border-rose-100 dark:border-rose-800/40 hover:border-rose-300'
+                      }`}
+                      title="Click to toggle Not Renewed (Expired) filter"
+                    >
                       <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-rose-700 dark:text-rose-400">
                         <span>⚠️ Not Renewed (Expired)</span>
-                        <span className="px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-900/60 font-black">{expiredCount} Accounts</span>
+                        <span className={`px-2 py-0.5 rounded-full font-black ${
+                          renewalFilter === 'Expired'
+                            ? 'bg-rose-600 text-white shadow-xs'
+                            : 'bg-rose-100 dark:bg-rose-900/60'
+                        }`}>{expiredCount} Accounts</span>
                       </div>
                       <div className="text-base font-black text-rose-600 dark:text-rose-400 mt-1">
                         ₹{expiredExpected.toLocaleString()}
@@ -4545,10 +5214,22 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* Card 4: Retention Rate */}
-                    <div className="p-3 bg-indigo-50/70 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-800/40 rounded-xl">
+                    <div 
+                      onClick={() => setRenewalFilter('All')}
+                      className={`p-3 rounded-xl border transition-all cursor-pointer hover:shadow-md hover:scale-[1.01] ${
+                        renewalFilter === 'All'
+                          ? 'bg-indigo-100/90 dark:bg-indigo-950/50 border-indigo-400 ring-2 ring-indigo-400/30 shadow-sm'
+                          : 'bg-indigo-50/70 dark:bg-indigo-950/20 border-indigo-100 dark:border-indigo-800/40 hover:border-indigo-300'
+                      }`}
+                      title="Click to show All contracts (Active Retention)"
+                    >
                       <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-indigo-700 dark:text-indigo-400">
                         <span>📊 Active Retention Rate</span>
-                        <span className="px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/60 font-black">{activePercent}%</span>
+                        <span className={`px-2 py-0.5 rounded-full font-black ${
+                          renewalFilter === 'All'
+                            ? 'bg-indigo-600 text-white shadow-xs'
+                            : 'bg-indigo-100 dark:bg-indigo-900/60'
+                        }`}>{activePercent}%</span>
                       </div>
                       <div className="text-base font-black text-indigo-700 dark:text-indigo-300 mt-1">
                         {totalOngoingCount} / {totalAllContracts} Active
@@ -4566,7 +5247,7 @@ export default function AdminDashboard() {
                     {/* Status Buttons */}
                     <div className="flex flex-wrap items-center gap-2">
                       {[
-                        { key: 'All', label: 'All Contracts', count: filteredRenewalClients.length },
+                        { key: 'All', label: 'All Contracts', count: totalAllContracts },
                         { key: 'Active', label: 'Active (Ongoing Plan)', count: totalOngoingCount, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-955/20' },
                         { key: 'Expiring Soon', label: 'Expiring Soon (7 Days)', count: expiringSoonCount, color: 'text-orange-500 bg-orange-50 dark:bg-orange-955/20' },
                         { key: 'Expired', label: 'Expired (Renewal Due)', count: expiredCount, color: 'text-red-500 bg-red-50 dark:bg-red-950/20' }
@@ -4760,17 +5441,49 @@ export default function AdminDashboard() {
                     {/* Expired / Overdue Contracts Table (Renewal Required) */}
                     {(renewalFilter === 'All' || renewalFilter === 'Expired') && (
                       <div className="border border-red-200 dark:border-red-900/50 rounded-xl overflow-hidden shadow-sm">
-                        <div className="p-3 bg-red-50/70 dark:bg-red-950/30 border-b border-red-200 dark:border-red-900/50 flex justify-between items-center">
+                        <div className="p-3 bg-red-50/70 dark:bg-red-950/30 border-b border-red-200 dark:border-red-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                           <div>
                             <span className="text-[11px] font-extrabold uppercase tracking-wider text-red-700 dark:text-red-400 flex items-center gap-1.5">
                               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
                               Expired Contracts — Renewal Required (Post Plan Cycle)
                             </span>
-                            <p className="text-[10px] text-red-600/80 dark:text-red-300/70 font-medium mt-0.5">Plan cycle completed. Renewal starts on next day after plan expiry.</p>
+                            <p className="text-[10px] text-red-600/80 dark:text-red-300/70 font-medium mt-0.5">
+                              Plan cycle completed. Renewal starts on next day after plan expiry. Clients stay on this list until renewed.
+                            </p>
                           </div>
-                          <span className="px-2 py-0.5 bg-red-600 text-white text-[8px] font-bold rounded uppercase tracking-wider shadow-sm">
-                            Renewal Required ({expiredCount})
-                          </span>
+                          <div className="flex items-center gap-2">
+                            {renewalMonthFilter !== 'all' && (
+                              <div className="flex items-center bg-white dark:bg-slate-800 p-0.5 rounded-lg border border-red-200 dark:border-red-900/60 shadow-2xs">
+                                <button
+                                  type="button"
+                                  onClick={() => setExpiredTableScope('all')}
+                                  className={`px-2 py-1 text-[10px] font-bold rounded-md transition cursor-pointer ${
+                                    expiredTableScope === 'all'
+                                      ? 'bg-red-600 text-white shadow-xs'
+                                      : 'text-slate-600 dark:text-slate-300 hover:text-red-600'
+                                  }`}
+                                >
+                                  All Overdues ({allUnrenewedExpiredClients.length})
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setExpiredTableScope('month')}
+                                  className={`px-2 py-1 text-[10px] font-bold rounded-md transition cursor-pointer ${
+                                    expiredTableScope === 'month'
+                                      ? 'bg-red-600 text-white shadow-xs'
+                                      : 'text-slate-600 dark:text-slate-300 hover:text-red-600'
+                                  }`}
+                                >
+                                  {selectedMonthObj?.label || 'This Month'} ({monthScopedExpiredClients.length})
+                                </button>
+                              </div>
+                            )}
+                            <span className="px-2.5 py-1 bg-red-600 text-white text-[9px] font-extrabold rounded-md uppercase tracking-wider shadow-xs">
+                              {expiredTableScope === 'month' && renewalMonthFilter !== 'all'
+                                ? `Due in ${selectedMonthObj?.label || 'Month'} (${monthScopedExpiredClients.length})`
+                                : `Total Overdue (${allUnrenewedExpiredClients.length})`}
+                            </span>
+                          </div>
                         </div>
                         <div className="overflow-x-auto">
                           <table className="min-w-[850px] w-full text-left border-collapse">
@@ -4789,13 +5502,26 @@ export default function AdminDashboard() {
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                             {(() => {
-                              const list = filteredRenewalClients
-                                .filter(c => getClientRenewalInfo(c).status === 'Expired')
+                              const baseExpired = (expiredTableScope === 'month' && renewalMonthFilter !== 'all')
+                                ? monthScopedExpiredClients
+                                : allUnrenewedExpiredClients;
+
+                              const list = baseExpired
                                 .filter(c => {
                                   if (!renewalSearch) return true;
                                   const q = renewalSearch.toLowerCase();
                                   const sm = getClientSmExecutive(c, allClientTasks, allClientDeliveries);
-                                  return c.businessName.toLowerCase().includes(q) || c.clientId.toLowerCase().includes(q) || (sm && sm.toLowerCase().includes(q));
+                                  return (
+                                    (c.businessName && c.businessName.toLowerCase().includes(q)) ||
+                                    (c.clientId && c.clientId.toLowerCase().includes(q)) ||
+                                    (c.clientName && c.clientName.toLowerCase().includes(q)) ||
+                                    (sm && sm.toLowerCase().includes(q))
+                                  );
+                                })
+                                .sort((a, b) => {
+                                  const infoA = getClientRenewalInfo(a);
+                                  const infoB = getClientRenewalInfo(b);
+                                  return (infoB.overdueDays || 0) - (infoA.overdueDays || 0);
                                 });
 
                               if (list.length === 0) {
@@ -4895,14 +5621,28 @@ export default function AdminDashboard() {
                                       </span>
                                     </td>
                                     <td className="p-4 text-right">
-                                      <button
-                                        onClick={() => handleRenewClientPlan(client.id, client.businessName)}
-                                        disabled={formLoading}
-                                        className="py-1.5 px-3 rounded-lg text-[10px] font-bold transition flex items-center gap-1 shadow-sm disabled:opacity-50 ml-auto bg-red-600 hover:bg-red-700 text-white shadow-red-500/10 cursor-pointer"
-                                      >
-                                        <RefreshCw className={`w-3 h-3 ${formLoading ? 'animate-spin' : ''}`} />
-                                        <span>Renew Plan Now</span>
-                                      </button>
+                                      <div className="flex items-center justify-end gap-1.5">
+                                        <button
+                                          onClick={() => {
+                                            setDirectExtensionModalClient(client);
+                                            setDirectExtensionDays(10);
+                                            setDirectExtensionReason('');
+                                          }}
+                                          className="py-1.5 px-2.5 rounded-lg text-[10px] font-bold transition flex items-center gap-1 shadow-sm bg-amber-600 hover:bg-amber-700 text-white cursor-pointer"
+                                          title="Admin Direct Extension (up to 10 days max)"
+                                        >
+                                          <Clock className="w-3 h-3" />
+                                          <span>Give Extension (Max 10d)</span>
+                                        </button>
+                                        <button
+                                          onClick={() => handleRenewClientPlan(client.id, client.businessName)}
+                                          disabled={formLoading}
+                                          className="py-1.5 px-3 rounded-lg text-[10px] font-bold transition flex items-center gap-1 shadow-sm disabled:opacity-50 bg-red-600 hover:bg-red-700 text-white shadow-red-500/10 cursor-pointer"
+                                        >
+                                          <RefreshCw className={`w-3 h-3 ${formLoading ? 'animate-spin' : ''}`} />
+                                          <span>Renew Plan Now</span>
+                                        </button>
+                                      </div>
                                     </td>
                                   </tr>
                                 );
@@ -5052,9 +5792,29 @@ export default function AdminDashboard() {
                                       </span>
                                     </td>
                                     <td className="p-4 text-right">
-                                      <span className="inline-block px-2.5 py-1 rounded-lg text-[9px] font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-900/40">
-                                        Active (Renewal on Day 31)
-                                      </span>
+                                      <div className="flex items-center justify-end gap-1.5">
+                                        <button
+                                          onClick={() => {
+                                            setDirectExtensionModalClient(client);
+                                            setDirectExtensionDays(10);
+                                            setDirectExtensionReason('');
+                                          }}
+                                          className="py-1 px-2.5 rounded-lg text-[9px] font-bold transition flex items-center gap-1 shadow-sm bg-amber-600 hover:bg-amber-700 text-white cursor-pointer"
+                                          title="Admin Direct Extension (up to 10 days max)"
+                                        >
+                                          <Clock className="w-2.5 h-2.5" />
+                                          <span>Give Extension</span>
+                                        </button>
+                                        <button
+                                          onClick={() => handleRenewClientPlan(client.id, client.businessName)}
+                                          disabled={formLoading}
+                                          className="py-1 px-2.5 rounded-lg text-[9px] font-bold transition flex items-center gap-1 shadow-sm disabled:opacity-50 bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
+                                          title="Renew Plan Now"
+                                        >
+                                          <RefreshCw className={`w-2.5 h-2.5 ${formLoading ? 'animate-spin' : ''}`} />
+                                          <span>Renew Plan</span>
+                                        </button>
+                                      </div>
                                     </td>
                                   </tr>
                                 );
@@ -5109,11 +5869,11 @@ export default function AdminDashboard() {
                                 .filter(c => {
                                   const s = getClientRenewalInfo(c).status;
                                   if (renewalFilter === 'Active') {
-                                    // When viewing Active filter, include ALL active ongoing contracts (both on-track and expiring soon)
-                                    return s === 'Active' || s === 'Expiring Soon';
+                                    // When viewing Active filter, include ALL active ongoing contracts (both on-track, expiring soon, and extended)
+                                    return s === 'Active' || s === 'Expiring Soon' || s === 'Extended';
                                   }
-                                  // In 'All' view, this table shows on-track active clients (since Expiring Soon has its own table above)
-                                  return s === 'Active';
+                                  // In 'All' view, this table shows on-track and extended active clients (since Expiring Soon has its own table above)
+                                  return s === 'Active' || s === 'Extended';
                                 })
                                 .filter(c => {
                                   if (!renewalSearch) return true;
@@ -5227,7 +5987,11 @@ export default function AdminDashboard() {
                                       </div>
                                     </td>
                                     <td className="p-4">
-                                      {isExpiringSoon ? (
+                                      {info.status === 'Extended' ? (
+                                        <span className="inline-block px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40">
+                                          Extended (+{info.extensionDays}d)
+                                        </span>
+                                      ) : isExpiringSoon ? (
                                         <span className="inline-block px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800/40">
                                           Expiring Soon (Active)
                                         </span>
@@ -5238,23 +6002,29 @@ export default function AdminDashboard() {
                                       )}
                                     </td>
                                     <td className="p-4 text-right">
-                                      {isExpiringSoon ? (
-                                        <div className="flex items-center justify-end gap-1.5">
-                                          <button
-                                            onClick={() => handleRenewClientPlan(client.id, client.businessName)}
-                                            disabled={formLoading}
-                                            className="py-1 px-2.5 rounded-lg text-[9px] font-bold transition flex items-center gap-1 shadow-sm disabled:opacity-50 bg-amber-600 hover:bg-amber-700 text-white cursor-pointer"
-                                            title="Advance to next cycle"
-                                          >
-                                            <RefreshCw className={`w-2.5 h-2.5 ${formLoading ? 'animate-spin' : ''}`} />
-                                            <span>Renew Plan</span>
-                                          </button>
-                                        </div>
-                                      ) : (
-                                        <span className="inline-block px-2.5 py-1 rounded-lg text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-955/30 border border-emerald-200 dark:border-emerald-900/40">
-                                          Plan Active
-                                        </span>
-                                      )}
+                                      <div className="flex items-center justify-end gap-1.5">
+                                        <button
+                                          onClick={() => {
+                                            setDirectExtensionModalClient(client);
+                                            setDirectExtensionDays(10);
+                                            setDirectExtensionReason('');
+                                          }}
+                                          className="py-1 px-2 rounded-lg text-[9px] font-bold transition flex items-center gap-1 shadow-sm bg-amber-600 hover:bg-amber-700 text-white cursor-pointer"
+                                          title="Admin Direct Extension (up to 10 days max)"
+                                        >
+                                          <Clock className="w-2.5 h-2.5" />
+                                          <span>Extend</span>
+                                        </button>
+                                        <button
+                                          onClick={() => handleRenewClientPlan(client.id, client.businessName)}
+                                          disabled={formLoading}
+                                          className="py-1 px-2.5 rounded-lg text-[9px] font-bold transition flex items-center gap-1 shadow-sm disabled:opacity-50 bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
+                                          title="Advance to next cycle"
+                                        >
+                                          <RefreshCw className={`w-2.5 h-2.5 ${formLoading ? 'animate-spin' : ''}`} />
+                                          <span>Renew</span>
+                                        </button>
+                                      </div>
                                     </td>
                                   </tr>
                                 );
@@ -5287,7 +6057,8 @@ export default function AdminDashboard() {
               clientsList.forEach(c => {
                 const info = getClientPlanInfo(c);
                 if (info.cycleMonthKey) monthKeysSet.add(info.cycleMonthKey);
-                if (info.renewalMonthKey) monthKeysSet.add(info.renewalMonthKey);
+                const mk = getClientMonthKey(c);
+                if (mk) monthKeysSet.add(mk);
               });
 
               const sortedKeys = Array.from(monthKeysSet).sort((a, b) => b.localeCompare(a));
@@ -5300,7 +6071,7 @@ export default function AdminDashboard() {
                 let monthRevenue = 0;
 
                 clientsList.forEach(c => {
-                  if (c.active && isClientActiveInMonth(c, mk)) {
+                  if (isClientContractInMonth(c, mk)) {
                     activeCount += 1;
                     monthRevenue += (c.packageAmount || 0);
                   }
@@ -5310,18 +6081,22 @@ export default function AdminDashboard() {
               });
             })();
 
-            // Global Lifecycle Counts across ALL clients in the agency
-            // Rule: Expiring Soon clients are active; Expired clients count as inactive until renewed
+            // Global Lifecycle Counts
+            const isMonthScoped = clientMonthFilter !== 'all' || clientStartDate || clientEndDate;
             const globalLifecycleCounts = {
-              all: clientsList.length,
-              active: clientsList.filter(c => c.active && getClientPlanInfo(c).status !== 'Expired').length,
+              all: isMonthScoped 
+                ? clientsList.filter(c => isClientContractInMonth(c, clientMonthFilter, clientStartDate, clientEndDate)).length
+                : clientsList.length,
+              active: isMonthScoped
+                ? clientsList.filter(c => isClientContractInMonth(c, clientMonthFilter, clientStartDate, clientEndDate)).length
+                : clientsList.filter(c => c.active && getClientPlanInfo(c).status !== 'Expired').length,
               expiring_soon: clientsList.filter(c => c.active && getClientPlanInfo(c).status === 'Expiring Soon').length,
-              expired: clientsList.filter(c => c.active && getClientPlanInfo(c).status === 'Expired').length,
+              expired: clientsList.filter(c => getClientPlanInfo(c).status === 'Expired').length,
               renewable: clientsList.filter(c => {
                 const info = getClientPlanInfo(c);
-                return info.isRenewed || (c.active && (info.status === 'Expired' || info.status === 'Expiring Soon'));
+                return info.isRenewed || info.status === 'Expired' || (c.active && info.status === 'Expiring Soon');
               }).length,
-              inactive: clientsList.filter(c => !c.active || getClientPlanInfo(c).status === 'Expired').length
+              inactive: clientsList.filter(c => !isClientPlanActive(c) && getClientPlanInfo(c).status !== 'Expired').length
             };
 
             const filteredClients = clientsList.filter(c => {
@@ -5343,39 +6118,36 @@ export default function AdminDashboard() {
               // 1. Lifecycle Status Filter
               if (clientLifecycleFilter !== 'all') {
                 if (clientLifecycleFilter === 'active') {
-                  // Active clients include both on-track Active and Expiring Soon (unexpired)
-                  if (!c.active || planInfo.status === 'Expired') return false;
+                  if (!isClientPlanActive(c)) return false;
                 } else if (clientLifecycleFilter === 'expiring_soon') {
                   if (!c.active || planInfo.status !== 'Expiring Soon') return false;
                 } else if (clientLifecycleFilter === 'expired') {
-                  if (!c.active || planInfo.status !== 'Expired') return false;
+                  if (planInfo.status !== 'Expired') return false;
                 } else if (clientLifecycleFilter === 'renewable') {
-                  const isRenewable = planInfo.isRenewed || (c.active && (planInfo.status === 'Expired' || planInfo.status === 'Expiring Soon'));
+                  const isRenewable = planInfo.isRenewed || planInfo.status === 'Expired' || (c.active && planInfo.status === 'Expiring Soon');
                   if (!isRenewable) return false;
                 } else if (clientLifecycleFilter === 'inactive') {
-                  // Expired counts as inactive along with manually inactive accounts
-                  const isInactive = !c.active || planInfo.status === 'Expired';
-                  if (!isInactive) return false;
+                  if (isClientPlanActive(c) || planInfo.status === 'Expired') return false;
                 }
               }
 
               // 2. Month Scope Filter:
-              // When clientFilterScope === 'all_clients' (and a specific status filter is active), we show across ALL clients.
-              // Otherwise, we filter by the selected month or custom range.
-              const shouldApplyMonth = clientLifecycleFilter === 'all' || clientFilterScope === 'month';
+              // Applies to calendar contracts and revenue. When viewing active clients, active clients are NOT mixed with month!
+              const shouldApplyMonth = (clientFilterScope === 'month' || isMonthScoped) && clientLifecycleFilter !== 'active';
               if (shouldApplyMonth) {
                 if (clientStartDate || clientEndDate) {
-                  if (!isClientActiveInMonth(c, null, clientStartDate, clientEndDate)) return false;
+                  if (!isClientContractInMonth(c, null, clientStartDate, clientEndDate)) return false;
                 } else if (clientMonthFilter !== 'all') {
-                  if (!isClientActiveInMonth(c, clientMonthFilter)) return false;
+                  if (!isClientContractInMonth(c, clientMonthFilter)) return false;
                 }
               }
 
               if (clientPaymentFilter !== 'all') {
                 const pInfo = getClientPaymentInfo(c);
-                if (clientPaymentFilter === 'Full' && pInfo.pStatus !== 'Full') return false;
-                if (clientPaymentFilter === 'Partial' && pInfo.pStatus !== 'Partial' && pInfo.pStatus !== 'Half') return false;
-                if (clientPaymentFilter === 'Pending' && pInfo.pStatus !== 'Pending' && pInfo.pStatus !== 'Unpaid') return false;
+                if ((clientPaymentFilter === 'Full' || clientPaymentFilter === 'full') && pInfo.pStatus !== 'Full') return false;
+                if ((clientPaymentFilter === 'Partial' || clientPaymentFilter === 'partial') && pInfo.pStatus !== 'Partial' && pInfo.pStatus !== 'Half') return false;
+                if ((clientPaymentFilter === 'Pending' || clientPaymentFilter === 'pending') && pInfo.pStatus !== 'Pending' && pInfo.pStatus !== 'Unpaid') return false;
+                if (clientPaymentFilter === 'paid_only' && pInfo.pStatus !== 'Full' && pInfo.pStatus !== 'Partial' && pInfo.pStatus !== 'Half') return false;
               }
 
               if (clientRevenueStreamFilter !== 'all') {
@@ -5386,7 +6158,34 @@ export default function AdminDashboard() {
               return true;
             });
 
+            // Global CRM Metrics (Strictly unmixed with revenue/month filter)
+            const totalActiveClientsInCrm = clientsList.filter(c => isClientPlanActive(c)).length;
+            const totalCrmClientsCount = clientsList.length;
             const activeFilteredClients = filteredClients.filter(c => isClientPlanActive(c));
+            const totalAll58ClientsBilling = clientsList.reduce((sum, c) => sum + (c.packageAmount || 0), 0);
+
+            // Global stream breakdown across all 58 clients for Expected Revenue card
+            let all58SalesExpected = 0;
+            let all58RenewalsExpected = 0;
+            let all58RetainersExpected = 0;
+            let activeSalesCount = 0;
+            let activeRenewalsCount = 0;
+            let activeRetainersCount = 0;
+
+            clientsList.forEach(c => {
+              const stream = getClientRevenueStream(c);
+              const amt = c.packageAmount || 0;
+              if (stream.type === 'NewPurchase') all58SalesExpected += amt;
+              else if (stream.type === 'Renewal') all58RenewalsExpected += amt;
+              else all58RetainersExpected += amt;
+
+              if (isClientPlanActive(c)) {
+                if (stream.type === 'NewPurchase') activeSalesCount++;
+                else if (stream.type === 'Renewal') activeRenewalsCount++;
+                else activeRetainersCount++;
+              }
+            });
+
             let expectedRevenue = 0;
             let actualRevenue = 0;
             let paymentReceivedCount = 0;
@@ -5408,7 +6207,8 @@ export default function AdminDashboard() {
             let expiringSoonCount = 0;
             let expiringSoonExpected = 0;
 
-            activeFilteredClients.forEach(c => {
+            // Revenue calculation is strictly calendar month based (day 1 to 30)
+            filteredClients.forEach(c => {
               const pkgAmt = c.packageAmount || 0;
               expectedRevenue += pkgAmt;
 
@@ -5472,34 +6272,95 @@ export default function AdminDashboard() {
                 {/* Client Metrics Divided into Actual, Expected & Pending with Stream Breakdown */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Total / Active Clients */}
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col justify-between">
+                  <div 
+                    onClick={() => {
+                      setClientLifecycleFilter(clientLifecycleFilter === 'active' ? 'all' : 'active');
+                      setClientFilterScope('all_clients');
+                      setClientMonthFilter('all');
+                      setClientStartDate('');
+                      setClientEndDate('');
+                    }}
+                    className={`bg-white dark:bg-slate-900 border p-5 rounded-2xl shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all ${
+                      clientLifecycleFilter === 'active'
+                        ? 'border-blue-500 ring-2 ring-blue-400/20 bg-blue-50/20 dark:bg-blue-950/20'
+                        : 'border-slate-200 dark:border-slate-800 hover:border-blue-300'
+                    }`}
+                    title="Click to toggle Active Clients filter (Strictly active plan packs)"
+                  >
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Clients / Services</span>
                       <Users className="w-4 h-4 text-blue-500" />
                     </div>
                     <div className="my-2">
                       <div className="text-2xl font-black text-slate-900 dark:text-white">
-                        {activeFilteredClients.length} <span className="text-sm font-semibold text-slate-400">Active</span>
+                        {totalActiveClientsInCrm} <span className="text-sm font-semibold text-slate-400">Active</span>
                       </div>
                       <div className="text-[10px] text-slate-400 mt-0.5">
-                        {filteredClients.length} Total CRM Accounts {clientMonthFilter !== 'all' && `in ${currentMonthLabel}`}
+                        {totalCrmClientsCount} Total CRM Accounts {clientMonthFilter !== 'all' && `(${filteredClients.length} in ${currentMonthLabel})`}
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-1 mt-1">
-                      <span className="text-[9px] text-emerald-700 dark:text-emerald-300 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-800/40">
-                        🛒 {newPurchasesCount} New
-                      </span>
-                      <span className="text-[9px] text-purple-700 dark:text-purple-300 font-bold bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.5 rounded border border-purple-100 dark:border-purple-800/40">
-                        🔄 {renewalsCount} Renewed
-                      </span>
-                      <span className="text-[9px] text-blue-700 dark:text-blue-300 font-bold bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded border border-blue-100 dark:border-blue-800/40">
-                        💼 {retainersCount} Retainers
-                      </span>
+                      <button 
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setClientRevenueStreamFilter(clientRevenueStreamFilter === 'NewPurchase' ? 'all' : 'NewPurchase');
+                        }}
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded border transition cursor-pointer hover:scale-105 ${
+                          clientRevenueStreamFilter === 'NewPurchase'
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                            : 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-100 dark:border-emerald-800/40'
+                        }`}
+                        title="Click to filter Sales clients"
+                      >
+                        🛒 {activeSalesCount} Sales
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setClientRevenueStreamFilter(clientRevenueStreamFilter === 'Renewal' ? 'all' : 'Renewal');
+                        }}
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded border transition cursor-pointer hover:scale-105 ${
+                          clientRevenueStreamFilter === 'Renewal'
+                            ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                            : 'text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 border-purple-100 dark:border-purple-800/40'
+                        }`}
+                        title="Click to filter Renewal clients"
+                      >
+                        🔄 {activeRenewalsCount} Renewals
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setClientRevenueStreamFilter(clientRevenueStreamFilter === 'ActiveRetainer' ? 'all' : 'ActiveRetainer');
+                        }}
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded border transition cursor-pointer hover:scale-105 ${
+                          clientRevenueStreamFilter === 'ActiveRetainer'
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                            : 'text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border-blue-100 dark:border-blue-800/40'
+                        }`}
+                        title="Click to filter Retainer clients"
+                      >
+                        💼 {activeRetainersCount} Retainers
+                      </button>
                     </div>
                   </div>
 
                   {/* Actual Revenue (Collected) */}
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col justify-between">
+                  <div 
+                    onClick={() => {
+                      setClientPaymentFilter(clientPaymentFilter === 'paid_only' ? 'all' : 'paid_only');
+                      setClientFilterScope('month');
+                    }}
+                    className={`bg-white dark:bg-slate-900 border p-5 rounded-2xl shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all ${
+                      clientPaymentFilter === 'paid_only' || clientPaymentFilter === 'Full'
+                        ? 'border-emerald-500 ring-2 ring-emerald-400/20 bg-emerald-50/20 dark:bg-emerald-950/20'
+                        : 'border-slate-200 dark:border-slate-800 hover:border-emerald-300'
+                    }`}
+                    title="Click to filter paid accounts in selected month (1 to 30 date)"
+                  >
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-extrabold uppercase tracking-wider">Actual Revenue</span>
                       <DollarSign className="w-4 h-4 text-emerald-500" />
@@ -5513,39 +6374,99 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-1 mt-1 text-[9px] font-medium text-slate-500 dark:text-slate-400">
-                      <span>New: <b className="text-emerald-600 font-bold">₹{newPurchasesActual.toLocaleString()}</b></span>
+                      <span 
+                        onClick={(e) => { e.stopPropagation(); setClientRevenueStreamFilter(clientRevenueStreamFilter === 'NewPurchase' ? 'all' : 'NewPurchase'); }}
+                        className="cursor-pointer hover:underline"
+                        title="Click to filter Sales clients"
+                      >
+                        Achieved Sale: <b className="text-emerald-600 font-bold">₹{newPurchasesActual.toLocaleString()}</b>
+                      </span>
                       <span>•</span>
-                      <span>Renew: <b className="text-purple-600 font-bold">₹{renewalsActual.toLocaleString()}</b></span>
+                      <span 
+                        onClick={(e) => { e.stopPropagation(); setClientRevenueStreamFilter(clientRevenueStreamFilter === 'Renewal' ? 'all' : 'Renewal'); }}
+                        className="cursor-pointer hover:underline"
+                        title="Click to filter Renewal clients"
+                      >
+                        Achieved Renewal: <b className="text-purple-600 font-bold">₹{renewalsActual.toLocaleString()}</b>
+                      </span>
                       <span>•</span>
-                      <span>Ret: <b className="text-blue-600 font-bold">₹{retainersActual.toLocaleString()}</b></span>
+                      <span 
+                        onClick={(e) => { e.stopPropagation(); setClientRevenueStreamFilter(clientRevenueStreamFilter === 'ActiveRetainer' ? 'all' : 'ActiveRetainer'); }}
+                        className="cursor-pointer hover:underline"
+                        title="Click to filter Retainer clients"
+                      >
+                        Ret: <b className="text-blue-600 font-bold">₹{retainersActual.toLocaleString()}</b>
+                      </span>
                     </div>
                   </div>
 
                   {/* Expected Revenue (Total Billing) */}
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col justify-between">
+                  <div 
+                    onClick={() => {
+                      setClientPaymentFilter('all');
+                      setClientLifecycleFilter('all');
+                      setClientRevenueStreamFilter('all');
+                      setClientFilterScope('all_clients');
+                      setClientMonthFilter('all');
+                      setClientStartDate('');
+                      setClientEndDate('');
+                    }}
+                    className={`bg-white dark:bg-slate-900 border p-5 rounded-2xl shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all ${
+                      clientFilterScope === 'all_clients' && clientPaymentFilter === 'all' && clientLifecycleFilter === 'all' && clientRevenueStreamFilter === 'all'
+                        ? 'border-indigo-500 ring-2 ring-indigo-400/20 bg-indigo-50/20 dark:bg-indigo-950/20'
+                        : 'border-slate-200 dark:border-slate-800 hover:border-indigo-300'
+                    }`}
+                    title="Click to view all 58 clients amount (Reset filters to All Clients)"
+                  >
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-extrabold uppercase tracking-wider">Expected Revenue</span>
                       <BarChart2 className="w-4 h-4 text-indigo-500" />
                     </div>
                     <div className="my-2">
                       <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
-                        ₹{expectedRevenue.toLocaleString()}
+                        ₹{totalAll58ClientsBilling.toLocaleString()}
                       </div>
                       <div className="text-[10px] text-slate-400 mt-0.5">
-                        Total Contract Billing Target
+                        All {clientsList.length} CRM Clients Target Billing
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-1 mt-1 text-[9px] font-medium text-slate-500 dark:text-slate-400">
-                      <span>New: <b className="text-indigo-600 font-bold">₹{newPurchasesExpected.toLocaleString()}</b></span>
+                      <span 
+                        onClick={(e) => { e.stopPropagation(); setClientRevenueStreamFilter(clientRevenueStreamFilter === 'NewPurchase' ? 'all' : 'NewPurchase'); }}
+                        className="cursor-pointer hover:underline"
+                        title="Click to filter Sales clients"
+                      >
+                        Target Sale: <b className="text-indigo-600 font-bold">₹{all58SalesExpected.toLocaleString()}</b>
+                      </span>
                       <span>•</span>
-                      <span>Renew: <b className="text-purple-600 font-bold">₹{renewalsExpected.toLocaleString()}</b></span>
+                      <span 
+                        onClick={(e) => { e.stopPropagation(); setClientRevenueStreamFilter(clientRevenueStreamFilter === 'Renewal' ? 'all' : 'Renewal'); }}
+                        className="cursor-pointer hover:underline"
+                        title="Click to filter Renewal clients"
+                      >
+                        Target Renewal: <b className="text-purple-600 font-bold">₹{all58RenewalsExpected.toLocaleString()}</b>
+                      </span>
                       <span>•</span>
-                      <span>Ret: <b className="text-blue-600 font-bold">₹{retainersExpected.toLocaleString()}</b></span>
+                      <span 
+                        onClick={(e) => { e.stopPropagation(); setClientRevenueStreamFilter(clientRevenueStreamFilter === 'ActiveRetainer' ? 'all' : 'ActiveRetainer'); }}
+                        className="cursor-pointer hover:underline"
+                        title="Click to filter Retainer clients"
+                      >
+                        Ret: <b className="text-blue-600 font-bold">₹{all58RetainersExpected.toLocaleString()}</b>
+                      </span>
                     </div>
                   </div>
 
                   {/* Pending Revenue (Outstanding) */}
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col justify-between">
+                  <div 
+                    onClick={() => setClientPaymentFilter(clientPaymentFilter === 'Pending' ? 'all' : 'Pending')}
+                    className={`bg-white dark:bg-slate-900 border p-5 rounded-2xl shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all ${
+                      clientPaymentFilter === 'Pending'
+                        ? 'border-orange-500 ring-2 ring-orange-400/20 bg-orange-50/20 dark:bg-orange-950/20'
+                        : 'border-slate-200 dark:border-slate-800 hover:border-orange-300'
+                    }`}
+                    title="Click to filter pending balance accounts"
+                  >
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] text-orange-600 dark:text-orange-400 font-extrabold uppercase tracking-wider">Pending Revenue</span>
                       <AlertCircle className="w-4 h-4 text-orange-500" />
@@ -5588,11 +6509,19 @@ export default function AdminDashboard() {
                   {/* Dual Progress Bar */}
                   <div className="space-y-1.5">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between text-[11px] font-bold gap-1">
-                      <span className="flex items-center gap-1.5 text-purple-700 dark:text-purple-400">
+                      <span 
+                        onClick={() => setClientRevenueStreamFilter(clientRevenueStreamFilter === 'Renewal' ? 'all' : 'Renewal')}
+                        className="flex items-center gap-1.5 text-purple-700 dark:text-purple-400 cursor-pointer hover:underline"
+                        title="Click to filter renewed clients"
+                      >
                         <span className="w-2.5 h-2.5 rounded-full bg-purple-600"></span>
                         🔄 Renewed: ₹{renewalsExpected.toLocaleString()} ({renewalsCount} accounts • {renewalPercent}%)
                       </span>
-                      <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+                      <span 
+                        onClick={() => setClientLifecycleFilter(clientLifecycleFilter === 'expired' ? 'all' : 'expired')}
+                        className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400 cursor-pointer hover:underline"
+                        title="Click to filter expired / non-renewed clients"
+                      >
                         <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
                         ⚠️ Not Renewed: ₹{notRenewedExpected.toLocaleString()} ({notRenewedCount} accounts • {notRenewedPercent}%)
                       </span>
@@ -5601,16 +6530,20 @@ export default function AdminDashboard() {
                     <div className="w-full bg-slate-100 dark:bg-slate-800 h-6 rounded-xl overflow-hidden flex shadow-inner p-1 gap-1">
                       {renewalsExpected > 0 && (
                         <div 
-                          className="bg-gradient-to-r from-purple-500 to-indigo-600 h-full rounded-lg transition-all duration-1000 ease-out flex items-center justify-center text-[9px] font-black text-white px-2 shadow-sm"
+                          onClick={() => setClientRevenueStreamFilter(clientRevenueStreamFilter === 'Renewal' ? 'all' : 'Renewal')}
+                          className="bg-gradient-to-r from-purple-500 to-indigo-600 h-full rounded-lg transition-all duration-1000 ease-out flex items-center justify-center text-[9px] font-black text-white px-2 shadow-sm cursor-pointer hover:opacity-90 active:scale-[0.99]"
                           style={{ width: `${Math.max(renewalPercent, 10)}%` }}
+                          title={`Click to filter Renewed accounts: ₹${renewalsExpected.toLocaleString()} (${renewalsCount} accounts)`}
                         >
                           {renewalPercent}% Renewed (₹{renewalsExpected.toLocaleString()})
                         </div>
                       )}
                       {notRenewedExpected > 0 && (
                         <div 
-                          className="bg-gradient-to-r from-rose-500 to-red-600 h-full rounded-lg transition-all duration-1000 ease-out flex items-center justify-center text-[9px] font-black text-white px-2 shadow-sm"
+                          onClick={() => setClientLifecycleFilter(clientLifecycleFilter === 'expired' ? 'all' : 'expired')}
+                          className="bg-gradient-to-r from-rose-500 to-red-600 h-full rounded-lg transition-all duration-1000 ease-out flex items-center justify-center text-[9px] font-black text-white px-2 shadow-sm cursor-pointer hover:opacity-90 active:scale-[0.99]"
                           style={{ width: `${Math.max(notRenewedPercent, 10)}%` }}
+                          title={`Click to filter Not Renewed / Expired accounts: ₹${notRenewedExpected.toLocaleString()} (${notRenewedCount} accounts)`}
                         >
                           {notRenewedPercent}% Not Renewed (₹{notRenewedExpected.toLocaleString()})
                         </div>
@@ -6034,6 +6967,17 @@ export default function AdminDashboard() {
                                       className="py-1 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-lg text-xs transition cursor-pointer"
                                     >
                                       Details
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setDirectExtensionModalClient(client);
+                                        setDirectExtensionDays(10);
+                                        setDirectExtensionReason('');
+                                      }}
+                                      className="p-1.5 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg text-amber-600 dark:text-amber-400 transition cursor-pointer border border-transparent hover:border-amber-200 dark:hover:border-amber-800"
+                                      title="Grant Pack Extension (Admin Power: Up to 10 Days)"
+                                    >
+                                      <Clock className="w-3.5 h-3.5" />
                                     </button>
                                     <button
                                       onClick={() => { resetClientForm(client); setShowEditClientModal(true); }}
@@ -8073,6 +9017,130 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* Admin Direct Pack Extension Modal (Admin Authority: Max 10 Days) */}
+      {directExtensionModalClient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-lg overflow-hidden animate-scaleIn">
+            <div className="p-5 bg-gradient-to-r from-amber-600 to-amber-700 text-white flex justify-between items-center">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center backdrop-blur-xs">
+                  <Clock className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base leading-tight">Grant Pack Extension</h3>
+                  <p className="text-xs text-amber-100 font-medium">Admin direct authority: Up to 10 Days Maximum</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDirectExtensionModalClient(null)}
+                className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAdminDirectExtension} className="p-6 space-y-4">
+              {/* Client Info Banner */}
+              <div className="p-3.5 bg-amber-50 dark:bg-amber-955/30 border border-amber-200 dark:border-amber-900/50 rounded-xl">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-bold text-slate-900 dark:text-white text-sm">
+                      {directExtensionModalClient.businessName}
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      ID: {directExtensionModalClient.clientId} | {directExtensionModalClient.packageName || 'Standard Plan'}
+                    </p>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+                    Admin Extension
+                  </span>
+                </div>
+              </div>
+
+              {/* Strict Rule Notice */}
+              <div className="p-3 bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/40 rounded-xl text-xs text-blue-800 dark:text-blue-300 space-y-1">
+                <div className="font-bold flex items-center gap-1.5 text-blue-900 dark:text-blue-200">
+                  <AlertCircle className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>Extension Authority & Deactivation Policy</span>
+                </div>
+                <div className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-300 space-y-0.5">
+                  <p>• <strong>TL Limit</strong>: Team Leaders can only request up to <strong>7 days max</strong> (requires Admin approval).</p>
+                  <p>• <strong>Admin Power</strong>: Admin can directly grant up to <strong>10 days max</strong> extension of pack.</p>
+                  <p>• <strong>Auto-Deactivation</strong>: If the client does not renew after the granted <strong>{directExtensionDays} extension days</strong> elapse, the pack will automatically expire and deactivate (portal login blocked).</p>
+                </div>
+              </div>
+
+              {/* Number of Extension Days */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Select Extension Duration (1 to 10 Days)
+                  </label>
+                  <span className="px-2 py-0.5 rounded text-xs font-black bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300">
+                    {directExtensionDays} Days Selected
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-10">
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(d => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setDirectExtensionDays(d)}
+                      className={`py-2 text-xs font-black rounded-lg border transition cursor-pointer ${
+                        directExtensionDays === d
+                          ? 'bg-amber-600 text-white border-amber-600 shadow-sm ring-2 ring-amber-500/30'
+                          : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-750 hover:border-amber-400'
+                      }`}
+                    >
+                      {d}d
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1 font-medium">
+                  <span>1 Day Minimum</span>
+                  <span className="text-amber-600 dark:text-amber-400 font-bold">10 Days Maximum (Admin Limit)</span>
+                </div>
+              </div>
+
+              {/* Reason / Admin Note */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Reason / Admin Note (Optional)
+                </label>
+                <textarea
+                  value={directExtensionReason}
+                  onChange={(e) => setDirectExtensionReason(e.target.value)}
+                  rows={2}
+                  placeholder="e.g. Granted 10 days extension as requested by client for festival / bank payment clearance..."
+                  className="w-full p-2.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-750 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 resize-none"
+                />
+              </div>
+
+              {/* Modal Actions */}
+              <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 -mx-6 -mb-6 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setDirectExtensionModalClient(null)}
+                  className="py-2 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={directExtensionLoading}
+                  className="py-2 px-5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow-md shadow-amber-500/20 disabled:opacity-50 cursor-pointer"
+                >
+                  <Clock className={`w-3.5 h-3.5 ${directExtensionLoading ? 'animate-spin' : ''}`} />
+                  <span>{directExtensionLoading ? 'Granting...' : `Grant ${directExtensionDays} Days Extension`}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Excel Sheet Bulk Upload Modal */}
       <ExcelImportModal
         isOpen={excelModalOpen}
@@ -8083,6 +9151,282 @@ export default function AdminDashboard() {
           showToast('Data imported successfully!', 'success');
         }}
       />
+
+      {/* Custom Confirmation & Warning Modal (Replaces native browser localhost confirm) */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden animate-scaleIn">
+            {/* Header Banner */}
+            <div className={`p-5 text-white flex justify-between items-center ${
+              confirmModal.confirmVariant === 'rose' 
+                ? 'bg-gradient-to-r from-rose-600 to-red-700'
+                : confirmModal.confirmVariant === 'emerald'
+                ? 'bg-gradient-to-r from-emerald-600 to-teal-700'
+                : confirmModal.confirmVariant === 'blue'
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-700'
+                : 'bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs shadow-inner">
+                  {confirmModal.confirmVariant === 'rose' ? (
+                    <Trash2 className="w-5 h-5 text-white" />
+                  ) : confirmModal.confirmVariant === 'emerald' ? (
+                    <CheckCircle className="w-5 h-5 text-white" />
+                  ) : (
+                    <AlertTriangle className="w-5 h-5 text-white" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base leading-tight">{confirmModal.title}</h3>
+                  {confirmModal.badge && (
+                    <span className="inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-white/20 text-white">
+                      {confirmModal.badge}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closeConfirmModal}
+                disabled={confirmModal.isLoading}
+                className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Client Name Highlight */}
+              {confirmModal.clientName && (
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-xl flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Target Account</span>
+                    <span className="font-extrabold text-slate-900 dark:text-white text-sm">
+                      {confirmModal.clientName}
+                    </span>
+                  </div>
+                  <span className="px-2 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+                    Action Required
+                  </span>
+                </div>
+              )}
+
+              {/* Message */}
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                {confirmModal.message}
+              </p>
+
+              {/* Prominent Warning Callout Banner */}
+              {confirmModal.warningNotice && (
+                <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800/80 rounded-xl">
+                  <div className="flex items-start gap-2.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <div className="text-xs font-semibold text-amber-900 dark:text-amber-200 leading-snug">
+                      {confirmModal.warningNotice}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Buttons */}
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={closeConfirmModal}
+                  disabled={confirmModal.isLoading}
+                  className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition cursor-pointer disabled:opacity-50"
+                >
+                  {confirmModal.cancelText || 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirmModal.onConfirm) confirmModal.onConfirm();
+                  }}
+                  disabled={confirmModal.isLoading}
+                  className={`py-2.5 px-5 text-white font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50 ${
+                    confirmModal.confirmVariant === 'rose'
+                      ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/20'
+                      : confirmModal.confirmVariant === 'emerald'
+                      ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
+                      : confirmModal.confirmVariant === 'blue'
+                      ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/20'
+                      : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 shadow-amber-500/20'
+                  }`}
+                >
+                  {confirmModal.isLoading ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <span>{confirmModal.confirmText || 'Confirm'}</span>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Success Template Modal */}
+      {successNoticeModal.isOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-emerald-200 dark:border-emerald-900/50 w-full max-w-md overflow-hidden animate-scaleIn">
+            <div className="p-5 bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs">
+                  <CheckCircle className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base leading-tight">{successNoticeModal.title}</h3>
+                  {successNoticeModal.subtitle && (
+                    <p className="text-xs text-emerald-100 font-medium">{successNoticeModal.subtitle}</p>
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closeSuccessNotice}
+                className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Client Tag */}
+              {successNoticeModal.clientName && (
+                <div className="flex items-center justify-between p-3 bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-xl">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 tracking-wider block">Client</span>
+                    <span className="font-extrabold text-slate-900 dark:text-white text-sm">
+                      {successNoticeModal.clientName}
+                    </span>
+                  </div>
+                  {successNoticeModal.badge && (
+                    <span className="px-2.5 py-1 rounded-full text-xs font-black bg-emerald-600 text-white shadow-xs">
+                      {successNoticeModal.badge}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Key details list */}
+              {successNoticeModal.details && successNoticeModal.details.length > 0 && (
+                <div className="space-y-2 bg-slate-50 dark:bg-slate-800/50 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800">
+                  {successNoticeModal.details.map((item, idx) => (
+                    <div key={idx} className="flex justify-between items-center text-xs">
+                      <span className="text-slate-500 dark:text-slate-400 font-medium">{item.label}:</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200">{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Warning Reminder Banner */}
+              {successNoticeModal.warningNote && (
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800/80 rounded-xl">
+                  <div className="flex items-start gap-2 text-xs text-amber-900 dark:text-amber-200">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <p className="font-semibold leading-relaxed">{successNoticeModal.warningNote}</p>
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={closeSuccessNotice}
+                className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow-md shadow-emerald-600/20 cursor-pointer text-center"
+              >
+                Got it, Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Rejection Note Modal (Replaces browser prompt) */}
+      {rejectRequestModal.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-rose-200 dark:border-rose-900/50 w-full max-w-md overflow-hidden animate-scaleIn">
+            <div className="p-5 bg-gradient-to-r from-rose-600 to-red-700 text-white flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs">
+                  <X className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base leading-tight">Reject Renewal / Extension Request</h3>
+                  <p className="text-xs text-rose-100 font-medium">Provide a reason for the Team Leader</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closeRejectRequestModal}
+                disabled={rejectRequestModal.isLoading}
+                className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {rejectRequestModal.req && (
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-xl flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Client</span>
+                    <span className="font-extrabold text-slate-900 dark:text-white text-sm">
+                      {rejectRequestModal.req.businessName}
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-xs font-bold bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300">
+                    {rejectRequestModal.req.requestType}
+                  </span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Rejection Reason / Admin Note
+                </label>
+                <textarea
+                  value={rejectRequestModal.reason}
+                  onChange={(e) => setRejectRequestModal(prev => ({ ...prev, reason: e.target.value }))}
+                  rows={3}
+                  placeholder="Enter reason for rejection..."
+                  className="w-full p-3 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-750 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 resize-none font-medium"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={closeRejectRequestModal}
+                  disabled={rejectRequestModal.isLoading}
+                  className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmRejectRequest}
+                  disabled={rejectRequestModal.isLoading}
+                  className="py-2.5 px-5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow-md shadow-rose-600/20 cursor-pointer disabled:opacity-50"
+                >
+                  {rejectRequestModal.isLoading ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Rejecting...</span>
+                    </>
+                  ) : (
+                    <span>Reject Request</span>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

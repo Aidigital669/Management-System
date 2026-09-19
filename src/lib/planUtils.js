@@ -184,25 +184,22 @@ export const getClientPlanInfo = (client, referenceDate = new Date()) => {
   const cycleMonthLabel = start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const renewalMonthLabel = expiry.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-  // Detect renewal
+  // Detect renewal strictly from renewal data / records (Renewal Data)
   let isRenewed = false;
   try {
-    if (client.notes && client.notes.toLowerCase().includes('renew')) isRenewed = true;
+    if (client.notes && (
+      client.notes.includes('[Plan Renewed]') || 
+      client.notes.toLowerCase().includes('plan renewed') || 
+      client.notes.toLowerCase().includes('renewal cycle') || 
+      client.notes.toLowerCase().includes('renewed')
+    )) {
+      isRenewed = true;
+    }
     if (client.notes && client.notes.trim().startsWith('{')) {
       const parsed = JSON.parse(client.notes);
-      if (parsed.isRenewed || parsed.renewalCycle) isRenewed = true;
+      if (parsed.isRenewed || parsed.renewalCycle || parsed.renewed) isRenewed = true;
     }
   } catch (e) {}
-
-  if (client.createdAt) {
-    const cd = new Date(client.createdAt);
-    if (!isNaN(cd.getTime())) {
-      const createdMonth = `${cd.getFullYear()}-${String(cd.getMonth() + 1).padStart(2, '0')}`;
-      if (createdMonth !== cycleMonthKey) {
-        isRenewed = true;
-      }
-    }
-  }
 
   let status = 'Active';
   let overdueDays = 0;
@@ -210,9 +207,15 @@ export const getClientPlanInfo = (client, referenceDate = new Date()) => {
   let displayText = 'Active';
 
   if (client.active === false) {
-    status = 'Inactive';
-    overdueDays = diffDays <= 0 ? Math.abs(diffDays) + 1 : 0;
-    displayText = 'Inactive (Deactivated)';
+    if (diffDays <= 0) {
+      status = 'Expired';
+      overdueDays = Math.abs(diffDays) + 1;
+      displayText = extensionDays > 0 ? `Extension Expired (${overdueDays}d overdue)` : `Overdue (${overdueDays}d)`;
+    } else {
+      status = 'Inactive';
+      overdueDays = 0;
+      displayText = 'Inactive (Deactivated)';
+    }
   } else if (diffDays <= 0) {
     status = 'Expired';
     overdueDays = Math.abs(diffDays) + 1;
@@ -273,28 +276,30 @@ export const isClientPlanActive = (client, referenceDate = new Date()) => {
 };
 
 /**
- * Determines whether a client has an active subscription during the specified month or date range.
- * A client is active during month M if:
- * 1. client.active !== false
- * 2. cycleStart <= monthEnd AND expiryDate >= monthStart
- * (or within the custom date range).
+ * Determines whether a client is an active client for the specified month or date range.
+ * Agency Business Rule:
+ * A client belongs to month M's active clients (e.g. September) if their package starts in that month.
+ * If their package started in August, they are an August client, NOT a September client.
+ * For custom date ranges [customStart, customEnd], the client's package start date must fall within the range.
  */
 export const isClientActiveInMonth = (client, monthKey, customStart = null, customEnd = null) => {
   if (!client || client.active === false) return false;
 
   const info = getClientPlanInfo(client);
-  if (!info.cycleStart || !info.expiryDate) return false;
+  if (!info.cycleStart) return false;
 
-  const cStart = info.cycleStart.getTime();
-  const cExpiry = info.expiryDate.getTime();
+  const cStart = new Date(info.cycleStart);
+  cStart.setHours(0, 0, 0, 0);
 
-  // Custom date range check
+  // Custom date range check: package start date must fall within [customStart, customEnd]
   if (customStart || customEnd) {
     const rStart = customStart ? parseDbDate(customStart) : null;
     const rEnd = customEnd ? parseDbDate(customEnd) : null;
+    if (rStart) rStart.setHours(0, 0, 0, 0);
+    if (rEnd) rEnd.setHours(23, 59, 59, 999);
 
-    if (rStart && cExpiry < rStart.getTime()) return false;
-    if (rEnd && cStart > rEnd.getTime()) return false;
+    if (rStart && cStart.getTime() < rStart.getTime()) return false;
+    if (rEnd && cStart.getTime() > rEnd.getTime()) return false;
     return true;
   }
 
@@ -313,8 +318,51 @@ export const isClientActiveInMonth = (client, monthKey, customStart = null, cust
   const lastDay = new Date(yyyy, mm, 0).getDate();
   const monthEnd = new Date(yyyy, mm - 1, lastDay, 23, 59, 59, 999).getTime();
 
-  // Plan overlaps month: Started on or before monthEnd, and expires on or after monthStart
-  return cStart <= monthEnd && cExpiry >= monthStart;
+  // Package starts in this month (cycle start falls within monthStart and monthEnd)
+  return cStart.getTime() >= monthStart && cStart.getTime() <= monthEnd;
+};
+
+/**
+ * Checks whether a client has an ongoing subscription covering the specified month or date range.
+ * Used for deliverables / operational task tracking across multi-month subscriptions.
+ */
+export const isClientSubscriptionCoveringMonth = (client, monthKey, customStart = null, customEnd = null) => {
+  if (!client || client.active === false) return false;
+
+  const info = getClientPlanInfo(client);
+  if (!info.cycleStart || !info.expiryDate) return false;
+
+  const cStart = new Date(info.cycleStart);
+  cStart.setHours(0, 0, 0, 0);
+  const cExpiry = new Date(info.expiryDate);
+  cExpiry.setHours(23, 59, 59, 999);
+
+  if (customStart || customEnd) {
+    const rStart = customStart ? parseDbDate(customStart) : null;
+    const rEnd = customEnd ? parseDbDate(customEnd) : null;
+    if (rStart) rStart.setHours(0, 0, 0, 0);
+    if (rEnd) rEnd.setHours(23, 59, 59, 999);
+
+    if (rStart && cExpiry.getTime() < rStart.getTime()) return false;
+    if (rEnd && cStart.getTime() > rEnd.getTime()) return false;
+    return true;
+  }
+
+  if (!monthKey || monthKey === 'all') {
+    return info.status !== 'Expired';
+  }
+
+  const parts = monthKey.split('-');
+  if (parts.length !== 2) return true;
+
+  const yyyy = parseInt(parts[0], 10);
+  const mm = parseInt(parts[1], 10);
+
+  const monthStart = new Date(yyyy, mm - 1, 1, 0, 0, 0, 0).getTime();
+  const lastDay = new Date(yyyy, mm, 0).getDate();
+  const monthEnd = new Date(yyyy, mm - 1, lastDay, 23, 59, 59, 999).getTime();
+
+  return cStart.getTime() <= monthEnd && cExpiry.getTime() >= monthStart;
 };
 
 /**
@@ -331,6 +379,8 @@ export const isClientExpiringInMonth = (client, monthKey, customStart = null, cu
   if (customStart || customEnd) {
     const rStart = customStart ? parseDbDate(customStart) : null;
     const rEnd = customEnd ? parseDbDate(customEnd) : null;
+    if (rStart) rStart.setHours(0, 0, 0, 0);
+    if (rEnd) rEnd.setHours(23, 59, 59, 999);
     if (rStart && cExpiry < rStart.getTime()) return false;
     if (rEnd && cExpiry > rEnd.getTime()) return false;
     return true;
@@ -342,52 +392,69 @@ export const isClientExpiringInMonth = (client, monthKey, customStart = null, cu
 };
 
 /**
- * Checks whether client's cycle started in the specified month
+ * Checks whether a client's contract cycle / package start falls within the specified month (1 to 30) or date range.
+ * Used for Revenue, Sales, and Renewal calculations.
+ * Revenue does NOT depend on current active status; any contract purchased/starting in month M (day 1 to 30) generates revenue for month M.
  */
-export const isClientStartingInMonth = (client, monthKey, customStart = null, customEnd = null) => {
-  if (!client || client.active === false) return false;
+export const isClientContractInMonth = (client, monthKey, customStart = null, customEnd = null) => {
+  if (!client) return false;
 
   const info = getClientPlanInfo(client);
   if (!info.cycleStart) return false;
 
-  const cStart = info.cycleStart.getTime();
+  const cStart = new Date(info.cycleStart);
+  cStart.setHours(0, 0, 0, 0);
 
   if (customStart || customEnd) {
     const rStart = customStart ? parseDbDate(customStart) : null;
     const rEnd = customEnd ? parseDbDate(customEnd) : null;
-    if (rStart && cStart < rStart.getTime()) return false;
-    if (rEnd && cStart > rEnd.getTime()) return false;
+    if (rStart) rStart.setHours(0, 0, 0, 0);
+    if (rEnd) rEnd.setHours(23, 59, 59, 999);
+
+    if (rStart && cStart.getTime() < rStart.getTime()) return false;
+    if (rEnd && cStart.getTime() > rEnd.getTime()) return false;
     return true;
   }
 
-  if (!monthKey || monthKey === 'all') return true;
+  if (!monthKey || monthKey === 'all') {
+    return true;
+  }
 
-  return info.cycleMonthKey === monthKey;
+  const parts = monthKey.split('-');
+  if (parts.length !== 2) return true;
+
+  const yyyy = parseInt(parts[0], 10);
+  const mm = parseInt(parts[1], 10);
+
+  const monthStart = new Date(yyyy, mm - 1, 1, 0, 0, 0, 0).getTime();
+  const lastDay = new Date(yyyy, mm, 0).getDate();
+  const monthEnd = new Date(yyyy, mm - 1, lastDay, 23, 59, 59, 999).getTime();
+
+  return cStart.getTime() >= monthStart && cStart.getTime() <= monthEnd;
+};
+
+/**
+ * Checks whether client's cycle started in the specified month
+ */
+export const isClientStartingInMonth = (client, monthKey, customStart = null, customEnd = null) => {
+  return isClientContractInMonth(client, monthKey, customStart, customEnd);
 };
 
 /**
  * Helper to determine revenue stream type (NewPurchase vs Renewal vs ActiveRetainer)
  */
 export const getClientRevenueStream = (client, selectedMonth = 'all') => {
-  if (!client || !client.active) return { type: 'Inactive', label: 'Inactive', badge: 'Inactive' };
+  if (!client) return { type: 'Inactive', label: 'Inactive', badge: 'Inactive' };
 
   const info = getClientPlanInfo(client);
 
+  // 1. Renewal Data: Strictly based on actual renewal data/records
   if (info.isRenewed) {
     return { type: 'Renewal', label: 'Plan Renewed', badge: '🔄 Renewed' };
   }
 
-  let createdMonth = null;
-  if (client.createdAt) {
-    const cd = new Date(client.createdAt);
-    if (!isNaN(cd.getTime())) createdMonth = `${cd.getFullYear()}-${String(cd.getMonth() + 1).padStart(2, '0')}`;
-  }
-
-  if (createdMonth && (selectedMonth === 'all' || createdMonth === selectedMonth)) {
-    return { type: 'NewPurchase', label: 'New Purchase', badge: '🛒 New Plan' };
-  }
-
-  return { type: 'ActiveRetainer', label: 'Active Retainer', badge: '💼 Retainer' };
+  // 2. Sales Data: Initial/new client contract purchase
+  return { type: 'NewPurchase', label: 'New Purchase', badge: '🛒 New Plan' };
 };
 
 // Dedicated Social Media / Digital Marketing Executives in the agency

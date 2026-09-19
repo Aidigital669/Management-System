@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -31,7 +33,8 @@ export async function GET(request) {
 
     return NextResponse.json({ logs: recentLogs }, { status: 200 });
   } catch (error) {
-    console.error('Error fetching recent attendance:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    console.warn('Attendance polling notice (database busy or transient connection):', error?.message || error);
+    // Return empty logs array gracefully so polling does not crash or spam 500 errors
+    return NextResponse.json({ logs: [], temporaryUnavailable: true }, { status: 200 });
   }
 }

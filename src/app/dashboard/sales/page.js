@@ -23,6 +23,7 @@ import {
   Bell,
   Loader2
 } from 'lucide-react';
+import AdminPreviewBanner from '@/components/AdminPreviewBanner';
 
 export default function SalesDashboard() {
   const router = useRouter();
@@ -926,14 +927,20 @@ export default function SalesDashboard() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 overflow-hidden">
+    <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 overflow-hidden">
+      {/* Admin Preview Mode Banner */}
+      <AdminPreviewBanner currentUserName={currentUser?.name} />
+
       {/* Toast Alert */}
       {toast.message && (
-        <div className={`fixed bottom-5 right-5 z-50 p-4 rounded-xl shadow-2xl flex items-center gap-3 border text-sm font-semibold 
+        <div className={`fixed bottom-5 right-5 z-[70] p-4 rounded-xl shadow-2xl flex items-center gap-3 border text-sm font-semibold 
           ${toast.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-950/80 border-emerald-200 text-emerald-800 dark:text-emerald-300' : 'bg-red-50 dark:bg-red-950/80 border-red-200 text-red-800 dark:text-red-300'}`}>
           <span>{toast.message}</span>
         </div>
       )}
+
+      {/* Dashboard Body: Sidebar + Main Panel */}
+      <div className="flex flex-col md:flex-row flex-1 min-h-0 w-full overflow-hidden relative">
 
       {/* Mobile Header */}
       <div className="md:hidden flex items-center justify-between p-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-30 shrink-0">
@@ -1568,6 +1575,7 @@ export default function SalesDashboard() {
           )}
         </div>
       </main>
+      </div>
 
       {/* New Call Modal */}
       {showCallModal && (

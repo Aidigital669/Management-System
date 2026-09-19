@@ -39,6 +39,7 @@ import {
   getPlanDurationLabel,
   getClientPlanInfo,
   isClientPlanActive,
+  isClientContractInMonth,
   isClientActiveInMonth,
   isClientExpiringInMonth,
   isClientStartingInMonth,
@@ -90,13 +91,21 @@ export default function CeoDashboard() {
   const [excelModalType, setExcelModalType] = useState('clients');
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [clientMonthFilter, setClientMonthFilter] = useState('all');
-  const [clientStartDate, setClientStartDate] = useState('');
-  const [clientEndDate, setClientEndDate] = useState('');
+  const now = new Date();
+  const curLiveYear = now.getFullYear();
+  const curLiveMonth = now.getMonth() + 1;
+  const currentLiveMonthKey = `${curLiveYear}-${String(curLiveMonth).padStart(2, '0')}`;
+  const currentLiveMonthLastDay = new Date(curLiveYear, curLiveMonth, 0).getDate();
+  const currentLiveMonthStart = `${curLiveYear}-${String(curLiveMonth).padStart(2, '0')}-01`;
+  const currentLiveMonthEnd = `${curLiveYear}-${String(curLiveMonth).padStart(2, '0')}-${String(currentLiveMonthLastDay).padStart(2, '0')}`;
+
+  const [clientMonthFilter, setClientMonthFilter] = useState(currentLiveMonthKey);
+  const [clientStartDate, setClientStartDate] = useState(currentLiveMonthStart);
+  const [clientEndDate, setClientEndDate] = useState(currentLiveMonthEnd);
   const [clientPaymentFilter, setClientPaymentFilter] = useState('all');
   const [clientRevenueStreamFilter, setClientRevenueStreamFilter] = useState('all');
-  const [clientLifecycleFilter, setClientLifecycleFilter] = useState('all'); // 'all', 'active', 'expiring_soon', 'expired', 'renewable', 'inactive'
-  const [clientFilterScope, setClientFilterScope] = useState('all_clients'); // 'all_clients' (global) or 'month'
+  const [clientLifecycleFilter, setClientLifecycleFilter] = useState('active'); // 'all', 'active', 'expiring_soon', 'expired', 'renewable', 'inactive'
+  const [clientFilterScope, setClientFilterScope] = useState('month'); // 'all_clients' (global) or 'month'
 
   // Form Fields - Client CRM
   const [showAddClientModal, setShowAddClientModal] = useState(false);
@@ -281,21 +290,14 @@ export default function CeoDashboard() {
   const getClientRevenueStream = (client, selectedMonthKey) => {
     if (!client || !client.active) return { type: 'Inactive', label: 'Inactive Account', badge: 'Inactive', badgeClass: 'bg-slate-100 text-slate-500' };
 
-    const joiningMonth = parseClientMonthKey(client);
-    let createdMonth = null;
-    if (client.createdAt) {
-      const cd = new Date(client.createdAt);
-      if (!isNaN(cd.getTime())) createdMonth = cd.toISOString().slice(0, 7);
-    }
-
     let isRenewed = false;
     try {
       if (client.notes && client.notes.toLowerCase().includes('renew')) isRenewed = true;
+      if (client.notes && client.notes.trim().startsWith('{')) {
+        const parsed = JSON.parse(client.notes);
+        if (parsed.isRenewed || parsed.renewalCycle || parsed.renewed) isRenewed = true;
+      }
     } catch (e) { }
-
-    if (createdMonth && joiningMonth && createdMonth !== joiningMonth) {
-      isRenewed = true;
-    }
 
     if (isRenewed) {
       return {
@@ -306,20 +308,11 @@ export default function CeoDashboard() {
       };
     }
 
-    if (createdMonth && (!selectedMonthKey || selectedMonthKey === 'all' || createdMonth === selectedMonthKey)) {
-      return {
-        type: 'NewPurchase',
-        label: 'New Plan Purchase',
-        badge: '🛒 New Plan',
-        badgeClass: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-      };
-    }
-
     return {
-      type: 'ActiveRetainer',
-      label: 'Active Retainer',
-      badge: '💼 Retainer',
-      badgeClass: 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+      type: 'NewPurchase',
+      label: 'New Plan Purchase',
+      badge: '🛒 New Plan',
+      badgeClass: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
     };
   };
 
@@ -423,14 +416,14 @@ export default function CeoDashboard() {
       const activeClientsCount = (clientsData.clients || []).filter(c => isClientPlanActive(c)).length;
       const totalClientsCount = (clientsData.clients || []).length;
 
-      // 3-Way Revenue Breakdown (Actual, Expected, Pending) - strictly from active clients
-      let actualRevenue = 0;
-      let expectedRevenue = 0;
-      (clientsData.clients || []).forEach(c => {
-        if (!isClientPlanActive(c)) return;
-        const pkgAmt = c.packageAmount || 0;
-        expectedRevenue += pkgAmt;
+      // Expected Revenue: All CRM Clients Target Billing
+      const totalAllClientsBilling = (clientsData.clients || []).reduce((sum, c) => sum + (c.packageAmount || 0), 0);
 
+      // Actual Revenue: Strictly calendar month based (day 1 to 30) - NOT mixed with active clients!
+      let actualRevenue = 0;
+      (clientsData.clients || []).forEach(c => {
+        if (!isClientContractInMonth(c)) return;
+        const pkgAmt = c.packageAmount || 0;
         const pInfo = getClientPaymentInfo(c);
         if (pInfo.pStatus === 'Full') {
           actualRevenue += pkgAmt;
@@ -438,7 +431,7 @@ export default function CeoDashboard() {
           actualRevenue += pInfo.paidAmount;
         }
       });
-      const pendingRevenue = Math.max(0, expectedRevenue - actualRevenue);
+      const pendingRevenue = Math.max(0, totalAllClientsBilling - actualRevenue);
 
       // Tasks Pipeline Calculation
       const ctArray = ctData.tasks || [];
@@ -458,10 +451,11 @@ export default function CeoDashboard() {
         activeClients: activeClientsCount,
         totalClients: totalClientsCount,
         actualRevenue: actualRevenue,
-        expectedRevenue: expectedRevenue,
+        expectedRevenue: totalAllClientsBilling,
+        totalAllClientsBilling: totalAllClientsBilling,
         pendingRevenue: pendingRevenue,
         totalRevenue: actualRevenue,
-        estRevenue: expectedRevenue,
+        estRevenue: totalAllClientsBilling,
         pendingTasks: pendingTasksCount,
         completedTasks: completedTasksCount,
         pendingDeliveries: pendingDeliveries,
@@ -1117,7 +1111,20 @@ export default function CeoDashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
 
                 {/* Active Clients Card */}
-                <div className="relative bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] transition duration-200 group">
+                <div 
+                  onClick={() => {
+                    setActiveTab('clients');
+                    setClientLifecycleFilter('active');
+                    setClientFilterScope('all_clients');
+                    setClientMonthFilter('all');
+                    setClientStartDate('');
+                    setClientEndDate('');
+                    setClientPaymentFilter('all');
+                    setClientRevenueStreamFilter('all');
+                  }}
+                  className="relative bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] hover:shadow-md hover:border-blue-300 transition duration-200 group cursor-pointer"
+                  title="Click to view Active Clients in Client CRM (Strictly active plan packs)"
+                >
                   <div className="absolute -right-6 -top-6 w-24 h-24 bg-blue-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
                   <div className="space-y-1 relative z-10 min-w-0 pr-2">
                     <div className="text-[10px] text-slate-400 dark:text-slate-500 font-extrabold uppercase tracking-wider truncate">Active Clients</div>
@@ -1135,7 +1142,17 @@ export default function CeoDashboard() {
                 </div>
 
                 {/* Actual Revenue Card */}
-                <div className="relative bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] transition duration-200 group">
+                <div 
+                  onClick={() => {
+                    setActiveTab('clients');
+                    setClientFilterScope('month');
+                    setClientPaymentFilter('paid_only');
+                    setClientLifecycleFilter('all');
+                    setClientRevenueStreamFilter('all');
+                  }}
+                  className="relative bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] hover:shadow-md hover:border-emerald-300 transition duration-200 group cursor-pointer"
+                  title="Click to view Paid Revenue accounts in Client CRM (Calendar Month 1-30)"
+                >
                   <div className="absolute -right-6 -top-6 w-24 h-24 bg-emerald-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
                   <div className="space-y-1 relative z-10 min-w-0 pr-2 flex-grow">
                     <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-extrabold uppercase tracking-wider truncate">Actual Revenue</div>
@@ -1150,13 +1167,26 @@ export default function CeoDashboard() {
                 </div>
 
                 {/* Expected Revenue Card */}
-                <div className="relative bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] transition duration-200 group">
+                <div 
+                  onClick={() => {
+                    setActiveTab('clients');
+                    setClientFilterScope('all_clients');
+                    setClientMonthFilter('all');
+                    setClientStartDate('');
+                    setClientEndDate('');
+                    setClientPaymentFilter('all');
+                    setClientLifecycleFilter('all');
+                    setClientRevenueStreamFilter('all');
+                  }}
+                  className="relative bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] hover:shadow-md hover:border-indigo-300 transition duration-200 group cursor-pointer"
+                  title="Click to view all 58 target billing accounts in Client CRM"
+                >
                   <div className="absolute -right-6 -top-6 w-24 h-24 bg-indigo-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
                   <div className="space-y-1 relative z-10 min-w-0 pr-2 flex-grow">
                     <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-extrabold uppercase tracking-wider truncate">Expected Revenue</div>
                     <h3 className="text-2xl font-black text-indigo-600 dark:text-indigo-400 truncate">₹{(metrics.expectedRevenue || 0).toLocaleString()}</h3>
                     <span className="text-[9px] text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-full border border-indigo-100 dark:border-indigo-900 block w-fit">
-                      Contract Target
+                      All {metrics.totalClients || clientsList.length} CRM Clients Target
                     </span>
                   </div>
                   <div className="shrink-0 relative z-10 w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-100 dark:border-indigo-900">
@@ -1165,7 +1195,14 @@ export default function CeoDashboard() {
                 </div>
 
                 {/* Pending Revenue Card */}
-                <div className="relative bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] transition duration-200 group">
+                <div 
+                  onClick={() => {
+                    setActiveTab('clients');
+                    setClientPaymentFilter('Pending');
+                  }}
+                  className="relative bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] hover:shadow-md hover:border-orange-300 transition duration-200 group cursor-pointer"
+                  title="Click to view Pending Balance accounts in Client CRM"
+                >
                   <div className="absolute -right-6 -top-6 w-24 h-24 bg-orange-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
                   <div className="space-y-1 relative z-10 min-w-0 pr-2 flex-grow">
                     <div className="text-[10px] text-orange-600 dark:text-orange-400 font-extrabold uppercase tracking-wider truncate">Pending Revenue</div>
@@ -1180,7 +1217,13 @@ export default function CeoDashboard() {
                 </div>
 
                 {/* Tasks & Deliveries Pipeline Card */}
-                <div className="relative bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] transition duration-200 group">
+                <div 
+                  onClick={() => {
+                    setActiveTab('deliverables');
+                  }}
+                  className="relative bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] hover:shadow-md hover:border-purple-300 transition duration-200 group cursor-pointer"
+                  title="Click to open Deliverables & Tasks Pipeline"
+                >
                   <div className="absolute -right-6 -top-6 w-24 h-24 bg-purple-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
                   <div className="space-y-1 relative z-10 min-w-0 pr-2 flex-grow">
                     <div className="text-[10px] text-purple-600 dark:text-purple-400 font-extrabold uppercase tracking-wider truncate">Pipeline</div>
@@ -1812,7 +1855,6 @@ export default function CeoDashboard() {
               clientsList.forEach(c => {
                 const info = getClientPlanInfo(c);
                 if (info.cycleMonthKey) monthKeys.add(info.cycleMonthKey);
-                if (info.renewalMonthKey) monthKeys.add(info.renewalMonthKey);
                 const mk = getClientMonthKey(c);
                 if (mk) monthKeys.add(mk);
               });
@@ -1828,7 +1870,7 @@ export default function CeoDashboard() {
                 let monthRevenue = 0;
 
                 clientsList.forEach(c => {
-                  if (c.active && isClientActiveInMonth(c, mk)) {
+                  if (isClientContractInMonth(c, mk)) {
                     activeCount += 1;
                     monthRevenue += (c.packageAmount || 0);
                   }
@@ -1838,17 +1880,22 @@ export default function CeoDashboard() {
               });
             })();
 
-            // Global Lifecycle Counts across ALL clients in the agency
+            // Global Lifecycle Counts
+            const isMonthScoped = clientMonthFilter !== 'all' || clientStartDate || clientEndDate;
             const globalLifecycleCounts = {
-              all: clientsList.length,
-              active: clientsList.filter(c => isClientPlanActive(c)).length,
+              all: isMonthScoped
+                ? clientsList.filter(c => isClientContractInMonth(c, clientMonthFilter, clientStartDate, clientEndDate)).length
+                : clientsList.length,
+              active: isMonthScoped
+                ? clientsList.filter(c => isClientContractInMonth(c, clientMonthFilter, clientStartDate, clientEndDate)).length
+                : clientsList.filter(c => isClientPlanActive(c)).length,
               expiring_soon: clientsList.filter(c => c.active && getClientPlanInfo(c).status === 'Expiring Soon').length,
-              expired: clientsList.filter(c => c.active && getClientPlanInfo(c).status === 'Expired').length,
+              expired: clientsList.filter(c => getClientPlanInfo(c).status === 'Expired').length,
               renewable: clientsList.filter(c => {
                 const info = getClientPlanInfo(c);
-                return info.isRenewed || (c.active && (info.status === 'Expired' || info.status === 'Expiring Soon'));
+                return info.isRenewed || info.status === 'Expired' || (c.active && info.status === 'Expiring Soon');
               }).length,
-              inactive: clientsList.filter(c => !c.active || getClientPlanInfo(c).status === 'Expired').length
+              inactive: clientsList.filter(c => !isClientPlanActive(c) && getClientPlanInfo(c).status !== 'Expired').length
             };
 
             const filteredClients = clientsList.filter(c => {
@@ -1872,32 +1919,32 @@ export default function CeoDashboard() {
                 } else if (clientLifecycleFilter === 'expiring_soon') {
                   if (!c.active || planInfo.status !== 'Expiring Soon') return false;
                 } else if (clientLifecycleFilter === 'expired') {
-                  if (!c.active || planInfo.status !== 'Expired') return false;
+                  if (planInfo.status !== 'Expired') return false;
                 } else if (clientLifecycleFilter === 'renewable') {
-                  const isRenewable = planInfo.isRenewed || (c.active && (planInfo.status === 'Expired' || planInfo.status === 'Expiring Soon'));
+                  const isRenewable = planInfo.isRenewed || planInfo.status === 'Expired' || (c.active && planInfo.status === 'Expiring Soon');
                   if (!isRenewable) return false;
                 } else if (clientLifecycleFilter === 'inactive') {
-                  if (isClientPlanActive(c)) return false;
+                  if (isClientPlanActive(c) || planInfo.status === 'Expired') return false;
                 }
               }
 
               // 2. Month Scope Filter:
-              // When clientFilterScope === 'all_clients' (and a specific status filter is active), we show across ALL clients.
-              // Otherwise, we filter by the selected month or custom range.
-              const shouldApplyMonth = clientLifecycleFilter === 'all' || clientFilterScope === 'month';
+              // Applies to calendar contracts and revenue. When viewing active clients, active clients are NOT mixed with month!
+              const shouldApplyMonth = (clientFilterScope === 'month' || isMonthScoped) && clientLifecycleFilter !== 'active';
               if (shouldApplyMonth) {
                 if (clientStartDate || clientEndDate) {
-                  if (!isClientActiveInMonth(c, null, clientStartDate, clientEndDate)) return false;
+                  if (!isClientContractInMonth(c, null, clientStartDate, clientEndDate)) return false;
                 } else if (clientMonthFilter !== 'all') {
-                  if (!isClientActiveInMonth(c, clientMonthFilter)) return false;
+                  if (!isClientContractInMonth(c, clientMonthFilter)) return false;
                 }
               }
 
               if (clientPaymentFilter !== 'all') {
                 const pInfo = getClientPaymentInfo(c);
-                if (clientPaymentFilter === 'Full' && pInfo.pStatus !== 'Full') return false;
-                if (clientPaymentFilter === 'Partial' && pInfo.pStatus !== 'Partial' && pInfo.pStatus !== 'Half') return false;
-                if (clientPaymentFilter === 'Pending' && pInfo.pStatus !== 'Pending' && pInfo.pStatus !== 'Unpaid') return false;
+                if ((clientPaymentFilter === 'Full' || clientPaymentFilter === 'full') && pInfo.pStatus !== 'Full') return false;
+                if ((clientPaymentFilter === 'Partial' || clientPaymentFilter === 'partial') && pInfo.pStatus !== 'Partial' && pInfo.pStatus !== 'Half') return false;
+                if ((clientPaymentFilter === 'Pending' || clientPaymentFilter === 'pending') && pInfo.pStatus !== 'Pending' && pInfo.pStatus !== 'Unpaid') return false;
+                if (clientPaymentFilter === 'paid_only' && pInfo.pStatus !== 'Full' && pInfo.pStatus !== 'Partial' && pInfo.pStatus !== 'Half') return false;
               }
 
               if (clientRevenueStreamFilter !== 'all') {
@@ -1908,7 +1955,34 @@ export default function CeoDashboard() {
               return true;
             });
 
-            const activeFilteredClients = filteredClients.filter(c => c.active);
+            // Global CRM Metrics (Strictly unmixed with revenue/month filter)
+            const totalActiveClientsInCrm = clientsList.filter(c => isClientPlanActive(c)).length;
+            const totalCrmClientsCount = clientsList.length;
+            const activeFilteredClients = filteredClients.filter(c => isClientPlanActive(c));
+            const totalAll58ClientsBilling = clientsList.reduce((sum, c) => sum + (c.packageAmount || 0), 0);
+
+            // Global stream breakdown across all 58 clients for Expected Revenue card
+            let all58SalesExpected = 0;
+            let all58RenewalsExpected = 0;
+            let all58RetainersExpected = 0;
+            let activeSalesCount = 0;
+            let activeRenewalsCount = 0;
+            let activeRetainersCount = 0;
+
+            clientsList.forEach(c => {
+              const stream = getClientRevenueStream(c);
+              const amt = c.packageAmount || 0;
+              if (stream.type === 'NewPurchase') all58SalesExpected += amt;
+              else if (stream.type === 'Renewal') all58RenewalsExpected += amt;
+              else all58RetainersExpected += amt;
+
+              if (isClientPlanActive(c)) {
+                if (stream.type === 'NewPurchase') activeSalesCount++;
+                else if (stream.type === 'Renewal') activeRenewalsCount++;
+                else activeRetainersCount++;
+              }
+            });
+
             let expectedRevenue = 0;
             let actualRevenue = 0;
             let paymentReceivedCount = 0;
@@ -1931,7 +2005,8 @@ export default function CeoDashboard() {
             let expiringSoonCount = 0;
             let expiringSoonExpected = 0;
 
-            activeFilteredClients.forEach(c => {
+            // Revenue calculation is strictly calendar month based (day 1 to 30) - NOT mixed with active plan packs
+            filteredClients.forEach(c => {
               const pkgAmt = c.packageAmount || 0;
               expectedRevenue += pkgAmt;
 
@@ -1995,34 +2070,95 @@ export default function CeoDashboard() {
                 {/* Client Metrics Divided into Actual, Expected & Pending with Stream Breakdown */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Total / Active Clients */}
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col justify-between">
+                  <div 
+                    onClick={() => {
+                      setClientLifecycleFilter(clientLifecycleFilter === 'active' ? 'all' : 'active');
+                      setClientFilterScope('all_clients');
+                      setClientMonthFilter('all');
+                      setClientStartDate('');
+                      setClientEndDate('');
+                    }}
+                    className={`bg-white dark:bg-slate-900 border p-5 rounded-2xl shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all ${
+                      clientLifecycleFilter === 'active'
+                        ? 'border-blue-500 ring-2 ring-blue-400/20 bg-blue-50/20 dark:bg-blue-950/20'
+                        : 'border-slate-200 dark:border-slate-800 hover:border-blue-300'
+                    }`}
+                    title="Click to toggle Active Clients filter (Strictly active plan packs)"
+                  >
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Clients / Services</span>
                       <Users className="w-4 h-4 text-blue-500" />
                     </div>
                     <div className="my-2">
                       <div className="text-2xl font-black text-slate-900 dark:text-white">
-                        {activeFilteredClients.length} <span className="text-sm font-semibold text-slate-400">Active</span>
+                        {totalActiveClientsInCrm} <span className="text-sm font-semibold text-slate-400">Active</span>
                       </div>
                       <div className="text-[10px] text-slate-400 mt-0.5">
-                        {filteredClients.length} Total CRM Accounts {clientMonthFilter !== 'all' && `in ${currentMonthLabel}`}
+                        {totalCrmClientsCount} Total CRM Accounts {clientMonthFilter !== 'all' && `(${filteredClients.length} in ${currentMonthLabel})`}
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-1 mt-1">
-                      <span className="text-[9px] text-emerald-700 dark:text-emerald-300 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-800/40">
-                        🛒 {newPurchasesCount} New
-                      </span>
-                      <span className="text-[9px] text-purple-700 dark:text-purple-300 font-bold bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.5 rounded border border-purple-100 dark:border-purple-800/40">
-                        🔄 {renewalsCount} Renewed
-                      </span>
-                      <span className="text-[9px] text-blue-700 dark:text-blue-300 font-bold bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded border border-blue-100 dark:border-blue-800/40">
-                        💼 {retainersCount} Retainers
-                      </span>
+                      <button 
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setClientRevenueStreamFilter(clientRevenueStreamFilter === 'NewPurchase' ? 'all' : 'NewPurchase');
+                        }}
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded border transition cursor-pointer hover:scale-105 ${
+                          clientRevenueStreamFilter === 'NewPurchase'
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                            : 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-100 dark:border-emerald-800/40'
+                        }`}
+                        title="Click to filter Sales clients"
+                      >
+                        🛒 {activeSalesCount} Sales
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setClientRevenueStreamFilter(clientRevenueStreamFilter === 'Renewal' ? 'all' : 'Renewal');
+                        }}
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded border transition cursor-pointer hover:scale-105 ${
+                          clientRevenueStreamFilter === 'Renewal'
+                            ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                            : 'text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 border-purple-100 dark:border-purple-800/40'
+                        }`}
+                        title="Click to filter Renewal clients"
+                      >
+                        🔄 {activeRenewalsCount} Renewals
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setClientRevenueStreamFilter(clientRevenueStreamFilter === 'ActiveRetainer' ? 'all' : 'ActiveRetainer');
+                        }}
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded border transition cursor-pointer hover:scale-105 ${
+                          clientRevenueStreamFilter === 'ActiveRetainer'
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                            : 'text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border-blue-100 dark:border-blue-800/40'
+                        }`}
+                        title="Click to filter Retainer clients"
+                      >
+                        💼 {activeRetainersCount} Retainers
+                      </button>
                     </div>
                   </div>
 
                   {/* Actual Revenue (Collected) */}
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col justify-between">
+                  <div 
+                    onClick={() => {
+                      setClientPaymentFilter(clientPaymentFilter === 'paid_only' ? 'all' : 'paid_only');
+                      setClientFilterScope('month');
+                    }}
+                    className={`bg-white dark:bg-slate-900 border p-5 rounded-2xl shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all ${
+                      clientPaymentFilter === 'paid_only' || clientPaymentFilter === 'Full'
+                        ? 'border-emerald-500 ring-2 ring-emerald-400/20 bg-emerald-50/20 dark:bg-emerald-950/20'
+                        : 'border-slate-200 dark:border-slate-800 hover:border-emerald-300'
+                    }`}
+                    title="Click to filter paid accounts in selected month (1 to 30 date)"
+                  >
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-extrabold uppercase tracking-wider">Actual Revenue</span>
                       <DollarSign className="w-4 h-4 text-emerald-500" />
@@ -2036,39 +2172,99 @@ export default function CeoDashboard() {
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-1 mt-1 text-[9px] font-medium text-slate-500 dark:text-slate-400">
-                      <span>New: <b className="text-emerald-600 font-bold">₹{newPurchasesActual.toLocaleString()}</b></span>
+                      <span 
+                        onClick={(e) => { e.stopPropagation(); setClientRevenueStreamFilter(clientRevenueStreamFilter === 'NewPurchase' ? 'all' : 'NewPurchase'); }}
+                        className="cursor-pointer hover:underline"
+                        title="Click to filter Sales clients"
+                      >
+                        Achieved Sale: <b className="text-emerald-600 font-bold">₹{newPurchasesActual.toLocaleString()}</b>
+                      </span>
                       <span>•</span>
-                      <span>Renew: <b className="text-purple-600 font-bold">₹{renewalsActual.toLocaleString()}</b></span>
+                      <span 
+                        onClick={(e) => { e.stopPropagation(); setClientRevenueStreamFilter(clientRevenueStreamFilter === 'Renewal' ? 'all' : 'Renewal'); }}
+                        className="cursor-pointer hover:underline"
+                        title="Click to filter Renewal clients"
+                      >
+                        Achieved Renewal: <b className="text-purple-600 font-bold">₹{renewalsActual.toLocaleString()}</b>
+                      </span>
                       <span>•</span>
-                      <span>Ret: <b className="text-blue-600 font-bold">₹{retainersActual.toLocaleString()}</b></span>
+                      <span 
+                        onClick={(e) => { e.stopPropagation(); setClientRevenueStreamFilter(clientRevenueStreamFilter === 'ActiveRetainer' ? 'all' : 'ActiveRetainer'); }}
+                        className="cursor-pointer hover:underline"
+                        title="Click to filter Retainer clients"
+                      >
+                        Ret: <b className="text-blue-600 font-bold">₹{retainersActual.toLocaleString()}</b>
+                      </span>
                     </div>
                   </div>
 
                   {/* Expected Revenue (Total Billing) */}
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col justify-between">
+                  <div 
+                    onClick={() => {
+                      setClientPaymentFilter('all');
+                      setClientLifecycleFilter('all');
+                      setClientRevenueStreamFilter('all');
+                      setClientFilterScope('all_clients');
+                      setClientMonthFilter('all');
+                      setClientStartDate('');
+                      setClientEndDate('');
+                    }}
+                    className={`bg-white dark:bg-slate-900 border p-5 rounded-2xl shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all ${
+                      clientFilterScope === 'all_clients' && clientPaymentFilter === 'all' && clientLifecycleFilter === 'all' && clientRevenueStreamFilter === 'all'
+                        ? 'border-indigo-500 ring-2 ring-indigo-400/20 bg-indigo-50/20 dark:bg-indigo-950/20'
+                        : 'border-slate-200 dark:border-slate-800 hover:border-indigo-300'
+                    }`}
+                    title="Click to view all 58 clients amount (Reset filters to All Clients)"
+                  >
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-extrabold uppercase tracking-wider">Expected Revenue</span>
                       <BarChart2 className="w-4 h-4 text-indigo-500" />
                     </div>
                     <div className="my-2">
                       <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
-                        ₹{expectedRevenue.toLocaleString()}
+                        ₹{totalAll58ClientsBilling.toLocaleString()}
                       </div>
                       <div className="text-[10px] text-slate-400 mt-0.5">
-                        Total Contract Billing Target
+                        All {clientsList.length} CRM Clients Target Billing
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-1 mt-1 text-[9px] font-medium text-slate-500 dark:text-slate-400">
-                      <span>New: <b className="text-indigo-600 font-bold">₹{newPurchasesExpected.toLocaleString()}</b></span>
+                      <span 
+                        onClick={(e) => { e.stopPropagation(); setClientRevenueStreamFilter(clientRevenueStreamFilter === 'NewPurchase' ? 'all' : 'NewPurchase'); }}
+                        className="cursor-pointer hover:underline"
+                        title="Click to filter Sales clients"
+                      >
+                        Target Sale: <b className="text-indigo-600 font-bold">₹{all58SalesExpected.toLocaleString()}</b>
+                      </span>
                       <span>•</span>
-                      <span>Renew: <b className="text-purple-600 font-bold">₹{renewalsExpected.toLocaleString()}</b></span>
+                      <span 
+                        onClick={(e) => { e.stopPropagation(); setClientRevenueStreamFilter(clientRevenueStreamFilter === 'Renewal' ? 'all' : 'Renewal'); }}
+                        className="cursor-pointer hover:underline"
+                        title="Click to filter Renewal clients"
+                      >
+                        Target Renewal: <b className="text-purple-600 font-bold">₹{all58RenewalsExpected.toLocaleString()}</b>
+                      </span>
                       <span>•</span>
-                      <span>Ret: <b className="text-blue-600 font-bold">₹{retainersExpected.toLocaleString()}</b></span>
+                      <span 
+                        onClick={(e) => { e.stopPropagation(); setClientRevenueStreamFilter(clientRevenueStreamFilter === 'ActiveRetainer' ? 'all' : 'ActiveRetainer'); }}
+                        className="cursor-pointer hover:underline"
+                        title="Click to filter Retainer clients"
+                      >
+                        Ret: <b className="text-blue-600 font-bold">₹{all58RetainersExpected.toLocaleString()}</b>
+                      </span>
                     </div>
                   </div>
 
                   {/* Pending Revenue (Outstanding) */}
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col justify-between">
+                  <div 
+                    onClick={() => setClientPaymentFilter(clientPaymentFilter === 'Pending' ? 'all' : 'Pending')}
+                    className={`bg-white dark:bg-slate-900 border p-5 rounded-2xl shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all ${
+                      clientPaymentFilter === 'Pending'
+                        ? 'border-orange-500 ring-2 ring-orange-400/20 bg-orange-50/20 dark:bg-orange-950/20'
+                        : 'border-slate-200 dark:border-slate-800 hover:border-orange-300'
+                    }`}
+                    title="Click to filter pending balance accounts"
+                  >
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] text-orange-600 dark:text-orange-400 font-extrabold uppercase tracking-wider">Pending Revenue</span>
                       <AlertCircle className="w-4 h-4 text-orange-500" />
@@ -2111,11 +2307,19 @@ export default function CeoDashboard() {
                   {/* Dual Progress Bar */}
                   <div className="space-y-1.5">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between text-[11px] font-bold gap-1">
-                      <span className="flex items-center gap-1.5 text-purple-700 dark:text-purple-400">
+                      <span 
+                        onClick={() => setClientRevenueStreamFilter(clientRevenueStreamFilter === 'Renewal' ? 'all' : 'Renewal')}
+                        className="flex items-center gap-1.5 text-purple-700 dark:text-purple-400 cursor-pointer hover:underline"
+                        title="Click to filter renewed clients"
+                      >
                         <span className="w-2.5 h-2.5 rounded-full bg-purple-600"></span>
                         🔄 Renewed: ₹{renewalsExpected.toLocaleString()} ({renewalsCount} accounts • {renewalPercent}%)
                       </span>
-                      <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+                      <span 
+                        onClick={() => setClientLifecycleFilter(clientLifecycleFilter === 'expired' ? 'all' : 'expired')}
+                        className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400 cursor-pointer hover:underline"
+                        title="Click to filter expired / non-renewed clients"
+                      >
                         <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
                         ⚠️ Not Renewed: ₹{notRenewedExpected.toLocaleString()} ({notRenewedCount} accounts • {notRenewedPercent}%)
                       </span>
@@ -2124,16 +2328,20 @@ export default function CeoDashboard() {
                     <div className="w-full bg-slate-100 dark:bg-slate-800 h-6 rounded-xl overflow-hidden flex shadow-inner p-1 gap-1">
                       {renewalsExpected > 0 && (
                         <div
-                          className="bg-gradient-to-r from-purple-500 to-indigo-600 h-full rounded-lg transition-all duration-1000 ease-out flex items-center justify-center text-[9px] font-black text-white px-2 shadow-sm"
+                          onClick={() => setClientRevenueStreamFilter(clientRevenueStreamFilter === 'Renewal' ? 'all' : 'Renewal')}
+                          className="bg-gradient-to-r from-purple-500 to-indigo-600 h-full rounded-lg transition-all duration-1000 ease-out flex items-center justify-center text-[9px] font-black text-white px-2 shadow-sm cursor-pointer hover:opacity-90 active:scale-[0.99]"
                           style={{ width: `${Math.max(renewalPercent, 10)}%` }}
+                          title={`Click to filter Renewed accounts: ₹${renewalsExpected.toLocaleString()} (${renewalsCount} accounts)`}
                         >
                           {renewalPercent}% Renewed (₹{renewalsExpected.toLocaleString()})
                         </div>
                       )}
                       {notRenewedExpected > 0 && (
                         <div
-                          className="bg-gradient-to-r from-rose-500 to-red-600 h-full rounded-lg transition-all duration-1000 ease-out flex items-center justify-center text-[9px] font-black text-white px-2 shadow-sm"
+                          onClick={() => setClientLifecycleFilter(clientLifecycleFilter === 'expired' ? 'all' : 'expired')}
+                          className="bg-gradient-to-r from-rose-500 to-red-600 h-full rounded-lg transition-all duration-1000 ease-out flex items-center justify-center text-[9px] font-black text-white px-2 shadow-sm cursor-pointer hover:opacity-90 active:scale-[0.99]"
                           style={{ width: `${Math.max(notRenewedPercent, 10)}%` }}
+                          title={`Click to filter Not Renewed / Expired accounts: ₹${notRenewedExpected.toLocaleString()} (${notRenewedCount} accounts)`}
                         >
                           {notRenewedPercent}% Not Renewed (₹{notRenewedExpected.toLocaleString()})
                         </div>

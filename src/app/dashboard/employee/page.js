@@ -33,6 +33,7 @@ import {
   X
 } from 'lucide-react';
 import { uploadFileAction } from '@/app/actions/uploadAction';
+import AdminPreviewBanner from '@/components/AdminPreviewBanner';
 
 const convertDbDateToIso = (dateStr) => {
   if (!dateStr) return '';
@@ -706,11 +707,14 @@ export default function EmployeeDashboard() {
   ].length;
 
   return (
-    <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 transition-colors duration-300">
-      
+    <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 transition-colors duration-300 overflow-hidden">
+
+      {/* Admin Preview Mode Banner — shown when Admin is previewing this employee's dashboard */}
+      <AdminPreviewBanner currentUserName={currentUser?.name} />
+
       {/* Toast Alert */}
       {toast.message && (
-        <div className={`fixed bottom-5 right-5 z-50 p-4 rounded-xl shadow-2xl flex items-center gap-3 border text-sm font-semibold animate-slide-in
+        <div className={`fixed bottom-5 right-5 z-[70] p-4 rounded-xl shadow-2xl flex items-center gap-3 border text-sm font-semibold animate-slide-in
           ${toast.type === 'success' 
             ? 'bg-emerald-50 dark:bg-emerald-950/80 border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-300' 
             : 'bg-red-50 dark:bg-red-950/80 border-red-200 dark:border-red-900 text-red-850 dark:text-red-300'
@@ -729,10 +733,12 @@ export default function EmployeeDashboard() {
         />
       )}
 
-      {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between shrink-0 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static ${
-        mobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
-      }`}>
+      {/* Dashboard Body: Sidebar + Main Content Side-by-Side */}
+      <div className="flex flex-1 min-h-0 w-full overflow-hidden relative">
+        {/* Sidebar */}
+        <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between shrink-0 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:h-full ${
+          mobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
+        }`}>
         <div className="overflow-y-auto flex-1">
           {/* Brand */}
           <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
@@ -858,10 +864,10 @@ export default function EmployeeDashboard() {
         </div>
       </aside>
 
-      {/* Main Panel Content */}
-      <main className="flex-grow flex flex-col min-w-0 overflow-y-auto h-screen">
-        
-        {/* Header */}
+        {/* Main Panel Content */}
+        <main className="flex-grow flex flex-col min-w-0 overflow-y-auto h-full">
+          
+          {/* Header */}
         <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-3 sm:px-6 lg:px-8 shrink-0 transition-colors">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
@@ -1998,6 +2004,7 @@ export default function EmployeeDashboard() {
 
         </div>
       </main>
+      </div>
 
       {/* --- STATUS UPDATE MODAL --- */}
       {showStatusModal && (

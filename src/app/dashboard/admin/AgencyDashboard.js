@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Users, DollarSign, FileText, CheckCircle, Clock, Truck, FileCheck, Target,
   ChevronDown, ChevronUp, BarChart2, AlertCircle, Layers, RefreshCw, AlertTriangle, TrendingUp, Tag,
@@ -13,6 +13,8 @@ import {
   getPlanDurationLabel,
   getClientPlanInfo,
   isClientActiveInMonth,
+  isClientContractInMonth,
+  isClientExpiringInMonth,
   getClientRevenueStream,
   getClientMonthKey,
   isClientPlanActive
@@ -20,8 +22,22 @@ import {
 import { calculateEmployeePerformance } from '@/lib/performanceUtils';
 import EmployeeTasksModal from './EmployeeTasksModal';
 
-export default function AgencyDashboard({ deliveries = [], clients = [], tasks = [], employees = [], attendance = [], feedbacks = [], onSelectTab, refreshData }) {
+export default function AgencyDashboard({ deliveries = [], clients = [], tasks = [], employees = [], attendance = [], feedbacks = [], calls = [], onSelectTab, refreshData }) {
   const [selectedEmployeeForTasks, setSelectedEmployeeForTasks] = useState(null);
+  const [internalCalls, setInternalCalls] = useState(calls || []);
+
+  useEffect(() => {
+    if (calls && calls.length > 0) {
+      setInternalCalls(calls);
+    } else {
+      fetch('/api/calls')
+        .then(r => r.json())
+        .then(data => {
+          if (data && Array.isArray(data.calls)) setInternalCalls(data.calls);
+        })
+        .catch(() => {});
+    }
+  }, [calls]);
   
   const activeClients = clients.filter(c => isClientPlanActive(c)).length;
   const totalClients = clients.length;
@@ -104,13 +120,50 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
   const overallPending = allOverallItems.filter(t => t.status !== 'DONE' && t.status !== 'Completed' && t.status !== 'Complete Task').length;
   const overallTotal = allOverallItems.length;
 
-  // --- DATASET 2: TODAY'S & CARRY-FORWARD OVERDUE ITEMS ---
-  const todayStr = new Date().toISOString().slice(0, 10);
+  // --- DATASET 2: TODAY'S & CARRY-FORWARD OVERDUE ITEMS (LIVE CALENDAR CONNECTED) ---
+  const [liveCalendarDate, setLiveCalendarDate] = useState(() => new Date());
+  const [isLiveCalendarMode, setIsLiveCalendarMode] = useState(true);
+
+  // Keep live calendar continuously synchronized every 30 seconds and upon window focus/tab visibility
+  useEffect(() => {
+    const updateDate = () => {
+      setLiveCalendarDate(new Date());
+    };
+    const timer = setInterval(updateDate, 30000);
+    const handleFocus = () => updateDate();
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', updateDate);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', updateDate);
+    };
+  }, []);
+
+  const curY = liveCalendarDate.getFullYear();
+  const curM = liveCalendarDate.getMonth() + 1;
+  const curD = liveCalendarDate.getDate();
+  const todayStr = `${curY}-${String(curM).padStart(2, '0')}-${String(curD).padStart(2, '0')}`;
+  const currentLiveMonthKey = `${curY}-${String(curM).padStart(2, '0')}`;
+  const currentMonthLastDay = new Date(curY, curM, 0).getDate();
+  const currentLiveMonthStart = `${curY}-${String(curM).padStart(2, '0')}-01`;
+  const currentLiveMonthEnd = `${curY}-${String(curM).padStart(2, '0')}-${String(currentMonthLastDay).padStart(2, '0')}`;
+
   const [taskFilterTab, setTaskFilterTab] = useState('all'); // 'all', 'today', 'overdue'
-  const [selectedRevenueMonth, setSelectedRevenueMonth] = useState('all'); // 'all' or 'YYYY-MM'
-  const [revenueStartDate, setRevenueStartDate] = useState('');
-  const [revenueEndDate, setRevenueEndDate] = useState('');
+  const [selectedRevenueMonth, setSelectedRevenueMonth] = useState(currentLiveMonthKey);
+  const [revenueStartDate, setRevenueStartDate] = useState(currentLiveMonthStart);
+  const [revenueEndDate, setRevenueEndDate] = useState(currentLiveMonthEnd);
   const [showCustomDate, setShowCustomDate] = useState(false);
+
+  // Auto-advance month as the live calendar rolls over (e.g. into October, November, December)
+  useEffect(() => {
+    if (isLiveCalendarMode) {
+      setSelectedRevenueMonth(currentLiveMonthKey);
+      setRevenueStartDate(currentLiveMonthStart);
+      setRevenueEndDate(currentLiveMonthEnd);
+    }
+  }, [currentLiveMonthKey, currentLiveMonthStart, currentLiveMonthEnd, isLiveCalendarMode]);
 
   const isDoneStatus = (status) => {
     const s = (status || '').toLowerCase();
@@ -221,14 +274,19 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
   // Extract distinct available months from clients (counts clients whose plan is active in each month)
   const availableRevenueMonths = React.useMemo(() => {
     const monthKeys = new Set();
-    const now = new Date();
+    const now = liveCalendarDate;
     const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     monthKeys.add(curKey);
+
+    // Provide past 5 months and next 5 months (Oct, Nov, Dec, Jan, Feb)
+    for (let i = -5; i <= 5; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      monthKeys.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    }
 
     clients.forEach(c => {
       const info = getClientPlanInfo(c);
       if (info.cycleMonthKey) monthKeys.add(info.cycleMonthKey);
-      if (info.renewalMonthKey) monthKeys.add(info.renewalMonthKey);
       const mk = getClientMonthKey(c);
       if (mk) monthKeys.add(mk);
     });
@@ -240,30 +298,35 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
       const dateObj = new Date(parseInt(yyyy, 10), parseInt(mm, 10) - 1, 1);
       const label = dateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-      // Count clients active in that month
-      let activeCount = 0;
+      // Count contracts starting in that month and revenue generated in that month (day 1 to 30)
+      let contractsCount = 0;
       let monthRevenue = 0;
       clients.forEach(c => {
-        if (isClientPlanActive(c) && isClientActiveInMonth(c, mk)) {
-          activeCount += 1;
+        if (isClientContractInMonth(c, mk)) {
+          contractsCount += 1;
           monthRevenue += (c.packageAmount || 0);
         }
       });
 
-      return { key: mk, label, count: activeCount, revenue: monthRevenue };
+      return { key: mk, label, count: contractsCount, revenue: monthRevenue };
     });
-  }, [clients]);
+  }, [clients, liveCalendarDate]);
 
-  // Filter clients for selected month or date range (strictly restricted to active clients whose plan has not expired)
+  // Clients generating revenue in the selected month or date range (day 1 to 30)
   const filteredRevenueClients = React.useMemo(() => {
+    if (selectedRevenueMonth === 'all' && !revenueStartDate && !revenueEndDate) {
+      return clients;
+    }
     if (revenueStartDate || revenueEndDate) {
-      return clients.filter(c => isClientPlanActive(c) && isClientActiveInMonth(c, null, revenueStartDate, revenueEndDate));
+      return clients.filter(c => isClientContractInMonth(c, null, revenueStartDate, revenueEndDate));
     }
-    if (selectedRevenueMonth === 'all') {
-      return clients.filter(c => isClientPlanActive(c));
-    }
-    return clients.filter(c => isClientPlanActive(c) && isClientActiveInMonth(c, selectedRevenueMonth));
+    return clients.filter(c => isClientContractInMonth(c, selectedRevenueMonth));
   }, [clients, selectedRevenueMonth, revenueStartDate, revenueEndDate]);
+
+  // All clients with currently active packs across the agency (active plans into Oct, Nov, Dec, etc.)
+  const currentlyActiveClients = React.useMemo(() => {
+    return clients.filter(c => isClientPlanActive(c));
+  }, [clients]);
 
   // Helper to determine plan cycle health for a client using dynamic duration (30, 90, 180, 365 days)
   const getClientPlanHealth = (client) => {
@@ -295,7 +358,6 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
   let retainersActual = 0;
 
   filteredRevenueClients.forEach(c => {
-    if (!isClientPlanActive(c)) return;
     const pkgAmt = c.packageAmount || 0;
     dynamicEstimatedRevenue += pkgAmt;
 
@@ -351,10 +413,10 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
   // Track non-renewed / expired contracts in the period for the Renewals vs Non-Renewals card
   clients.forEach(c => {
     if (c.active === false || !isClientPlanActive(c)) {
-      const isRelevant = (revenueStartDate || revenueEndDate)
-        ? isClientActiveInMonth(c, null, revenueStartDate, revenueEndDate)
-        : (selectedRevenueMonth === 'all' ? true : isClientActiveInMonth(c, selectedRevenueMonth));
-      if (isRelevant) {
+      const isExpiredInPeriod = (revenueStartDate || revenueEndDate)
+        ? isClientExpiringInMonth(c, null, revenueStartDate, revenueEndDate)
+        : (selectedRevenueMonth === 'all' ? true : isClientExpiringInMonth(c, selectedRevenueMonth));
+      if (isExpiredInPeriod) {
         notRenewedCount += 1;
         notRenewedExpected += (c.packageAmount || 0);
       }
@@ -362,6 +424,36 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
   });
 
   const pendingRevenue = Math.max(0, dynamicEstimatedRevenue - dynamicTotalRevenue);
+
+  // Total billing across all 58 clients in CRM (Expected Revenue)
+  const totalAllClientsBilling = clients.reduce((sum, c) => sum + (c.packageAmount || 0), 0);
+
+  // --- PROJECTION TELEMETRY METRICS ---
+  // 1. Projection Renewal: Total renewal pool = (clients with no renewal / not renewed) + (renewed)
+  // Achieved renewal = how many persons renewed from the list and their amount
+  const totalRenewalCount = renewalsCount + notRenewedCount;
+  const totalRenewalExpected = renewalsExpected + notRenewedExpected;
+  const achievedRenewalCount = renewalsCount;
+  const achievedRenewalActual = renewalsActual;
+  const renewalRealizedPercent = totalRenewalCount > 0 
+    ? Math.round((achievedRenewalCount / totalRenewalCount) * 100) 
+    : 0;
+
+  // 2. Projection Sale: Per lead = ₹3,500
+  // Total Hot Pool = Done + Hot leads = 78 + 391 = 469 Total Qualified Leads
+  // Expected Sale Projection = Total Hot Pool * 3500 = 469 * 3500 = 16,41,500
+  // Achieved Sale Projection = Done * 3500 = 78 * 3500 = 2,73,000
+  // Closing Ratio = Done / (Hot leads + Done) = 78 / 469 (17%)
+  const convertedLeads = internalCalls.filter(c => c.status === 'ANSWERED' || c.status === 'CONVERTED' || c.status === 'WON');
+  const hotLeads = internalCalls.filter(c => c.status === 'INTERESTED' || c.status === 'CALLBACK');
+  const convertedLeadsCount = convertedLeads.length;
+  const hotLeadsCount = hotLeads.length;
+  const totalHotPoolCount = convertedLeadsCount + hotLeadsCount; // 78 + 391 = 469
+  const expectedSaleProjection = totalHotPoolCount * 3500; // 469 * 3500 = 16,41,500
+  const achievedSaleProjection = convertedLeadsCount * 3500; // 78 * 3500 = 2,73,000
+  const saleRealizedPercent = totalHotPoolCount > 0 
+    ? Math.round((convertedLeadsCount / totalHotPoolCount) * 100) 
+    : 0;
 
   // Active Ongoing Contracts in the period
   const totalActiveOngoingCount = newPurchasesCount + renewalsCount + retainersCount;
@@ -440,7 +532,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
   const employeeTaskPending = employeeData.reduce((sum, emp) => sum + emp.pending, 0);
 
   const topLevelMetrics = {
-    activeClients,
+    activeClients: currentlyActiveClients.length,
     totalClients,
     paymentReceivedCount,
     paymentPendingCount,
@@ -461,18 +553,34 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
     <div className="space-y-8 animate-fade-in text-slate-800 dark:text-slate-200">
       
       {/* 1. KPIs Section */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4">
         {/* Active Clients */}
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group">
+        <div 
+          onClick={() => onSelectTab && onSelectTab('clients', { 
+            lifecycleFilter: 'active', 
+            filterScope: 'all_clients', 
+            monthFilter: 'all', 
+            paymentFilter: 'all', 
+            revenueStreamFilter: 'all' 
+          })}
+          className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
+          title="Click to view all Active Clients in CRM"
+        >
           <div className="absolute -right-6 -top-6 w-24 h-24 bg-blue-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
           <div className="space-y-1.5 relative z-10">
-            <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-widest font-extrabold font-sans">Active Clients</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-widest font-extrabold font-sans">Active Clients</span>
+              <span className="flex items-center gap-1 text-[8px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded border border-emerald-200/50 dark:border-emerald-800/40 tracking-wider">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                LIVE
+              </span>
+            </div>
             <div className="flex items-end gap-1.5">
-              <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white">{filteredRevenueClients.length}</h3>
+              <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white">{currentlyActiveClients.length}</h3>
               <span className="text-xs text-slate-400 font-semibold mb-0.5">/ {clients.length} in CRM</span>
             </div>
-            <span className="text-[9px] text-blue-500 font-bold bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full border border-blue-100 dark:border-blue-800/30 block w-fit">
-              {selectedRevenueMonth === 'all' ? 'All Active Accounts' : `${availableRevenueMonths.find(m => m.key === selectedRevenueMonth)?.label || selectedRevenueMonth}`}
+            <span className="text-[9px] text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full border border-blue-100 dark:border-blue-800/30 block w-fit">
+              {currentlyActiveClients.length} Active Plans (Ongoing Subscriptions)
             </span>
           </div>
           <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center relative z-10 shadow-inner border border-blue-100 dark:border-blue-900 shrink-0">
@@ -481,13 +589,25 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
         </div>
 
         {/* Actual Revenue (Collected) */}
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group">
+        <div 
+          onClick={() => onSelectTab && onSelectTab('clients', { 
+            monthFilter: selectedRevenueMonth, 
+            startDate: revenueStartDate, 
+            endDate: revenueEndDate, 
+            filterScope: 'month', 
+            paymentFilter: 'paid_only', 
+            lifecycleFilter: 'all', 
+            revenueStreamFilter: 'all' 
+          })}
+          className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-emerald-300 dark:hover:border-emerald-700 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
+          title="Click to view day 1 to 30 clients for this collected revenue in CRM"
+        >
           <div className="absolute -right-6 -top-6 w-24 h-24 bg-emerald-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
           <div className="space-y-1.5 relative z-10">
             <span className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase tracking-widest font-extrabold font-sans">Actual Revenue</span>
             <h3 className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400">₹{dynamicTotalRevenue.toLocaleString()}</h3>
             <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-800/40 block w-fit">
-              Collected ({revReceivedPercent}%)
+              Collected Day 1 to 30 ({paymentReceivedCount} Paid Accounts)
             </span>
           </div>
           <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center relative z-10 shadow-inner border border-emerald-100 dark:border-emerald-900 shrink-0">
@@ -496,13 +616,23 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
         </div>
 
         {/* Expected Revenue (Total Target) */}
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group">
+        <div 
+          onClick={() => onSelectTab && onSelectTab('clients', { 
+            filterScope: 'all_clients', 
+            monthFilter: 'all', 
+            paymentFilter: 'all', 
+            lifecycleFilter: 'all', 
+            revenueStreamFilter: 'all' 
+          })}
+          className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
+          title="Click to view all 58 Client Accounts in CRM"
+        >
           <div className="absolute -right-6 -top-6 w-24 h-24 bg-indigo-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
           <div className="space-y-1.5 relative z-10">
             <span className="text-[10px] text-indigo-600 dark:text-indigo-400 uppercase tracking-widest font-extrabold font-sans">Expected Revenue</span>
-            <h3 className="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400">₹{dynamicEstimatedRevenue.toLocaleString()}</h3>
+            <h3 className="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400">₹{totalAllClientsBilling.toLocaleString()}</h3>
             <span className="text-[9px] text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-full border border-indigo-100 dark:border-indigo-800/40 block w-fit">
-              Target Billing (100%)
+              All {clients.length} Clients Billing (100%)
             </span>
           </div>
           <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center relative z-10 shadow-inner border border-indigo-100 dark:border-indigo-900 shrink-0">
@@ -510,8 +640,62 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
           </div>
         </div>
 
+        {/* Achieved Renewal (Depends on Renewal Data) */}
+        <div 
+          onClick={() => onSelectTab && onSelectTab('renewals', { renewalFilter: 'All' })}
+          className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-purple-200/60 dark:border-purple-900/40 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-purple-400 dark:hover:border-purple-600 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
+          title="Click to open Renewals & Retention Hub"
+        >
+          <div className="absolute -right-6 -top-6 w-24 h-24 bg-purple-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
+          <div className="space-y-1.5 relative z-10">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-purple-600 dark:text-purple-400 uppercase tracking-widest font-extrabold font-sans">Achieved Renewal</span>
+              <span className="text-[8px] font-bold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/60 px-1.5 py-0.2 rounded-full">Renewal Data</span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <h3 className="text-2xl font-extrabold text-purple-600 dark:text-purple-400">₹{achievedRenewalActual.toLocaleString()}</h3>
+              <span className="text-xs text-purple-400 font-semibold" title="Total Projected Renewal Target (Renewed + Non-Renewed)">/ ₹{totalRenewalExpected.toLocaleString()}</span>
+            </div>
+            <span className="text-[9px] text-purple-700 dark:text-purple-300 font-bold bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded-full border border-purple-100 dark:border-purple-800/40 block w-fit">
+              {achievedRenewalCount} of {totalRenewalCount} Renewed ({renewalRealizedPercent}%)
+            </span>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center relative z-10 shadow-inner border border-purple-100 dark:border-purple-900 shrink-0">
+            <RefreshCw className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Achieved Sale (Depends on Sales Data) */}
+        <div 
+          onClick={() => onSelectTab && onSelectTab('seller-dashboard', { activeStatusFilter: 'ANSWERED' })}
+          className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-cyan-200/60 dark:border-cyan-900/40 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-cyan-400 dark:hover:border-cyan-600 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
+          title="Click to view Sales & Converted Leads in Seller Dashboard"
+        >
+          <div className="absolute -right-6 -top-6 w-24 h-24 bg-cyan-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
+          <div className="space-y-1.5 relative z-10">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-cyan-600 dark:text-cyan-400 uppercase tracking-widest font-extrabold font-sans">Achieved Sale</span>
+              <span className="text-[8px] font-bold text-cyan-700 dark:text-cyan-300 bg-cyan-100 dark:bg-cyan-900/60 px-1.5 py-0.2 rounded-full">Sales Data</span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <h3 className="text-2xl font-extrabold text-cyan-600 dark:text-cyan-400">₹{achievedSaleProjection.toLocaleString()}</h3>
+              <span className="text-xs text-cyan-400 font-semibold" title={`Total Hot Target: (${convertedLeadsCount} Done + ${hotLeadsCount} Hot = ${totalHotPoolCount} Leads) × ₹3,500`}>/ ₹{expectedSaleProjection.toLocaleString()}</span>
+            </div>
+            <span className="text-[9px] text-cyan-700 dark:text-cyan-300 font-bold bg-cyan-50 dark:bg-cyan-950/40 px-2 py-0.5 rounded-full border border-cyan-100 dark:border-cyan-800/40 block w-fit">
+              {convertedLeadsCount} / {totalHotPoolCount} Done ({saleRealizedPercent}%) • {hotLeadsCount} Hot Pipeline
+            </span>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-950/50 text-cyan-600 dark:text-cyan-400 flex items-center justify-center relative z-10 shadow-inner border border-cyan-100 dark:border-cyan-900 shrink-0">
+            <TrendingUp className="w-5 h-5" />
+          </div>
+        </div>
+
         {/* Pending Revenue (Outstanding) */}
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group">
+        <div 
+          onClick={() => onSelectTab && onSelectTab('pending-payments', { paymentTabFilter: 'All' })}
+          className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-orange-300 dark:hover:border-orange-700 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
+          title="Click to open Pending Payments Hub"
+        >
           <div className="absolute -right-6 -top-6 w-24 h-24 bg-orange-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
           <div className="space-y-1.5 relative z-10">
             <span className="text-[10px] text-orange-600 dark:text-orange-400 uppercase tracking-widest font-extrabold font-sans">Pending Revenue</span>
@@ -526,7 +710,11 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
         </div>
 
         {/* Tasks & Deliveries Pipeline */}
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group">
+        <div 
+          onClick={() => onSelectTab && onSelectTab('deliverables')}
+          className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-purple-300 dark:hover:border-purple-700 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
+          title="Click to open Task Manager & Deliverables"
+        >
           <div className="absolute -right-6 -top-6 w-24 h-24 bg-purple-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
           <div className="space-y-1.5 relative z-10">
             <span className="text-[10px] text-purple-600 dark:text-purple-400 uppercase tracking-widest font-extrabold font-sans">Pipeline</span>
@@ -561,7 +749,13 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
                     Revenue Breakdown
                   </h4>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    Actual vs Expected vs Pending • <span className="font-bold text-slate-700 dark:text-slate-300">{selectedRevenueMonth === 'all' && !revenueStartDate ? 'All Months' : (availableRevenueMonths.find(m => m.key === selectedRevenueMonth)?.label || selectedRevenueMonth)}</span>
+                    Actual vs Expected vs Pending • <span className="font-bold text-slate-700 dark:text-slate-300">
+                      {selectedRevenueMonth === 'all' && !revenueStartDate
+                        ? 'All Months (All-Time)'
+                        : revenueStartDate && revenueEndDate
+                          ? `${availableRevenueMonths.find(m => m.key === selectedRevenueMonth)?.label || selectedRevenueMonth} (${new Date(revenueStartDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${new Date(revenueEndDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })})`
+                          : (availableRevenueMonths.find(m => m.key === selectedRevenueMonth)?.label || selectedRevenueMonth)}
+                    </span>
                   </p>
                 </div>
               </div>
@@ -574,12 +768,15 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
                     const val = e.target.value;
                     setSelectedRevenueMonth(val);
                     if (val === 'all') {
+                      setIsLiveCalendarMode(false);
                       setRevenueStartDate('');
                       setRevenueEndDate('');
                       setShowCustomDate(false);
                     } else if (val === 'custom') {
+                      setIsLiveCalendarMode(false);
                       setShowCustomDate(true);
                     } else {
+                      setIsLiveCalendarMode(val === currentLiveMonthKey);
                       const [yyyy, mm] = val.split('-');
                       const y = parseInt(yyyy, 10);
                       const m = parseInt(mm, 10);
@@ -594,7 +791,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
                   <option value="all">🌐 All Months (Combined)</option>
                   {availableRevenueMonths.map(m => (
                     <option key={m.key} value={m.key}>
-                      📅 {m.label} ({m.count} clients)
+                      {m.key === currentLiveMonthKey ? `🟢 Live Current Month: ${m.label}` : `📅 ${m.label}`} ({m.count} clients)
                     </option>
                   ))}
                   <option value="custom">📅 Custom Date Range...</option>
@@ -609,7 +806,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
             >
               <button
                 type="button"
-                onClick={() => { setSelectedRevenueMonth('all'); setRevenueStartDate(''); setRevenueEndDate(''); setShowCustomDate(false); }}
+                onClick={() => { setSelectedRevenueMonth('all'); setIsLiveCalendarMode(false); setRevenueStartDate(''); setRevenueEndDate(''); setShowCustomDate(false); }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 whitespace-nowrap ${
                   selectedRevenueMonth === 'all' && !revenueStartDate && !revenueEndDate
                     ? 'bg-emerald-600 text-white shadow-xs'
@@ -619,13 +816,15 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
                 All Months
               </button>
               {availableRevenueMonths.map(m => {
-                const isSelected = selectedRevenueMonth === m.key && !showCustomDate && !revenueStartDate;
+                const isSelected = selectedRevenueMonth === m.key && !showCustomDate;
+                const isLiveCurrent = m.key === currentLiveMonthKey;
                 return (
                   <button
                     key={m.key}
                     type="button"
                     onClick={() => {
                       setSelectedRevenueMonth(m.key);
+                      setIsLiveCalendarMode(isLiveCurrent);
                       const [yyyy, mm] = m.key.split('-');
                       const y = parseInt(yyyy, 10);
                       const mInt = parseInt(mm, 10);
@@ -640,7 +839,11 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                     }`}
                   >
+                    {isLiveCurrent && (
+                      <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-emerald-500'} animate-pulse shrink-0`}></span>
+                    )}
                     <span>{m.label.split(' ')[0]}</span>
+                    {isLiveCurrent && <span className="text-[9px] font-extrabold uppercase opacity-90">(Live)</span>}
                     <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-200/70 dark:bg-slate-700 text-slate-500'}`}>
                       {m.count}
                     </span>
@@ -707,11 +910,15 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
           
           <div className="space-y-5 my-auto">
             {/* 1. Actual Revenue */}
-            <div className="space-y-1.5">
+            <div 
+              onClick={() => onSelectTab && onSelectTab('clients', { paymentFilter: 'full' })}
+              className="space-y-1.5 p-2 -mx-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-all duration-200 group"
+              title="Click to view fully paid accounts in CRM"
+            >
               <div className="flex justify-between items-end">
                 <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Actual Revenue (Collected)</span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block group-hover:scale-125 transition-transform"></span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition">Actual Revenue (Collected)</span>
                 </div>
                 <div className="flex items-baseline gap-2">
                   <span className="text-lg font-black text-emerald-600 dark:text-emerald-400">₹{dynamicTotalRevenue.toLocaleString()}</span>
@@ -724,15 +931,22 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
                   style={{ width: `${revReceivedPercent}%` }}
                 />
               </div>
-              <div className="text-[10px] text-slate-400 text-right">{paymentReceivedCount} accounts paid</div>
+              <div className="text-[10px] text-slate-400 text-right flex justify-between items-center">
+                <span className="text-emerald-600 text-[9px] font-semibold opacity-0 group-hover:opacity-100 transition">View Paid Accounts →</span>
+                <span>{paymentReceivedCount} accounts paid</span>
+              </div>
             </div>
 
             {/* 2. Expected Revenue */}
-            <div className="space-y-1.5">
+            <div 
+              onClick={() => onSelectTab && onSelectTab('clients', { lifecycleFilter: 'all' })}
+              className="space-y-1.5 p-2 -mx-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-all duration-200 group"
+              title="Click to view all billing contracts in CRM"
+            >
               <div className="flex justify-between items-end">
                 <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block"></span>
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Expected Revenue (Total Target)</span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block group-hover:scale-125 transition-transform"></span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">Expected Revenue (Total Target)</span>
                 </div>
                 <div className="flex items-baseline gap-2">
                   <span className="text-lg font-black text-indigo-600 dark:text-indigo-400">₹{dynamicEstimatedRevenue.toLocaleString()}</span>
@@ -745,15 +959,22 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
                   style={{ width: `100%` }}
                 />
               </div>
-              <div className="text-[10px] text-slate-400 text-right">{filteredRevenueClients.length} active contracts</div>
+              <div className="text-[10px] text-slate-400 text-right flex justify-between items-center">
+                <span className="text-indigo-600 text-[9px] font-semibold opacity-0 group-hover:opacity-100 transition">View CRM Clients →</span>
+                <span>{filteredRevenueClients.length} active contracts</span>
+              </div>
             </div>
 
             {/* 3. Pending Revenue */}
-            <div className="space-y-1.5">
+            <div 
+              onClick={() => onSelectTab && onSelectTab('pending-payments', { paymentTabFilter: 'All' })}
+              className="space-y-1.5 p-2 -mx-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-all duration-200 group"
+              title="Click to view Pending Balance accounts"
+            >
               <div className="flex justify-between items-end">
                 <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block"></span>
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Pending Revenue (Outstanding)</span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block group-hover:scale-125 transition-transform"></span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-orange-500 transition">Pending Revenue (Outstanding)</span>
                 </div>
                 <div className="flex items-baseline gap-2">
                   <span className="text-lg font-black text-orange-500">₹{pendingRevenue.toLocaleString()}</span>
@@ -766,57 +987,102 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
                   style={{ width: `${revPendingPercent}%` }}
                 />
               </div>
-              <div className="text-[10px] text-slate-400 text-right">{paymentPendingCount} accounts pending</div>
+              <div className="text-[10px] text-slate-400 text-right flex justify-between items-center">
+                <span className="text-orange-600 text-[9px] font-semibold opacity-0 group-hover:opacity-100 transition">View Pending Payments →</span>
+                <span>{paymentPendingCount} accounts pending</span>
+              </div>
             </div>
           </div>
           
           {/* Interlinked Revenue Streams Breakdown */}
           <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-            <div className="bg-emerald-50/70 dark:bg-emerald-950/20 p-2.5 rounded-xl border border-emerald-100 dark:border-emerald-800/30 flex flex-col justify-between">
+            <div 
+              onClick={() => onSelectTab && onSelectTab('clients', { revenueStreamFilter: 'NewPurchase' })}
+              className="bg-emerald-50/70 dark:bg-emerald-950/20 p-2.5 rounded-xl border border-emerald-100 dark:border-emerald-800/30 flex flex-col justify-between cursor-pointer hover:shadow-sm hover:scale-[1.02] active:scale-[0.99] transition-all"
+              title="Click to view Sales Data in CRM"
+            >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-extrabold uppercase">🛒 New Purchases</span>
-                <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 dark:bg-emerald-900/50 px-1.5 py-0.2 rounded">{newPurchasesCount}</span>
+                <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-extrabold uppercase">🛒 Sales Data (New Purchases)</span>
+                <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 dark:bg-emerald-900/50 px-1.5 py-0.2 rounded">{newPurchasesCount} Sales</span>
               </div>
               <div className="mt-1.5">
-                <span className="text-xs font-black text-slate-900 dark:text-white">₹{newPurchasesExpected.toLocaleString()}</span>
-                <div className="text-[9px] text-slate-400">Paid: <span className="font-bold text-emerald-600">₹{newPurchasesActual.toLocaleString()}</span></div>
+                <div className="text-[9px] text-slate-400">Target: <span className="font-bold text-slate-700 dark:text-slate-300">₹{newPurchasesExpected.toLocaleString()}</span></div>
+                <div className="text-[10px] font-extrabold text-emerald-600">Achieved: ₹{newPurchasesActual.toLocaleString()}</div>
               </div>
             </div>
 
-            <div className="bg-purple-50/70 dark:bg-purple-950/20 p-2.5 rounded-xl border border-purple-100 dark:border-purple-800/30 flex flex-col justify-between">
+            <div 
+              onClick={() => onSelectTab && onSelectTab('renewals', { renewalFilter: 'All' })}
+              className="bg-purple-50/70 dark:bg-purple-950/20 p-2.5 rounded-xl border border-purple-100 dark:border-purple-800/30 flex flex-col justify-between cursor-pointer hover:shadow-sm hover:scale-[1.02] active:scale-[0.99] transition-all"
+              title="Click to open Renewals & Retention Hub"
+            >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] text-purple-700 dark:text-purple-400 font-extrabold uppercase">🔄 Renewals</span>
-                <span className="text-[9px] font-bold text-purple-700 bg-purple-100 dark:bg-purple-900/50 px-1.5 py-0.2 rounded">{renewalsCount}</span>
+                <span className="text-[10px] text-purple-700 dark:text-purple-400 font-extrabold uppercase">🔄 Renewal Data (Plan Renewals)</span>
+                <span className="text-[9px] font-bold text-purple-700 bg-purple-100 dark:bg-purple-900/50 px-1.5 py-0.2 rounded">{renewalsCount} Renewals</span>
               </div>
               <div className="mt-1.5">
-                <span className="text-xs font-black text-slate-900 dark:text-white">₹{renewalsExpected.toLocaleString()}</span>
-                <div className="text-[9px] text-slate-400">Paid: <span className="font-bold text-purple-600">₹{renewalsActual.toLocaleString()}</span></div>
+                <div className="text-[9px] text-slate-400">Target: <span className="font-bold text-slate-700 dark:text-slate-300">₹{renewalsExpected.toLocaleString()}</span></div>
+                <div className="text-[10px] font-extrabold text-purple-600">Achieved: ₹{renewalsActual.toLocaleString()}</div>
               </div>
             </div>
 
-            <div className="bg-blue-50/70 dark:bg-blue-950/20 p-2.5 rounded-xl border border-blue-100 dark:border-blue-800/30 flex flex-col justify-between">
+            <div 
+              onClick={() => onSelectTab && onSelectTab('clients', { revenueStreamFilter: 'ActiveRetainer' })}
+              className="bg-blue-50/70 dark:bg-blue-950/20 p-2.5 rounded-xl border border-blue-100 dark:border-blue-800/30 flex flex-col justify-between cursor-pointer hover:shadow-sm hover:scale-[1.02] active:scale-[0.99] transition-all"
+              title="Click to view Active Retainers in CRM"
+            >
               <div className="flex items-center justify-between">
                 <span className="text-[10px] text-blue-700 dark:text-blue-400 font-extrabold uppercase">💼 Retainers</span>
-                <span className="text-[9px] font-bold text-blue-700 bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.2 rounded">{retainersCount}</span>
+                <span className="text-[9px] font-bold text-blue-700 bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.2 rounded">{retainersCount} Retainers</span>
               </div>
               <div className="mt-1.5">
-                <span className="text-xs font-black text-slate-900 dark:text-white">₹{retainersExpected.toLocaleString()}</span>
-                <div className="text-[9px] text-slate-400">Paid: <span className="font-bold text-blue-600">₹{retainersActual.toLocaleString()}</span></div>
+                <div className="text-[9px] text-slate-400">Target: <span className="font-bold text-slate-700 dark:text-slate-300">₹{retainersExpected.toLocaleString()}</span></div>
+                <div className="text-[10px] font-extrabold text-blue-600">Achieved: ₹{retainersActual.toLocaleString()}</div>
               </div>
             </div>
           </div>
           
-          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-3 gap-1.5 sm:gap-2 text-center text-xs">
-            <div className="bg-emerald-50 dark:bg-emerald-950/30 p-2 rounded-xl border border-emerald-100 dark:border-emerald-800/30 min-w-0">
-              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold block truncate">Actual</span>
+          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5 sm:gap-2 text-center text-xs">
+            <div 
+              onClick={() => onSelectTab && onSelectTab('clients', { paymentFilter: 'full' })}
+              className="bg-emerald-50 dark:bg-emerald-950/30 p-2 rounded-xl border border-emerald-100 dark:border-emerald-800/30 min-w-0 cursor-pointer hover:shadow-xs hover:scale-[1.02] transition-all"
+              title="Click to view fully paid accounts in CRM"
+            >
+              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold block truncate">Actual Revenue</span>
               <span className="text-[11px] sm:text-xs font-extrabold text-emerald-800 dark:text-emerald-300 block truncate">₹{dynamicTotalRevenue.toLocaleString()}</span>
             </div>
-            <div className="bg-indigo-50 dark:bg-indigo-950/30 p-2 rounded-xl border border-indigo-100 dark:border-indigo-800/30 min-w-0">
-              <span className="text-[10px] text-indigo-700 dark:text-indigo-400 font-bold block truncate">Expected</span>
-              <span className="text-[11px] sm:text-xs font-extrabold text-indigo-800 dark:text-indigo-300 block truncate">₹{dynamicEstimatedRevenue.toLocaleString()}</span>
+            <div 
+              onClick={() => onSelectTab && onSelectTab('clients', { filterScope: 'all_clients', monthFilter: 'all', paymentFilter: 'all', lifecycleFilter: 'all', revenueStreamFilter: 'all' })}
+              className="bg-indigo-50 dark:bg-indigo-950/30 p-2 rounded-xl border border-indigo-100 dark:border-indigo-800/30 min-w-0 cursor-pointer hover:shadow-xs hover:scale-[1.02] transition-all"
+              title="Click to view all 58 accounts in CRM"
+            >
+              <span className="text-[10px] text-indigo-700 dark:text-indigo-400 font-bold block truncate">Expected Target</span>
+              <span className="text-[11px] sm:text-xs font-extrabold text-indigo-800 dark:text-indigo-300 block truncate">₹{totalAllClientsBilling.toLocaleString()}</span>
             </div>
-            <div className="bg-orange-50 dark:bg-orange-950/30 p-2 rounded-xl border border-orange-100 dark:border-orange-800/30 min-w-0">
-              <span className="text-[10px] text-orange-700 dark:text-orange-400 font-bold block truncate">Pending</span>
+            <div 
+              onClick={() => onSelectTab && onSelectTab('renewals', { renewalFilter: 'All' })}
+              className="bg-purple-50 dark:bg-purple-950/30 p-2 rounded-xl border border-purple-100 dark:border-purple-800/30 min-w-0 cursor-pointer hover:shadow-xs hover:scale-[1.02] transition-all"
+              title="Click to view Renewal Data in Renewals Hub"
+            >
+              <span className="text-[10px] text-purple-700 dark:text-purple-400 font-bold block truncate">Achieved Renewal</span>
+              <span className="text-[11px] sm:text-xs font-extrabold text-purple-800 dark:text-purple-300 block truncate">₹{achievedRenewalActual.toLocaleString()}</span>
+              <span className="text-[8px] text-purple-600/70 dark:text-purple-400/70 block truncate">Proj: ₹{totalRenewalExpected.toLocaleString()}</span>
+            </div>
+            <div 
+              onClick={() => onSelectTab && onSelectTab('seller-dashboard', { activeStatusFilter: 'ANSWERED' })}
+              className="bg-cyan-50 dark:bg-cyan-950/30 p-2 rounded-xl border border-cyan-100 dark:border-cyan-800/30 min-w-0 cursor-pointer hover:shadow-xs hover:scale-[1.02] transition-all"
+              title="Click to view Sales Data in Seller Dashboard"
+            >
+              <span className="text-[10px] text-cyan-700 dark:text-cyan-400 font-bold block truncate">Achieved Sale</span>
+              <span className="text-[11px] sm:text-xs font-extrabold text-cyan-800 dark:text-cyan-300 block truncate">₹{achievedSaleProjection.toLocaleString()}</span>
+              <span className="text-[8px] text-cyan-600/70 dark:text-cyan-400/70 block truncate">Proj: ₹{expectedSaleProjection.toLocaleString()}</span>
+            </div>
+            <div 
+              onClick={() => onSelectTab && onSelectTab('pending-payments', { paymentTabFilter: 'All' })}
+              className="bg-orange-50 dark:bg-orange-950/30 p-2 rounded-xl border border-orange-100 dark:border-orange-800/30 min-w-0 col-span-2 sm:col-span-1 cursor-pointer hover:shadow-xs hover:scale-[1.02] transition-all"
+              title="Click to view Pending Payments"
+            >
+              <span className="text-[10px] text-orange-700 dark:text-orange-400 font-bold block truncate">Pending Balance</span>
               <span className="text-[11px] sm:text-xs font-extrabold text-orange-800 dark:text-orange-300 block truncate">₹{pendingRevenue.toLocaleString()}</span>
             </div>
           </div>
@@ -845,12 +1111,114 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
             </span>
           </div>
 
-          {/* Bar Chart */}
-          <div className="space-y-5 my-auto">
+          {/* Animated SVG Donut Velocity Gauge — Fills the vertical space with rich telemetry */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 my-2 py-4 px-4 bg-slate-50/70 dark:bg-slate-850/50 rounded-2xl border border-slate-100 dark:border-slate-800/60 shadow-inner">
+            {/* SVG Donut Chart */}
+            <div className="relative w-40 h-40 shrink-0 flex items-center justify-center">
+              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 160 160">
+                {/* Background Ring Track */}
+                <circle
+                  cx="80"
+                  cy="80"
+                  r="62"
+                  className="stroke-slate-200/80 dark:stroke-slate-800"
+                  strokeWidth="14"
+                  fill="transparent"
+                />
+                {/* Pending Segment (Orange) */}
+                <circle
+                  cx="80"
+                  cy="80"
+                  r="62"
+                  className="stroke-orange-400/80 dark:stroke-orange-500/80 transition-all duration-1000 ease-out"
+                  strokeWidth="14"
+                  strokeDasharray={389.55}
+                  strokeDashoffset={0}
+                  fill="transparent"
+                />
+                {/* Completed Segment (Emerald) */}
+                <circle
+                  cx="80"
+                  cy="80"
+                  r="62"
+                  className="stroke-emerald-500 dark:stroke-emerald-400 transition-all duration-1000 ease-out"
+                  strokeWidth="14"
+                  strokeLinecap="round"
+                  strokeDasharray={389.55}
+                  strokeDashoffset={389.55 - (389.55 * (overallTotal > 0 ? (overallCompleted / overallTotal) : 0))}
+                  fill="transparent"
+                />
+              </svg>
+              {/* Inner Center Telemetry */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none">
+                <span className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+                  {overallTotal > 0 ? Math.round((overallCompleted / overallTotal) * 100) : 0}%
+                </span>
+                <span className="text-[9px] uppercase tracking-widest font-extrabold text-emerald-600 dark:text-emerald-400">
+                  {overallCompleted === overallTotal && overallTotal > 0 ? 'Completed' : 'Velocity'}
+                </span>
+                <span className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                  {overallCompleted} / {overallTotal}
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Status Breakdown Chips beside Donut */}
+            <div className="flex flex-col gap-2.5 w-full sm:w-auto">
+              <div 
+                onClick={() => onSelectTab && onSelectTab('deliverables', { deliverableStatusFilter: 'Complete Task' })}
+                className="flex items-center justify-between sm:justify-start gap-3 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-2xs cursor-pointer hover:shadow-md hover:scale-[1.02] hover:border-emerald-300 dark:hover:border-emerald-700 transition-all"
+                title="Click to view Completed Tasks in Task Manager"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0"></span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Completed</span>
+                </div>
+                <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 ml-auto sm:ml-4">
+                  {overallCompleted} ({overallTotal > 0 ? Math.round((overallCompleted / overallTotal) * 100) : 0}%)
+                </span>
+              </div>
+
+              <div 
+                onClick={() => onSelectTab && onSelectTab('deliverables', { deliverableStatusFilter: 'Working On It' })}
+                className="flex items-center justify-between sm:justify-start gap-3 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-2xs cursor-pointer hover:shadow-md hover:scale-[1.02] hover:border-orange-300 dark:hover:border-orange-700 transition-all"
+                title="Click to view In-Progress Tasks in Task Manager"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-orange-400 shrink-0"></span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Pending</span>
+                </div>
+                <span className="text-xs font-black text-orange-500 ml-auto sm:ml-4">
+                  {overallPending} ({overallTotal > 0 ? Math.round((overallPending / overallTotal) * 100) : 0}%)
+                </span>
+              </div>
+
+              <div 
+                onClick={() => onSelectTab && onSelectTab('deliverables', { deliverableStatusFilter: 'all' })}
+                className="flex items-center justify-between sm:justify-start gap-3 px-3.5 py-2 rounded-xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/40 shadow-2xs cursor-pointer hover:shadow-md hover:scale-[1.02] hover:border-purple-300 dark:hover:border-purple-700 transition-all"
+                title="Click to view all deliverables in Task Manager"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-purple-500 shrink-0"></span>
+                  <span className="text-xs font-bold text-purple-700 dark:text-purple-300">Total Workload</span>
+                </div>
+                <span className="text-xs font-black text-purple-700 dark:text-purple-300 ml-auto sm:ml-4">
+                  {overallTotal} Items
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Bar Chart Drill-down */}
+          <div className="space-y-4 pt-2">
             {/* Completed bar */}
-            <div className="space-y-1.5">
+            <div 
+              onClick={() => onSelectTab && onSelectTab('deliverables', { deliverableStatusFilter: 'Complete Task' })}
+              className="space-y-1.5 p-1.5 -mx-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer transition-all duration-200 group"
+              title="Click to filter Task Manager by Completed Tasks"
+            >
               <div className="flex justify-between text-xs font-bold">
-                <span className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+                <span className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 group-hover:text-emerald-600">
                   <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block"></span>
                   Completed Tasks
                 </span>
@@ -858,7 +1226,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
               </div>
               <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-7 overflow-hidden relative shadow-inner">
                 <div
-                  className="bg-gradient-to-r from-emerald-400 to-emerald-600 h-full rounded-full transition-all duration-1000 ease-out flex items-center justify-end pr-3"
+                  className="bg-gradient-to-r from-emerald-400 to-emerald-600 h-full rounded-full transition-all duration-1000 ease-out flex items-center justify-end pr-3 group-hover:brightness-110"
                   style={{ width: overallTotal > 0 ? `${Math.max(Math.round((overallCompleted / overallTotal) * 100), overallCompleted > 0 ? 8 : 0)}%` : '0%' }}
                 >
                   {overallCompleted > 0 && (
@@ -869,9 +1237,13 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
             </div>
 
             {/* Pending bar */}
-            <div className="space-y-1.5">
+            <div 
+              onClick={() => onSelectTab && onSelectTab('deliverables', { deliverableStatusFilter: 'Working On It' })}
+              className="space-y-1.5 p-1.5 -mx-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer transition-all duration-200 group"
+              title="Click to filter Task Manager by In-Progress Tasks"
+            >
               <div className="flex justify-between text-xs font-bold">
-                <span className="flex items-center gap-2 text-orange-600 dark:text-orange-400">
+                <span className="flex items-center gap-2 text-orange-600 dark:text-orange-400 group-hover:text-orange-500">
                   <span className="w-2.5 h-2.5 rounded-sm bg-orange-400 inline-block"></span>
                   Pending / Not Started
                 </span>
@@ -879,7 +1251,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
               </div>
               <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-7 overflow-hidden relative shadow-inner">
                 <div
-                  className="bg-gradient-to-r from-orange-400 to-orange-500 h-full rounded-full transition-all duration-1000 ease-out flex items-center justify-end pr-3"
+                  className="bg-gradient-to-r from-orange-400 to-orange-500 h-full rounded-full transition-all duration-1000 ease-out flex items-center justify-end pr-3 group-hover:brightness-110"
                   style={{ width: overallTotal > 0 ? `${Math.max(Math.round((overallPending / overallTotal) * 100), overallPending > 0 ? 8 : 0)}%` : '0%' }}
                 >
                   {overallPending > 0 && (
@@ -973,7 +1345,11 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
         {/* 4 Detail Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 text-xs">
           {/* 1. Renewed Revenue */}
-          <div className="p-3.5 bg-purple-50/70 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-800/40 rounded-xl flex flex-col justify-between">
+          <div 
+            onClick={() => onSelectTab && onSelectTab('renewals', { renewalFilter: 'Active' })}
+            className="p-3.5 bg-purple-50/70 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-800/40 rounded-xl flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.02] active:scale-[0.99] transition-all"
+            title="Click to view renewed active accounts in Renewals Hub"
+          >
             <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-purple-700 dark:text-purple-400">
               <span>🔄 Renewed Revenue</span>
               <span className="px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/60 font-black">{renewalsCount} Accounts</span>
@@ -987,12 +1363,16 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
               </div>
             </div>
             <span className="text-[9px] text-purple-600 dark:text-purple-400 font-semibold">
-              ✓ Active cycle renewed
+              ✓ Active cycle renewed →
             </span>
           </div>
 
           {/* 2. Not Renewed / Expired Revenue */}
-          <div className="p-3.5 bg-rose-50/70 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-800/40 rounded-xl flex flex-col justify-between">
+          <div 
+            onClick={() => onSelectTab && onSelectTab('renewals', { renewalFilter: 'Expired' })}
+            className="p-3.5 bg-rose-50/70 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-800/40 rounded-xl flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.02] active:scale-[0.99] transition-all"
+            title="Click to view all overdue expired contracts requiring renewal"
+          >
             <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-rose-700 dark:text-rose-400">
               <span>⚠️ Not Renewed (Expired)</span>
               <span className="px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-900/60 font-black">{notRenewedCount} Accounts</span>
@@ -1006,12 +1386,16 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
               </div>
             </div>
             <span className="text-[9px] text-rose-500 font-semibold">
-              ⚠️ Immediate renewal required
+              ⚠️ Immediate renewal required →
             </span>
           </div>
 
           {/* 3. Expiring Soon Revenue */}
-          <div className="p-3.5 bg-amber-50/70 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-800/40 rounded-xl flex flex-col justify-between">
+          <div 
+            onClick={() => onSelectTab && onSelectTab('renewals', { renewalFilter: 'Expiring Soon' })}
+            className="p-3.5 bg-amber-50/70 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-800/40 rounded-xl flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.02] active:scale-[0.99] transition-all"
+            title="Click to view contracts expiring within 7 days in Renewals Hub"
+          >
             <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-amber-700 dark:text-amber-400">
               <span>⏳ Expiring Soon (7 Days)</span>
               <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/60 font-black">{expiringSoonCount} Accounts</span>
@@ -1025,12 +1409,16 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
               </div>
             </div>
             <span className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold">
-              Upcoming renewal pipeline
+              Upcoming renewal pipeline →
             </span>
           </div>
 
           {/* 4. Renewal Conversion Rate */}
-          <div className="p-3.5 bg-indigo-50/70 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-800/40 rounded-xl flex flex-col justify-between">
+          <div 
+            onClick={() => onSelectTab && onSelectTab('renewals', { renewalFilter: 'All' })}
+            className="p-3.5 bg-indigo-50/70 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-800/40 rounded-xl flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.02] active:scale-[0.99] transition-all"
+            title="Click to open full Renewals & Retention Hub"
+          >
             <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-indigo-700 dark:text-indigo-400">
               <span>📊 Retention Rate</span>
               <span className="px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/60 font-black">{renewalPercent}%</span>
@@ -1044,7 +1432,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
               </div>
             </div>
             <span className="text-[9px] text-indigo-600 dark:text-indigo-400 font-semibold">
-              Active plan retention rate
+              Active plan retention rate →
             </span>
           </div>
         </div>
@@ -1196,18 +1584,26 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
               Invoice Status
             </h4>
             <div className="space-y-5">
-              <div>
+              <div 
+                onClick={() => onSelectTab && onSelectTab('clients', { paymentFilter: 'full' })}
+                className="cursor-pointer p-2 -mx-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all group"
+                title="Click to view fully paid accounts in CRM"
+              >
                 <div className="flex justify-between text-xs font-bold mb-2">
-                  <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>Done ({topLevelMetrics.paymentReceivedCount})</span>
+                  <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1.5 group-hover:text-emerald-600 transition"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>Done ({topLevelMetrics.paymentReceivedCount})</span>
                   <span className="text-emerald-600">{Math.round((topLevelMetrics.paymentReceivedCount / (topLevelMetrics.paymentReceivedCount + topLevelMetrics.paymentPendingCount)) * 100)}%</span>
                 </div>
                 <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2">
                   <div className="bg-emerald-500 h-2 rounded-full" style={{width: `${(topLevelMetrics.paymentReceivedCount / (topLevelMetrics.paymentReceivedCount + topLevelMetrics.paymentPendingCount)) * 100}%`}}></div>
                 </div>
               </div>
-              <div>
+              <div 
+                onClick={() => onSelectTab && onSelectTab('pending-payments', { paymentTabFilter: 'All' })}
+                className="cursor-pointer p-2 -mx-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all group"
+                title="Click to view Pending Payment accounts"
+              >
                 <div className="flex justify-between text-xs font-bold mb-2">
-                  <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div>Pending ({topLevelMetrics.paymentPendingCount})</span>
+                  <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1.5 group-hover:text-orange-500 transition"><div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div>Pending ({topLevelMetrics.paymentPendingCount})</span>
                   <span className="text-orange-500">{Math.round((topLevelMetrics.paymentPendingCount / (topLevelMetrics.paymentReceivedCount + topLevelMetrics.paymentPendingCount)) * 100)}%</span>
                 </div>
                 <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2">
@@ -1233,7 +1629,11 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
             {/* Progress bars */}
             <div className="space-y-4 relative z-10">
               {/* Completed */}
-              <div>
+              <div 
+                onClick={() => onSelectTab && onSelectTab('deliverables', { deliverableStatusFilter: 'Complete Task' })}
+                className="cursor-pointer p-1.5 -mx-1.5 rounded-xl hover:bg-white/10 transition-all group"
+                title="Click to view Completed Tasks in Task Manager"
+              >
                 <div className="flex justify-between text-xs font-bold mb-1.5">
                   <span className="flex items-center gap-1.5 text-emerald-300"><CheckCircle className="w-3.5 h-3.5" /> Completed</span>
                   <span className="text-white font-black">{todayCompleted}</span>
@@ -1247,7 +1647,11 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
               </div>
 
               {/* Pending */}
-              <div>
+              <div 
+                onClick={() => onSelectTab && onSelectTab('deliverables', { deliverableStatusFilter: 'Working On It' })}
+                className="cursor-pointer p-1.5 -mx-1.5 rounded-xl hover:bg-white/10 transition-all group"
+                title="Click to view In-Progress Tasks in Task Manager"
+              >
                 <div className="flex justify-between text-xs font-bold mb-1.5">
                   <span className="flex items-center gap-1.5 text-orange-300"><Clock className="w-3.5 h-3.5" /> Pending</span>
                   <span className="text-white font-black">{todayPending}</span>
@@ -1261,7 +1665,11 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
               </div>
 
               {/* Total */}
-              <div className="flex items-center justify-between pt-3 border-t border-white/10">
+              <div 
+                onClick={() => onSelectTab && onSelectTab('deliverables', { deliverableStatusFilter: 'all' })}
+                className="flex items-center justify-between pt-3 border-t border-white/10 cursor-pointer p-1.5 -mx-1.5 rounded-xl hover:bg-white/10 transition-all group"
+                title="Click to view All Deliverables in Task Manager"
+              >
                 <span className="flex items-center gap-1.5 text-xs font-bold text-blue-200"><FileText className="w-3.5 h-3.5" /> Total Today</span>
                 <span className="text-2xl font-black text-white">{todayTotal}</span>
               </div>

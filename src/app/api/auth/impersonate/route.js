@@ -11,7 +11,7 @@ export async function POST(request) {
     const originalAdminIdStr = cookieStore.get('originalAdminId')?.value;
 
     const body = await request.json();
-    const { userId: targetUserId, revert } = body;
+    const { userId: targetUserId, revert, targetUrl } = body;
 
     // 1. REVERT BACK TO ORIGINAL ADMIN SESSION
     if (revert) {
@@ -93,11 +93,13 @@ export async function POST(request) {
     });
     cookieStore.delete('clientId');
 
-    const redirectUrl = targetUser.role === 'SALES' 
+    const defaultRedirect = targetUser.role === 'SALES' 
       ? '/dashboard/sales' 
       : targetUser.role === 'TL' 
         ? '/dashboard/tl' 
         : '/dashboard/employee';
+
+    const redirectUrl = targetUrl || defaultRedirect;
 
     return NextResponse.json({
       success: true,

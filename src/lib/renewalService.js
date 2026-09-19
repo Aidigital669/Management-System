@@ -326,14 +326,29 @@ export async function executeClientRenewal(clientDbId, requester = { name: 'Admi
     }
   }
 
-  // 4. Update client's joining date, reset extension days, and activate
+  // 4. Update client's joining date, reset extension days, mark renewal in notes, and activate
+  let updatedNotes = client.notes || '';
+  try {
+    if (updatedNotes.trim().startsWith('{')) {
+      const parsed = JSON.parse(updatedNotes);
+      parsed.isRenewed = true;
+      parsed.lastRenewedAt = new Date().toISOString();
+      updatedNotes = JSON.stringify(parsed);
+    } else {
+      updatedNotes = updatedNotes ? `${updatedNotes} [Plan Renewed]` : '[Plan Renewed]';
+    }
+  } catch (e) {
+    updatedNotes = `${updatedNotes} [Plan Renewed]`;
+  }
+
   await prisma.client.update({
     where: { id: client.id },
     data: { 
       joiningDate: newStartStr,
       active: true,
       extensionDays: 0,
-      extensionExpiryDate: null
+      extensionExpiryDate: null,
+      notes: updatedNotes
     }
   });
 
