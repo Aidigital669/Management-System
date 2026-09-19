@@ -67,7 +67,10 @@ export default function SalesDashboard() {
     nextAction: 'Follow-Up Scheduled',
     scheduleDate: '',
     interestedIn: [],
-    classification: 'Hot Lead'
+    classification: 'Hot Lead',
+    packageName: 'Meta Ads Management',
+    packagePrice: '',
+    expectedClosingDate: ''
   });
 
   useEffect(() => {
@@ -84,7 +87,12 @@ export default function SalesDashboard() {
           interestedIn: activeCall.notes && activeCall.notes.includes('[Campaign:')
             ? [getCampaign(activeCall)]
             : [],
-          classification: 'Hot Lead'
+          classification: activeCall.status === 'ANSWERED' ? 'Hot Lead' : (activeCall.status === 'INTERESTED' ? 'Hot Lead' : 'Follow up'),
+          packageName: activeCall.packageName || 'Meta Ads Management',
+          packagePrice: activeCall.expectedValue ? String(activeCall.expectedValue) : '',
+          expectedClosingDate: activeCall.expectedClosingDate
+            ? new Date(activeCall.expectedClosingDate).toISOString().slice(0, 10)
+            : ''
         });
       }
     }
@@ -476,16 +484,29 @@ export default function SalesDashboard() {
     }
 
     // Override to ANSWERED if conversation was successful
-    if (followUpData.currentUpdate === 'Conversation done' || followUpData.currentUpdate === 'Conversation done(via WhatsApp)') {
+    const isConverted = followUpData.currentUpdate === 'Conversation done' || followUpData.currentUpdate === 'Conversation done(via WhatsApp)';
+    if (isConverted) {
       dbStatus = 'ANSWERED';
     }
 
     const activeCall = callsList.find(c => c.id === callId);
     let noteText = `[Classification: ${followUpData.classification}] [Update: ${followUpData.currentUpdate}] ${followUpData.nextRemark}`;
+    if (isConverted && followUpData.packageName) {
+      noteText = `[Package: ${followUpData.packageName}] [Amount: ₹${followUpData.packagePrice || '0'}] [Expected Closing: ${followUpData.expectedClosingDate || 'N/A'}] ` + noteText;
+    }
     if (followUpData.interestedIn.length > 0) {
       noteText = `[Interested: ${followUpData.interestedIn.join(', ')}] ` + noteText;
     }
     const updatedNotes = activeCall.notes ? `${activeCall.notes}\n${noteText}` : noteText;
+
+    const dealPrice = followUpData.packagePrice !== '' && followUpData.packagePrice !== null && !isNaN(parseFloat(followUpData.packagePrice))
+      ? parseFloat(followUpData.packagePrice)
+      : (activeCall.expectedValue || null);
+
+    const chosenPackage = isConverted ? followUpData.packageName : (followUpData.packageName || activeCall.packageName || null);
+    const closingDate = followUpData.expectedClosingDate 
+      ? new Date(followUpData.expectedClosingDate).toISOString() 
+      : (activeCall.expectedClosingDate ? new Date(activeCall.expectedClosingDate).toISOString() : null);
 
     try {
       const res = await fetch(`/api/calls/${callId}`, {
@@ -495,7 +516,9 @@ export default function SalesDashboard() {
           status: dbStatus,
           notes: updatedNotes,
           followUpDate: followUpData.scheduleDate ? new Date(followUpData.scheduleDate).toISOString() : null,
-          expectedValue: activeCall.expectedValue,
+          expectedValue: dealPrice,
+          packageName: chosenPackage,
+          expectedClosingDate: closingDate,
           leadSource: followUpData.interestedIn.join(', ')
         })
       });
@@ -837,6 +860,79 @@ export default function SalesDashboard() {
             </select>
           </div>
 
+          {/* DYNAMIC PACKAGE & SALES PROJECTION FIELDS (Triggered on Conversation Done or Hot Lead) */}
+          <div className={`p-3.5 rounded-xl border transition-all ${
+            followUpData.currentUpdate === 'Conversation done' || followUpData.currentUpdate === 'Conversation done(via WhatsApp)'
+              ? 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800 shadow-sm'
+              : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800'
+          }`}>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
+                <span>📦</span>
+                {followUpData.currentUpdate === 'Conversation done' || followUpData.currentUpdate === 'Conversation done(via WhatsApp)'
+                  ? 'Converted Deal & Sales Projection Details *'
+                  : 'Target Package & Closing Projection (Optional)'}
+              </span>
+              {(followUpData.currentUpdate === 'Conversation done' || followUpData.currentUpdate === 'Conversation done(via WhatsApp)') && (
+                <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-600 text-white shadow-xs">
+                  Required for Projection
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                  Service Package*
+                </label>
+                <select
+                  value={followUpData.packageName}
+                  onChange={(e) => setFollowUpData({ ...followUpData, packageName: e.target.value })}
+                  className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-emerald-500 transition cursor-pointer"
+                >
+                  <option value="Meta Ads Management">Meta Ads Management</option>
+                  <option value="Google Ads Management">Google Ads Management</option>
+                  <option value="Website Design & Development">Website Design & Development</option>
+                  <option value="Combo Package (Multiple Services)">Combo Package (Multiple Services)</option>
+                  <option value="Custom / Other Service">Custom / Other Service</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                  Agreed Package Price (₹)*
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">₹</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="e.g. 15000"
+                    value={followUpData.packagePrice}
+                    onChange={(e) => setFollowUpData({ ...followUpData, packagePrice: e.target.value })}
+                    className="w-full pl-7 pr-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-xl text-xs font-bold focus:outline-none focus:border-emerald-500 transition"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                Expected Closing / Payment Date*
+              </label>
+              <input
+                type="date"
+                value={followUpData.expectedClosingDate}
+                onChange={(e) => setFollowUpData({ ...followUpData, expectedClosingDate: e.target.value })}
+                className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-emerald-500 transition cursor-pointer"
+              />
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-normal">
+                📅 When client is expected to pay or onboarding starts. Directly feeds monthly sales projection metrics.
+              </p>
+            </div>
+          </div>
+
           <div className="flex gap-3 mt-4 pt-4 border-t border-slate-200 dark:border-slate-800">
             <button
               type="button"
@@ -867,9 +963,31 @@ export default function SalesDashboard() {
         <p className="text-sm font-semibold text-slate-500 mb-1.5 flex items-center gap-1 flex-wrap justify-center">
           Last assigned was <span className="text-red-500 bg-red-50 dark:bg-red-950/30 px-1.5 py-0.5 rounded text-xs font-bold">2 days</span> ago, Total call duration <span className="text-red-500 bg-red-50 dark:bg-red-950/30 px-1.5 py-0.5 rounded text-xs font-bold">0 minutes</span>
         </p>
-        <p className="text-xs font-bold text-slate-400 flex items-center gap-1 mb-5">
+        <p className="text-xs font-bold text-slate-400 flex items-center gap-1 mb-4">
           <Clock className="w-3 h-3" /> Scheduled Follow-up: {activeCall.followUpDate ? new Date(activeCall.followUpDate).toLocaleString() : new Date(activeCall.callDate).toLocaleDateString()}
         </p>
+
+        {/* Highlight converted deal info if present */}
+        {(activeCall.packageName || activeCall.expectedValue > 0 || activeCall.expectedClosingDate) && (
+          <div className="w-full bg-emerald-50/80 dark:bg-emerald-950/40 p-3.5 rounded-2xl border border-emerald-200 dark:border-emerald-800/60 mb-4 text-left shadow-xs">
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <span className="text-[11px] font-extrabold text-emerald-800 dark:text-emerald-300 uppercase tracking-wide flex items-center gap-1">
+                <span>📦</span> {activeCall.packageName || 'Confirmed Deal'}
+              </span>
+              {activeCall.expectedValue > 0 && (
+                <span className="text-sm font-black text-emerald-700 dark:text-emerald-400">
+                  ₹{Number(activeCall.expectedValue).toLocaleString()}
+                </span>
+              )}
+            </div>
+            {activeCall.expectedClosingDate && (
+              <div className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                <span>🎯 Expected Closing / Payment:</span>
+                <span className="font-bold underline">{new Date(activeCall.expectedClosingDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex flex-wrap justify-center gap-2 mb-6">
           <button
@@ -1404,6 +1522,15 @@ export default function SalesDashboard() {
                                 <span className={`text-[9px] px-2 py-0.5 rounded font-bold capitalize ${isSelected ? 'bg-slate-900 text-white' : 'bg-slate-800 text-white'}`}>
                                   {campaign.replace(' Campaign', '')}
                                 </span>
+                                {call.expectedValue > 0 && (
+                                  <span className={`text-[9px] px-2 py-0.5 rounded font-black whitespace-nowrap ${
+                                    isSelected 
+                                      ? 'bg-emerald-400 text-slate-950' 
+                                      : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                                  }`}>
+                                    ₹{Number(call.expectedValue).toLocaleString()}{call.packageName ? ` • ${call.packageName.replace(' Management', '').replace(' & Development', '')}` : ''}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>

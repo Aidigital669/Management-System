@@ -71,7 +71,10 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
     scheduleDate: '',
     interestedIn: [],
     classification: 'Hot Lead',
-    reassignedSellerId: ''
+    reassignedSellerId: '',
+    packageName: 'Meta Ads Management',
+    packagePrice: '',
+    expectedClosingDate: ''
   });
 
   // Modal States
@@ -93,7 +96,9 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
     expectedValue: '',
     leadSource: 'Facebook Campaign',
     followUpDate: '',
-    notes: ''
+    notes: '',
+    packageName: 'Meta Ads Management',
+    expectedClosingDate: ''
   });
 
   // New Seller Form State
@@ -165,8 +170,13 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
           interestedIn: activeCall.notes && activeCall.notes.includes('[Campaign:')
             ? [getCampaign(activeCall)]
             : [],
-          classification: 'Hot Lead',
-          reassignedSellerId: activeCall.salesPersonId ? String(activeCall.salesPersonId) : ''
+          classification: activeCall.status === 'ANSWERED' ? 'Hot Lead' : (activeCall.status === 'INTERESTED' ? 'Hot Lead' : 'Follow up'),
+          reassignedSellerId: activeCall.salesPersonId ? String(activeCall.salesPersonId) : '',
+          packageName: activeCall.packageName || 'Meta Ads Management',
+          packagePrice: activeCall.expectedValue ? String(activeCall.expectedValue) : '',
+          expectedClosingDate: activeCall.expectedClosingDate
+            ? new Date(activeCall.expectedClosingDate).toISOString().slice(0, 10)
+            : ''
         });
       }
     }
@@ -491,16 +501,29 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
       dbStatus = 'PENDING';
     }
 
-    if (followUpData.currentUpdate === 'Conversation done' || followUpData.currentUpdate === 'Conversation done(via WhatsApp)') {
+    const isConverted = followUpData.currentUpdate === 'Conversation done' || followUpData.currentUpdate === 'Conversation done(via WhatsApp)';
+    if (isConverted) {
       dbStatus = 'ANSWERED';
     }
 
     const activeCall = callsList.find(c => c.id === callId);
     let noteText = `[Classification: ${followUpData.classification}] [Update: ${followUpData.currentUpdate}] ${followUpData.nextRemark}`;
+    if (isConverted && followUpData.packageName) {
+      noteText = `[Package: ${followUpData.packageName}] [Amount: ₹${followUpData.packagePrice || '0'}] [Expected Closing: ${followUpData.expectedClosingDate || 'N/A'}] ` + noteText;
+    }
     if (followUpData.interestedIn.length > 0) {
       noteText = `[Interested: ${followUpData.interestedIn.join(', ')}] ` + noteText;
     }
     const updatedNotes = activeCall?.notes ? `${activeCall.notes}\n${noteText}` : noteText;
+
+    const dealPrice = followUpData.packagePrice !== '' && followUpData.packagePrice !== null && !isNaN(parseFloat(followUpData.packagePrice))
+      ? parseFloat(followUpData.packagePrice)
+      : (activeCall?.expectedValue || null);
+
+    const chosenPackage = isConverted ? followUpData.packageName : (followUpData.packageName || activeCall?.packageName || null);
+    const closingDate = followUpData.expectedClosingDate 
+      ? new Date(followUpData.expectedClosingDate).toISOString() 
+      : (activeCall?.expectedClosingDate ? new Date(activeCall.expectedClosingDate).toISOString() : null);
 
     try {
       const res = await fetch(`/api/calls/${callId}`, {
@@ -510,7 +533,9 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
           status: dbStatus,
           notes: updatedNotes,
           followUpDate: followUpData.scheduleDate ? new Date(followUpData.scheduleDate).toISOString() : null,
-          expectedValue: activeCall?.expectedValue,
+          expectedValue: dealPrice,
+          packageName: chosenPackage,
+          expectedClosingDate: closingDate,
           leadSource: followUpData.interestedIn.join(', ') || activeCall?.leadSource,
           salesPersonId: followUpData.reassignedSellerId ? parseInt(followUpData.reassignedSellerId, 10) : activeCall?.salesPersonId
         })
@@ -594,7 +619,9 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
           expectedValue: leadForm.expectedValue ? parseFloat(leadForm.expectedValue) : null,
           leadSource: leadForm.leadSource,
           followUpDate: leadForm.followUpDate ? new Date(leadForm.followUpDate).toISOString() : null,
-          notes: leadForm.notes
+          notes: leadForm.notes,
+          packageName: leadForm.packageName || null,
+          expectedClosingDate: leadForm.expectedClosingDate ? new Date(leadForm.expectedClosingDate).toISOString() : null
         })
       });
 
@@ -609,7 +636,9 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
           expectedValue: '',
           leadSource: 'Facebook Campaign',
           followUpDate: '',
-          notes: ''
+          notes: '',
+          packageName: 'Meta Ads Management',
+          expectedClosingDate: ''
         });
         await fetchSellerData();
       } else {
@@ -1334,6 +1363,79 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
                     </div>
                   </div>
 
+                  {/* DYNAMIC PACKAGE & SALES PROJECTION FIELDS (Triggered on Conversation Done or Hot Lead) */}
+                  <div className={`p-3.5 rounded-xl border transition-all ${
+                    followUpData.currentUpdate === 'Conversation done' || followUpData.currentUpdate === 'Conversation done(via WhatsApp)'
+                      ? 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800 shadow-sm'
+                      : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800'
+                  }`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
+                        <span>📦</span>
+                        {followUpData.currentUpdate === 'Conversation done' || followUpData.currentUpdate === 'Conversation done(via WhatsApp)'
+                          ? 'Converted Deal & Sales Projection Details *'
+                          : 'Target Package & Closing Projection (Optional)'}
+                      </span>
+                      {(followUpData.currentUpdate === 'Conversation done' || followUpData.currentUpdate === 'Conversation done(via WhatsApp)') && (
+                        <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-600 text-white shadow-xs">
+                          Required for Projection
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                          Service Package*
+                        </label>
+                        <select
+                          value={followUpData.packageName}
+                          onChange={(e) => setFollowUpData({ ...followUpData, packageName: e.target.value })}
+                          className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-emerald-500 transition cursor-pointer"
+                        >
+                          <option value="Meta Ads Management">Meta Ads Management</option>
+                          <option value="Google Ads Management">Google Ads Management</option>
+                          <option value="Website Design & Development">Website Design & Development</option>
+                          <option value="Combo Package (Multiple Services)">Combo Package (Multiple Services)</option>
+                          <option value="Custom / Other Service">Custom / Other Service</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                          Agreed Package Price (₹)*
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">₹</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            placeholder="e.g. 15000"
+                            value={followUpData.packagePrice}
+                            onChange={(e) => setFollowUpData({ ...followUpData, packagePrice: e.target.value })}
+                            className="w-full pl-7 pr-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-xl text-xs font-bold focus:outline-none focus:border-emerald-500 transition"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                        Expected Closing / Payment Date*
+                      </label>
+                      <input
+                        type="date"
+                        value={followUpData.expectedClosingDate}
+                        onChange={(e) => setFollowUpData({ ...followUpData, expectedClosingDate: e.target.value })}
+                        className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-emerald-500 transition cursor-pointer"
+                      />
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-normal">
+                        📅 When client is expected to pay or onboarding starts. Directly feeds monthly sales projection metrics.
+                      </p>
+                    </div>
+                  </div>
+
                   <div className="flex gap-3 mt-4 pt-4 border-t border-slate-200 dark:border-slate-800">
                     <button
                       type="button"
@@ -1392,6 +1494,28 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
                       ))}
                     </select>
                   </div>
+
+                  {/* Highlight converted deal info if present */}
+                  {(activeLead.packageName || (activeLead.expectedValue && activeLead.expectedValue > 0) || activeLead.expectedClosingDate) && (
+                    <div className="w-full bg-emerald-50/80 dark:bg-emerald-950/40 p-3.5 rounded-2xl border border-emerald-200 dark:border-emerald-800/60 mb-4 text-left shadow-xs">
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <span className="text-[11px] font-extrabold text-emerald-800 dark:text-emerald-300 uppercase tracking-wide flex items-center gap-1">
+                          <span>📦</span> {activeLead.packageName || 'Confirmed Deal'}
+                        </span>
+                        {activeLead.expectedValue > 0 && (
+                          <span className="text-sm font-black text-emerald-700 dark:text-emerald-400">
+                            ₹{Number(activeLead.expectedValue).toLocaleString('en-IN')}
+                          </span>
+                        )}
+                      </div>
+                      {activeLead.expectedClosingDate && (
+                        <div className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                          <span>🎯 Expected Closing / Payment:</span>
+                          <span className="font-bold underline">{new Date(activeLead.expectedClosingDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <p className="text-sm font-semibold text-slate-500 mb-1.5 flex items-center gap-1 flex-wrap justify-center">
                     Call duration <span className="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded text-xs font-bold">Active Lead</span>
@@ -1682,9 +1806,24 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
                           </span>
                         </td>
 
-                        {/* Deal Value */}
+                        {/* Deal Value & Package */}
                         <td className="py-2 px-4 font-bold text-xs text-slate-900 dark:text-white whitespace-nowrap">
-                          {call.expectedValue ? `₹${call.expectedValue.toLocaleString('en-IN')}` : '—'}
+                          {call.expectedValue ? (
+                            <div>
+                              <span>₹{call.expectedValue.toLocaleString('en-IN')}</span>
+                              {call.packageName && (
+                                <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                                  {call.packageName.replace(' Management', '').replace(' & Development', '')}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            call.packageName ? (
+                              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                                {call.packageName.replace(' Management', '').replace(' & Development', '')}
+                              </span>
+                            ) : '—'
+                          )}
                         </td>
 
                         {/* Lead Source */}
@@ -1694,22 +1833,27 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
                           </span>
                         </td>
 
-                        {/* Follow-up Date */}
+                        {/* Follow-up & Expected Closing Date */}
                         <td className="py-2 px-4 whitespace-nowrap">
-                          {call.followUpDate ? (
-                            <div className="flex flex-col gap-0.5">
+                          <div className="flex flex-col gap-0.5">
+                            {call.followUpDate ? (
                               <div className={`font-bold flex items-center gap-1 ${
                                 isFollowUpDue ? 'text-purple-600 dark:text-purple-400' : isOverdue ? 'text-red-500' : 'text-slate-600 dark:text-slate-300'
                               }`}>
                                 <Calendar className="w-3 h-3 shrink-0" />
                                 <span className="text-[11px]">{new Date(call.followUpDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                               </div>
-                              {isFollowUpDue && <span className="text-[9px] font-black uppercase text-purple-600 bg-purple-50 dark:bg-purple-950 px-1.5 py-0.2 rounded w-max">Due Today</span>}
-                              {isOverdue && <span className="text-[9px] font-black uppercase text-red-600 bg-red-50 dark:bg-red-950 px-1.5 py-0.2 rounded w-max">Overdue</span>}
-                            </div>
-                          ) : (
-                            <span className="text-slate-400 font-medium text-[11px]">None</span>
-                          )}
+                            ) : (
+                              <span className="text-slate-400 font-medium text-[11px]">No follow-up</span>
+                            )}
+                            {isFollowUpDue && <span className="text-[9px] font-black uppercase text-purple-600 bg-purple-50 dark:bg-purple-950 px-1.5 py-0.2 rounded w-max">Due Today</span>}
+                            {isOverdue && <span className="text-[9px] font-black uppercase text-red-600 bg-red-50 dark:bg-red-950 px-1.5 py-0.2 rounded w-max">Overdue</span>}
+                            {call.expectedClosingDate && (
+                              <span className="text-[9px] font-black uppercase text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.2 rounded w-max border border-emerald-200 dark:border-emerald-800">
+                                🎯 Close: {new Date(call.expectedClosingDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         {/* Notes */}
@@ -1860,6 +2004,33 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
                     type="datetime-local"
                     value={leadForm.followUpDate}
                     onChange={(e) => setLeadForm({ ...leadForm, followUpDate: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:outline-none focus:border-blue-500 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Target / Sold Package</label>
+                  <select
+                    value={leadForm.packageName}
+                    onChange={(e) => setLeadForm({ ...leadForm, packageName: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="Meta Ads Management">Meta Ads Management</option>
+                    <option value="Google Ads Management">Google Ads Management</option>
+                    <option value="Website Design & Development">Website Design & Development</option>
+                    <option value="Combo Package (Multiple Services)">Combo Package (Multiple Services)</option>
+                    <option value="Custom / Other Service">Custom / Other Service</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Expected Closing / Payment Date</label>
+                  <input
+                    type="date"
+                    value={leadForm.expectedClosingDate}
+                    onChange={(e) => setLeadForm({ ...leadForm, expectedClosingDate: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:outline-none focus:border-blue-500 dark:text-white"
                   />
                 </div>
@@ -2292,9 +2463,27 @@ function KanbanCard({ call, onWhatsApp, onEdit, onStatusChange }) {
         {call.phoneNumber}
       </div>
 
-      {call.expectedValue && (
-        <div className="text-xs font-black text-emerald-600">
-          ₹{call.expectedValue.toLocaleString('en-IN')}
+      {call.expectedValue ? (
+        <div className="flex items-center justify-between text-xs font-black text-emerald-600">
+          <span>₹{call.expectedValue.toLocaleString('en-IN')}</span>
+          {call.packageName && (
+            <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+              {call.packageName.replace(' Management', '').replace(' & Development', '')}
+            </span>
+          )}
+        </div>
+      ) : (
+        call.packageName && (
+          <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+            {call.packageName}
+          </div>
+        )
+      )}
+
+      {call.expectedClosingDate && (
+        <div className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded flex items-center justify-between border border-emerald-100 dark:border-emerald-900/40">
+          <span>🎯 Expected Close:</span>
+          <span>{new Date(call.expectedClosingDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</span>
         </div>
       )}
 

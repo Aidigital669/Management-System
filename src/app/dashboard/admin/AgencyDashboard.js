@@ -439,21 +439,53 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
     ? Math.round((achievedRenewalCount / totalRenewalCount) * 100) 
     : 0;
 
-  // 2. Projection Sale: Per lead = ₹3,500
-  // Total Hot Pool = Done + Hot leads = 78 + 391 = 469 Total Qualified Leads
-  // Expected Sale Projection = Total Hot Pool * 3500 = 469 * 3500 = 16,41,500
-  // Achieved Sale Projection = Done * 3500 = 78 * 3500 = 2,73,000
-  // Closing Ratio = Done / (Hot leads + Done) = 78 / 469 (17%)
+  // 2. Projection Sale: Derived from actual converted entries filled by sales executives
+  // Converted leads: ANSWERED, CONVERTED, WON
+  // Hot leads: INTERESTED, CALLBACK
   const convertedLeads = internalCalls.filter(c => c.status === 'ANSWERED' || c.status === 'CONVERTED' || c.status === 'WON');
   const hotLeads = internalCalls.filter(c => c.status === 'INTERESTED' || c.status === 'CALLBACK');
   const convertedLeadsCount = convertedLeads.length;
   const hotLeadsCount = hotLeads.length;
-  const totalHotPoolCount = convertedLeadsCount + hotLeadsCount; // 78 + 391 = 469
-  const expectedSaleProjection = totalHotPoolCount * 3500; // 469 * 3500 = 16,41,500
-  const achievedSaleProjection = convertedLeadsCount * 3500; // 78 * 3500 = 2,73,000
-  const saleRealizedPercent = totalHotPoolCount > 0 
-    ? Math.round((convertedLeadsCount / totalHotPoolCount) * 100) 
-    : 0;
+  const totalHotPoolCount = convertedLeadsCount + hotLeadsCount;
+
+  // Achieved Sale Projection: Sum of actual package amounts entered by sales executives (fallback ₹3,500 if not filled yet)
+  const achievedSaleProjection = convertedLeads.reduce((sum, c) => {
+    const val = typeof c.expectedValue === 'number' && c.expectedValue > 0
+      ? c.expectedValue
+      : (parseFloat(c.expectedValue) > 0 ? parseFloat(c.expectedValue) : 3500);
+    return sum + val;
+  }, 0);
+
+  // Hot Leads Pipeline: Sum of expected package value or ₹3,500 benchmark
+  const hotLeadsPipeline = hotLeads.reduce((sum, c) => {
+    const val = typeof c.expectedValue === 'number' && c.expectedValue > 0
+      ? c.expectedValue
+      : (parseFloat(c.expectedValue) > 0 ? parseFloat(c.expectedValue) : 3500);
+    return sum + val;
+  }, 0);
+
+  const expectedSaleProjection = achievedSaleProjection + hotLeadsPipeline;
+
+  const saleRealizedPercent = expectedSaleProjection > 0 
+    ? Math.round((achievedSaleProjection / expectedSaleProjection) * 100) 
+    : (totalHotPoolCount > 0 ? Math.round((convertedLeadsCount / totalHotPoolCount) * 100) : 0);
+
+  // Real Converted Entries with explicit package data
+  const convertedWithPackage = convertedLeads.filter(c => c.packageName || (c.expectedValue && c.expectedValue > 0));
+
+  // Current Month Expected Closings
+  const currentMonthKey = new Date().toISOString().slice(0, 7); // e.g. '2026-09'
+  const convertedClosingThisMonth = convertedLeads.filter(c => {
+    if (!c.expectedClosingDate) return true;
+    const dt = new Date(c.expectedClosingDate);
+    return !isNaN(dt.getTime()) && dt.toISOString().slice(0, 7) === currentMonthKey;
+  });
+  const thisMonthConvertedRevenue = convertedClosingThisMonth.reduce((sum, c) => {
+    const val = typeof c.expectedValue === 'number' && c.expectedValue > 0
+      ? c.expectedValue
+      : (parseFloat(c.expectedValue) > 0 ? parseFloat(c.expectedValue) : 3500);
+    return sum + val;
+  }, 0);
 
   // Active Ongoing Contracts in the period
   const totalActiveOngoingCount = newPurchasesCount + renewalsCount + retainersCount;
@@ -679,11 +711,18 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
             </div>
             <div className="flex flex-wrap items-baseline gap-1 sm:gap-2">
               <h3 className="text-xl sm:text-2xl font-extrabold text-cyan-600 dark:text-cyan-400">₹{achievedSaleProjection.toLocaleString()}</h3>
-              <span className="text-xs text-cyan-400 font-semibold whitespace-nowrap" title={`Total Hot Target: (${convertedLeadsCount} Done + ${hotLeadsCount} Hot = ${totalHotPoolCount} Leads) × ₹3,500`}>/ ₹{expectedSaleProjection.toLocaleString()}</span>
+              <span className="text-xs text-cyan-400 font-semibold whitespace-nowrap" title={`Pipeline Potential: Converted (₹${achievedSaleProjection.toLocaleString()}) + Hot Leads (₹${hotLeadsPipeline.toLocaleString()})`}>/ ₹{expectedSaleProjection.toLocaleString()}</span>
             </div>
-            <span className="text-[9px] text-cyan-700 dark:text-cyan-300 font-bold bg-cyan-50 dark:bg-cyan-950/40 px-2 py-0.5 rounded-full border border-cyan-100 dark:border-cyan-800/40 block w-fit truncate max-w-full">
-              {convertedLeadsCount} / {totalHotPoolCount} Done ({saleRealizedPercent}%) • {hotLeadsCount} Hot
-            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[9px] text-cyan-700 dark:text-cyan-300 font-bold bg-cyan-50 dark:bg-cyan-950/40 px-2 py-0.5 rounded-full border border-cyan-100 dark:border-cyan-800/40 block w-fit truncate max-w-full">
+                {convertedLeadsCount} / {totalHotPoolCount} Done ({saleRealizedPercent}%) • {hotLeadsCount} Hot
+              </span>
+              {convertedWithPackage.length > 0 && (
+                <span className="text-[9px] text-emerald-700 dark:text-emerald-300 font-black bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/40 whitespace-nowrap">
+                  {convertedWithPackage.length} Packages
+                </span>
+              )}
+            </div>
           </div>
           <div className="w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-950/50 text-cyan-600 dark:text-cyan-400 flex items-center justify-center relative z-10 shadow-inner border border-cyan-100 dark:border-cyan-900 shrink-0">
             <TrendingUp className="w-5 h-5" />
@@ -1075,7 +1114,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
             >
               <span className="text-[10px] text-cyan-700 dark:text-cyan-400 font-bold block truncate">Achieved Sale</span>
               <span className="text-[11px] sm:text-xs font-extrabold text-cyan-800 dark:text-cyan-300 block truncate">₹{achievedSaleProjection.toLocaleString()}</span>
-              <span className="text-[8px] text-cyan-600/70 dark:text-cyan-400/70 block truncate">Proj: ₹{expectedSaleProjection.toLocaleString()}</span>
+              <span className="text-[8px] text-cyan-600/70 dark:text-cyan-400/70 block truncate">{convertedWithPackage.length > 0 ? `${convertedWithPackage.length} Pkg • ` : ''}Proj: ₹{expectedSaleProjection.toLocaleString()}</span>
             </div>
             <div 
               onClick={() => onSelectTab && onSelectTab('pending-payments', { paymentTabFilter: 'All' })}

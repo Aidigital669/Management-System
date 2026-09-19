@@ -5,7 +5,7 @@ export async function PUT(req, { params }) {
   try {
     const { id } = await params;
     const body = await req.json();
-    const { status, notes, followUpDate, expectedValue, leadSource, salesPersonId, clientName, phoneNumber } = body;
+    const { status, notes, followUpDate, expectedValue, leadSource, salesPersonId, clientName, phoneNumber, packageName, expectedClosingDate } = body;
 
     const updateData = {};
     if (status !== undefined) updateData.status = status;
@@ -16,6 +16,8 @@ export async function PUT(req, { params }) {
     if (salesPersonId !== undefined) updateData.salesPersonId = parseInt(salesPersonId, 10);
     if (clientName !== undefined) updateData.clientName = clientName;
     if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber;
+    if (packageName !== undefined) updateData.packageName = packageName;
+    if (expectedClosingDate !== undefined) updateData.expectedClosingDate = expectedClosingDate ? new Date(expectedClosingDate) : null;
 
     const updatedCall = await prisma.callRecord.update({
       where: { id: parseInt(id, 10) },

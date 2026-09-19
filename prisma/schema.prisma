@@ -174,17 +174,19 @@ model ClientFeedback {
 }
 
 model CallRecord {
-  id             Int      @id @default(autoincrement())
-  clientName     String
-  phoneNumber    String
-  status         String   @default("PENDING")
-  notes          String?
-  callDate       DateTime @default(now())
-  followUpDate   DateTime?
-  expectedValue  Float?
-  leadSource     String?
-  salesPersonId  Int
-  salesPerson    User     @relation(fields: [salesPersonId], references: [id], onDelete: Cascade)
+  id                  Int      @id @default(autoincrement())
+  clientName          String
+  phoneNumber         String
+  status              String   @default("PENDING")
+  notes               String?
+  callDate            DateTime @default(now())
+  followUpDate        DateTime?
+  expectedValue       Float?
+  leadSource          String?
+  salesPersonId       Int
+  packageName         String?  // Service package sold: "Meta Ads", "Google Ads", "Website Design", "Combo Package"
+  expectedClosingDate DateTime? // When client is expected to pay / onboard after conversion
+  salesPerson         User     @relation(fields: [salesPersonId], references: [id], onDelete: Cascade)
 }
 
 model RenewalRequest {

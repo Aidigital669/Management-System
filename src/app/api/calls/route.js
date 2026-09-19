@@ -99,7 +99,7 @@ export async function POST(req) {
     }
 
     const body = await req.json();
-    let { clientName, phoneNumber, salesPersonId, notes, status, followUpDate, expectedValue, leadSource } = body;
+    let { clientName, phoneNumber, salesPersonId, notes, status, followUpDate, expectedValue, leadSource, packageName, expectedClosingDate } = body;
 
     // Fallback for name / phone variations
     clientName = clientName || body.name || 'Website Lead';
@@ -142,7 +142,9 @@ export async function POST(req) {
         status: status || 'PENDING',
         followUpDate: followUpDate ? new Date(followUpDate) : null,
         expectedValue: expectedValue ? parseFloat(expectedValue) : null,
-        leadSource: leadSource || 'Website'
+        leadSource: leadSource || 'Website',
+        packageName: packageName || null,
+        expectedClosingDate: expectedClosingDate ? new Date(expectedClosingDate) : null
       }
     });
 
