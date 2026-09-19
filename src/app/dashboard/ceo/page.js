@@ -1108,7 +1108,7 @@ export default function CeoDashboard() {
           {activeTab === 'overview' && (
             <div className="space-y-8 animate-fade-in">
               {/* Metric grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-5">
 
                 {/* Active Clients Card */}
                 <div 
@@ -1122,17 +1122,17 @@ export default function CeoDashboard() {
                     setClientPaymentFilter('all');
                     setClientRevenueStreamFilter('all');
                   }}
-                  className="relative bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] hover:shadow-md hover:border-blue-300 transition duration-200 group cursor-pointer"
+                  className="relative bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] hover:shadow-md hover:border-blue-300 transition duration-200 group cursor-pointer"
                   title="Click to view Active Clients in Client CRM (Strictly active plan packs)"
                 >
                   <div className="absolute -right-6 -top-6 w-24 h-24 bg-blue-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
-                  <div className="space-y-1 relative z-10 min-w-0 pr-2">
+                  <div className="space-y-1 relative z-10 min-w-0 flex-1 pr-2">
                     <div className="text-[10px] text-slate-400 dark:text-slate-500 font-extrabold uppercase tracking-wider truncate">Active Clients</div>
                     <div className="flex items-baseline gap-1.5 flex-wrap">
-                      <h3 className="text-2xl font-black text-slate-900 dark:text-white truncate">{metrics.activeClients}</h3>
+                      <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white truncate">{metrics.activeClients}</h3>
                       <span className="text-xs font-bold text-slate-500 whitespace-nowrap">/ {metrics.totalClients} Total</span>
                     </div>
-                    <span className="text-[9px] text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-full border border-blue-100 dark:border-blue-900 block w-fit">
+                    <span className="text-[9px] text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-full border border-blue-100 dark:border-blue-900 block w-fit truncate max-w-full">
                       Live Accounts
                     </span>
                   </div>
@@ -1150,14 +1150,14 @@ export default function CeoDashboard() {
                     setClientLifecycleFilter('all');
                     setClientRevenueStreamFilter('all');
                   }}
-                  className="relative bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] hover:shadow-md hover:border-emerald-300 transition duration-200 group cursor-pointer"
+                  className="relative bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] hover:shadow-md hover:border-emerald-300 transition duration-200 group cursor-pointer"
                   title="Click to view Paid Revenue accounts in Client CRM (Calendar Month 1-30)"
                 >
                   <div className="absolute -right-6 -top-6 w-24 h-24 bg-emerald-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
-                  <div className="space-y-1 relative z-10 min-w-0 pr-2 flex-grow">
+                  <div className="space-y-1 relative z-10 min-w-0 flex-1 pr-2">
                     <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-extrabold uppercase tracking-wider truncate">Actual Revenue</div>
-                    <h3 className="text-2xl font-black text-emerald-600 dark:text-emerald-400 truncate">₹{(metrics.actualRevenue || 0).toLocaleString()}</h3>
-                    <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-900 block w-fit">
+                    <h3 className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 truncate">₹{(metrics.actualRevenue || 0).toLocaleString()}</h3>
+                    <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-900 block w-fit truncate max-w-full">
                       {metrics.expectedRevenue > 0 ? Math.round(((metrics.actualRevenue || 0) / metrics.expectedRevenue) * 100) : 0}% Realized
                     </span>
                   </div>
@@ -1178,15 +1178,15 @@ export default function CeoDashboard() {
                     setClientLifecycleFilter('all');
                     setClientRevenueStreamFilter('all');
                   }}
-                  className="relative bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] hover:shadow-md hover:border-indigo-300 transition duration-200 group cursor-pointer"
+                  className="relative bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] hover:shadow-md hover:border-indigo-300 transition duration-200 group cursor-pointer"
                   title="Click to view all 58 target billing accounts in Client CRM"
                 >
                   <div className="absolute -right-6 -top-6 w-24 h-24 bg-indigo-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
-                  <div className="space-y-1 relative z-10 min-w-0 pr-2 flex-grow">
+                  <div className="space-y-1 relative z-10 min-w-0 flex-1 pr-2">
                     <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-extrabold uppercase tracking-wider truncate">Expected Revenue</div>
-                    <h3 className="text-2xl font-black text-indigo-600 dark:text-indigo-400 truncate">₹{(metrics.expectedRevenue || 0).toLocaleString()}</h3>
-                    <span className="text-[9px] text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-full border border-indigo-100 dark:border-indigo-900 block w-fit">
-                      All {metrics.totalClients || clientsList.length} CRM Clients Target
+                    <h3 className="text-xl sm:text-2xl font-black text-indigo-600 dark:text-indigo-400 truncate">₹{(metrics.expectedRevenue || 0).toLocaleString()}</h3>
+                    <span className="text-[9px] text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-full border border-indigo-100 dark:border-indigo-900 block w-fit truncate max-w-full">
+                      All {metrics.totalClients || clientsList.length} Clients Target
                     </span>
                   </div>
                   <div className="shrink-0 relative z-10 w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-100 dark:border-indigo-900">
@@ -1200,14 +1200,14 @@ export default function CeoDashboard() {
                     setActiveTab('clients');
                     setClientPaymentFilter('Pending');
                   }}
-                  className="relative bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] hover:shadow-md hover:border-orange-300 transition duration-200 group cursor-pointer"
+                  className="relative bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] hover:shadow-md hover:border-orange-300 transition duration-200 group cursor-pointer"
                   title="Click to view Pending Balance accounts in Client CRM"
                 >
                   <div className="absolute -right-6 -top-6 w-24 h-24 bg-orange-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
-                  <div className="space-y-1 relative z-10 min-w-0 pr-2 flex-grow">
+                  <div className="space-y-1 relative z-10 min-w-0 flex-1 pr-2">
                     <div className="text-[10px] text-orange-600 dark:text-orange-400 font-extrabold uppercase tracking-wider truncate">Pending Revenue</div>
-                    <h3 className="text-2xl font-black text-orange-500 truncate">₹{(metrics.pendingRevenue || 0).toLocaleString()}</h3>
-                    <span className="text-[9px] text-orange-600 dark:text-orange-400 font-bold bg-orange-50 dark:bg-orange-950/40 px-2 py-0.5 rounded-full border border-orange-100 dark:border-orange-900 block w-fit">
+                    <h3 className="text-xl sm:text-2xl font-black text-orange-500 truncate">₹{(metrics.pendingRevenue || 0).toLocaleString()}</h3>
+                    <span className="text-[9px] text-orange-600 dark:text-orange-400 font-bold bg-orange-50 dark:bg-orange-950/40 px-2 py-0.5 rounded-full border border-orange-100 dark:border-orange-900 block w-fit truncate max-w-full">
                       Outstanding Due
                     </span>
                   </div>
@@ -1221,25 +1221,24 @@ export default function CeoDashboard() {
                   onClick={() => {
                     setActiveTab('deliverables');
                   }}
-                  className="relative bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] hover:shadow-md hover:border-purple-300 transition duration-200 group cursor-pointer"
+                  className="relative bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] hover:shadow-md hover:border-purple-300 transition duration-200 group cursor-pointer"
                   title="Click to open Deliverables & Tasks Pipeline"
                 >
                   <div className="absolute -right-6 -top-6 w-24 h-24 bg-purple-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
-                  <div className="space-y-1 relative z-10 min-w-0 pr-2 flex-grow">
+                  <div className="space-y-1 relative z-10 min-w-0 flex-1 pr-2">
                     <div className="text-[10px] text-purple-600 dark:text-purple-400 font-extrabold uppercase tracking-wider truncate">Pipeline</div>
                     <div className="flex items-baseline gap-1.5 flex-wrap">
-                      <h3 className="text-2xl font-black text-slate-900 dark:text-white truncate">{(metrics.pendingTasks || 0) + (metrics.pendingDeliveries || 0)}</h3>
+                      <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white truncate">{(metrics.pendingTasks || 0) + (metrics.pendingDeliveries || 0)}</h3>
                       <span className="text-xs font-bold text-slate-500 whitespace-nowrap">Pending</span>
                     </div>
-                    <span className="text-[9px] text-purple-600 dark:text-purple-400 font-bold bg-purple-50 dark:bg-purple-900/30 px-2 py-0.5 rounded-full border border-purple-100 dark:border-purple-800/30 block w-fit">
+                    <span className="text-[9px] text-purple-600 dark:text-purple-400 font-bold bg-purple-50 dark:bg-purple-900/30 px-2 py-0.5 rounded-full border border-purple-100 dark:border-purple-800/30 block w-fit truncate max-w-full">
                       Done: {(metrics.completedTasks || 0) + (metrics.completedDeliveries || 0)}
                     </span>
                   </div>
                   <div className="shrink-0 relative z-10 w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-100 dark:border-purple-900">
-                    <Activity className="w-5 h-5" />
+                    <Target className="w-5 h-5" />
                   </div>
                 </div>
-
               </div>
 
               {/* Graphics and lists panel */}

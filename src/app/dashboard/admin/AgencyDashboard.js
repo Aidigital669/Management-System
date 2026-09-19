@@ -553,7 +553,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
     <div className="space-y-8 animate-fade-in text-slate-800 dark:text-slate-200">
       
       {/* 1. KPIs Section */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-3 sm:gap-4">
         {/* Active Clients */}
         <div 
           onClick={() => onSelectTab && onSelectTab('clients', { 
@@ -563,24 +563,24 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
             paymentFilter: 'all', 
             revenueStreamFilter: 'all' 
           })}
-          className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
+          className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
           title="Click to view all Active Clients in CRM"
         >
           <div className="absolute -right-6 -top-6 w-24 h-24 bg-blue-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
-          <div className="space-y-1.5 relative z-10">
-            <div className="flex items-center gap-1.5">
+          <div className="space-y-1.5 relative z-10 min-w-0 flex-1 pr-2">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-widest font-extrabold font-sans">Active Clients</span>
-              <span className="flex items-center gap-1 text-[8px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded border border-emerald-200/50 dark:border-emerald-800/40 tracking-wider">
+              <span className="flex items-center gap-1 text-[8px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded border border-emerald-200/50 dark:border-emerald-800/40 tracking-wider whitespace-nowrap">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 LIVE
               </span>
             </div>
-            <div className="flex items-end gap-1.5">
-              <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white">{currentlyActiveClients.length}</h3>
-              <span className="text-xs text-slate-400 font-semibold mb-0.5">/ {clients.length} in CRM</span>
+            <div className="flex items-baseline gap-1.5 flex-wrap">
+              <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white truncate">{currentlyActiveClients.length}</h3>
+              <span className="text-xs text-slate-400 font-semibold mb-0.5 whitespace-nowrap">/ {clients.length} in CRM</span>
             </div>
-            <span className="text-[9px] text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full border border-blue-100 dark:border-blue-800/30 block w-fit">
-              {currentlyActiveClients.length} Active Plans (Ongoing Subscriptions)
+            <span className="text-[9px] text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full border border-blue-100 dark:border-blue-800/30 block w-fit truncate max-w-full">
+              {currentlyActiveClients.length} Active Plans (Ongoing)
             </span>
           </div>
           <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center relative z-10 shadow-inner border border-blue-100 dark:border-blue-900 shrink-0">
@@ -599,15 +599,15 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
             lifecycleFilter: 'all', 
             revenueStreamFilter: 'all' 
           })}
-          className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-emerald-300 dark:hover:border-emerald-700 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
+          className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-emerald-300 dark:hover:border-emerald-700 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
           title="Click to view day 1 to 30 clients for this collected revenue in CRM"
         >
           <div className="absolute -right-6 -top-6 w-24 h-24 bg-emerald-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
-          <div className="space-y-1.5 relative z-10">
-            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase tracking-widest font-extrabold font-sans">Actual Revenue</span>
-            <h3 className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400">₹{dynamicTotalRevenue.toLocaleString()}</h3>
-            <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-800/40 block w-fit">
-              Collected Day 1 to 30 ({paymentReceivedCount} Paid Accounts)
+          <div className="space-y-1.5 relative z-10 min-w-0 flex-1 pr-2">
+            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase tracking-widest font-extrabold font-sans block truncate">Actual Revenue</span>
+            <h3 className="text-xl sm:text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 truncate">₹{dynamicTotalRevenue.toLocaleString()}</h3>
+            <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-800/40 block w-fit truncate max-w-full">
+              Collected Day 1-30 ({paymentReceivedCount} Paid)
             </span>
           </div>
           <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center relative z-10 shadow-inner border border-emerald-100 dark:border-emerald-900 shrink-0">
@@ -624,14 +624,14 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
             lifecycleFilter: 'all', 
             revenueStreamFilter: 'all' 
           })}
-          className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
+          className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
           title="Click to view all 58 Client Accounts in CRM"
         >
           <div className="absolute -right-6 -top-6 w-24 h-24 bg-indigo-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
-          <div className="space-y-1.5 relative z-10">
-            <span className="text-[10px] text-indigo-600 dark:text-indigo-400 uppercase tracking-widest font-extrabold font-sans">Expected Revenue</span>
-            <h3 className="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400">₹{totalAllClientsBilling.toLocaleString()}</h3>
-            <span className="text-[9px] text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-full border border-indigo-100 dark:border-indigo-800/40 block w-fit">
+          <div className="space-y-1.5 relative z-10 min-w-0 flex-1 pr-2">
+            <span className="text-[10px] text-indigo-600 dark:text-indigo-400 uppercase tracking-widest font-extrabold font-sans block truncate">Expected Revenue</span>
+            <h3 className="text-xl sm:text-2xl font-extrabold text-indigo-600 dark:text-indigo-400 truncate">₹{totalAllClientsBilling.toLocaleString()}</h3>
+            <span className="text-[9px] text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-full border border-indigo-100 dark:border-indigo-800/40 block w-fit truncate max-w-full">
               All {clients.length} Clients Billing (100%)
             </span>
           </div>
@@ -643,20 +643,20 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
         {/* Achieved Renewal (Depends on Renewal Data) */}
         <div 
           onClick={() => onSelectTab && onSelectTab('renewals', { renewalFilter: 'All' })}
-          className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-purple-200/60 dark:border-purple-900/40 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-purple-400 dark:hover:border-purple-600 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
+          className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-purple-200/60 dark:border-purple-900/40 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-purple-400 dark:hover:border-purple-600 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
           title="Click to open Renewals & Retention Hub"
         >
           <div className="absolute -right-6 -top-6 w-24 h-24 bg-purple-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
-          <div className="space-y-1.5 relative z-10">
-            <div className="flex items-center gap-1.5">
+          <div className="space-y-1.5 relative z-10 min-w-0 flex-1 pr-2">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[10px] text-purple-600 dark:text-purple-400 uppercase tracking-widest font-extrabold font-sans">Achieved Renewal</span>
-              <span className="text-[8px] font-bold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/60 px-1.5 py-0.2 rounded-full">Renewal Data</span>
+              <span className="text-[8px] font-bold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/60 px-1.5 py-0.2 rounded-full whitespace-nowrap">Renewal Data</span>
             </div>
-            <div className="flex items-baseline gap-2">
-              <h3 className="text-2xl font-extrabold text-purple-600 dark:text-purple-400">₹{achievedRenewalActual.toLocaleString()}</h3>
-              <span className="text-xs text-purple-400 font-semibold" title="Total Projected Renewal Target (Renewed + Non-Renewed)">/ ₹{totalRenewalExpected.toLocaleString()}</span>
+            <div className="flex flex-wrap items-baseline gap-1 sm:gap-2">
+              <h3 className="text-xl sm:text-2xl font-extrabold text-purple-600 dark:text-purple-400">₹{achievedRenewalActual.toLocaleString()}</h3>
+              <span className="text-xs text-purple-400 font-semibold whitespace-nowrap" title="Total Projected Renewal Target (Renewed + Non-Renewed)">/ ₹{totalRenewalExpected.toLocaleString()}</span>
             </div>
-            <span className="text-[9px] text-purple-700 dark:text-purple-300 font-bold bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded-full border border-purple-100 dark:border-purple-800/40 block w-fit">
+            <span className="text-[9px] text-purple-700 dark:text-purple-300 font-bold bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded-full border border-purple-100 dark:border-purple-800/40 block w-fit truncate max-w-full">
               {achievedRenewalCount} of {totalRenewalCount} Renewed ({renewalRealizedPercent}%)
             </span>
           </div>
@@ -668,21 +668,21 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
         {/* Achieved Sale (Depends on Sales Data) */}
         <div 
           onClick={() => onSelectTab && onSelectTab('seller-dashboard', { activeStatusFilter: 'ANSWERED' })}
-          className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-cyan-200/60 dark:border-cyan-900/40 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-cyan-400 dark:hover:border-cyan-600 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
+          className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-cyan-200/60 dark:border-cyan-900/40 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-cyan-400 dark:hover:border-cyan-600 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
           title="Click to view Sales & Converted Leads in Seller Dashboard"
         >
           <div className="absolute -right-6 -top-6 w-24 h-24 bg-cyan-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
-          <div className="space-y-1.5 relative z-10">
-            <div className="flex items-center gap-1.5">
+          <div className="space-y-1.5 relative z-10 min-w-0 flex-1 pr-2">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[10px] text-cyan-600 dark:text-cyan-400 uppercase tracking-widest font-extrabold font-sans">Achieved Sale</span>
-              <span className="text-[8px] font-bold text-cyan-700 dark:text-cyan-300 bg-cyan-100 dark:bg-cyan-900/60 px-1.5 py-0.2 rounded-full">Sales Data</span>
+              <span className="text-[8px] font-bold text-cyan-700 dark:text-cyan-300 bg-cyan-100 dark:bg-cyan-900/60 px-1.5 py-0.2 rounded-full whitespace-nowrap">Sales Data</span>
             </div>
-            <div className="flex items-baseline gap-2">
-              <h3 className="text-2xl font-extrabold text-cyan-600 dark:text-cyan-400">₹{achievedSaleProjection.toLocaleString()}</h3>
-              <span className="text-xs text-cyan-400 font-semibold" title={`Total Hot Target: (${convertedLeadsCount} Done + ${hotLeadsCount} Hot = ${totalHotPoolCount} Leads) × ₹3,500`}>/ ₹{expectedSaleProjection.toLocaleString()}</span>
+            <div className="flex flex-wrap items-baseline gap-1 sm:gap-2">
+              <h3 className="text-xl sm:text-2xl font-extrabold text-cyan-600 dark:text-cyan-400">₹{achievedSaleProjection.toLocaleString()}</h3>
+              <span className="text-xs text-cyan-400 font-semibold whitespace-nowrap" title={`Total Hot Target: (${convertedLeadsCount} Done + ${hotLeadsCount} Hot = ${totalHotPoolCount} Leads) × ₹3,500`}>/ ₹{expectedSaleProjection.toLocaleString()}</span>
             </div>
-            <span className="text-[9px] text-cyan-700 dark:text-cyan-300 font-bold bg-cyan-50 dark:bg-cyan-950/40 px-2 py-0.5 rounded-full border border-cyan-100 dark:border-cyan-800/40 block w-fit">
-              {convertedLeadsCount} / {totalHotPoolCount} Done ({saleRealizedPercent}%) • {hotLeadsCount} Hot Pipeline
+            <span className="text-[9px] text-cyan-700 dark:text-cyan-300 font-bold bg-cyan-50 dark:bg-cyan-950/40 px-2 py-0.5 rounded-full border border-cyan-100 dark:border-cyan-800/40 block w-fit truncate max-w-full">
+              {convertedLeadsCount} / {totalHotPoolCount} Done ({saleRealizedPercent}%) • {hotLeadsCount} Hot
             </span>
           </div>
           <div className="w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-950/50 text-cyan-600 dark:text-cyan-400 flex items-center justify-center relative z-10 shadow-inner border border-cyan-100 dark:border-cyan-900 shrink-0">
@@ -693,14 +693,14 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
         {/* Pending Revenue (Outstanding) */}
         <div 
           onClick={() => onSelectTab && onSelectTab('pending-payments', { paymentTabFilter: 'All' })}
-          className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-orange-300 dark:hover:border-orange-700 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
+          className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-orange-300 dark:hover:border-orange-700 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
           title="Click to open Pending Payments Hub"
         >
           <div className="absolute -right-6 -top-6 w-24 h-24 bg-orange-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
-          <div className="space-y-1.5 relative z-10">
-            <span className="text-[10px] text-orange-600 dark:text-orange-400 uppercase tracking-widest font-extrabold font-sans">Pending Revenue</span>
-            <h3 className="text-2xl font-extrabold text-orange-500">₹{pendingRevenue.toLocaleString()}</h3>
-            <span className="text-[9px] text-orange-600 dark:text-orange-400 font-bold bg-orange-50 dark:bg-orange-950/40 px-2 py-0.5 rounded-full border border-orange-100 dark:border-orange-800/40 block w-fit">
+          <div className="space-y-1.5 relative z-10 min-w-0 flex-1 pr-2">
+            <span className="text-[10px] text-orange-600 dark:text-orange-400 uppercase tracking-widest font-extrabold font-sans block truncate">Pending Revenue</span>
+            <h3 className="text-xl sm:text-2xl font-extrabold text-orange-500 truncate">₹{pendingRevenue.toLocaleString()}</h3>
+            <span className="text-[9px] text-orange-600 dark:text-orange-400 font-bold bg-orange-50 dark:bg-orange-950/40 px-2 py-0.5 rounded-full border border-orange-100 dark:border-orange-800/40 block w-fit truncate max-w-full">
               Outstanding ({revPendingPercent}%)
             </span>
           </div>
@@ -712,17 +712,17 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
         {/* Tasks & Deliveries Pipeline */}
         <div 
           onClick={() => onSelectTab && onSelectTab('deliverables')}
-          className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-purple-300 dark:hover:border-purple-700 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
+          className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-purple-300 dark:hover:border-purple-700 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
           title="Click to open Task Manager & Deliverables"
         >
           <div className="absolute -right-6 -top-6 w-24 h-24 bg-purple-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
-          <div className="space-y-1.5 relative z-10">
-            <span className="text-[10px] text-purple-600 dark:text-purple-400 uppercase tracking-widest font-extrabold font-sans">Pipeline</span>
-            <div className="flex items-end gap-1.5">
-              <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white">{topLevelMetrics.taskPending + topLevelMetrics.deliveryPending}</h3>
-              <span className="text-xs text-slate-400 font-semibold mb-0.5">Pending</span>
+          <div className="space-y-1.5 relative z-10 min-w-0 flex-1 pr-2">
+            <span className="text-[10px] text-purple-600 dark:text-purple-400 uppercase tracking-widest font-extrabold font-sans block truncate">Pipeline</span>
+            <div className="flex flex-wrap items-baseline gap-1 sm:gap-1.5">
+              <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white truncate">{topLevelMetrics.taskPending + topLevelMetrics.deliveryPending}</h3>
+              <span className="text-xs text-slate-400 font-semibold mb-0.5 whitespace-nowrap">Pending</span>
             </div>
-            <span className="text-[9px] text-purple-600 dark:text-purple-400 font-bold bg-purple-50 dark:bg-purple-900/30 px-2 py-0.5 rounded-full border border-purple-100 dark:border-purple-800/30 block w-fit">
+            <span className="text-[9px] text-purple-600 dark:text-purple-400 font-bold bg-purple-50 dark:bg-purple-900/30 px-2 py-0.5 rounded-full border border-purple-100 dark:border-purple-800/30 block w-fit truncate max-w-full">
               Done: {topLevelMetrics.taskCompleted + topLevelMetrics.deliveryCompleted}
             </span>
           </div>
@@ -739,16 +739,16 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
         <div className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between overflow-hidden">
           <div>
             {/* Header: Title, Subtitle, & Month Selector Dropdown */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-              <div className="flex items-center gap-3 min-w-0">
+            <div className="flex flex-col sm:flex-row lg:flex-col 2xl:flex-row sm:items-center lg:items-start 2xl:items-center justify-between gap-3 mb-3">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
                 <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-100 dark:border-emerald-900 shadow-inner shrink-0">
                   <DollarSign className="w-5 h-5" />
                 </div>
-                <div className="min-w-0">
-                  <h4 className="text-base font-extrabold text-slate-900 dark:text-white">
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-base font-extrabold text-slate-900 dark:text-white truncate">
                     Revenue Breakdown
                   </h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
+                  <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
                     Actual vs Expected vs Pending • <span className="font-bold text-slate-700 dark:text-slate-300">
                       {selectedRevenueMonth === 'all' && !revenueStartDate
                         ? 'All Months (All-Time)'
@@ -761,7 +761,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
               </div>
 
               {/* Month Dropdown Quick Selector */}
-              <div className="shrink-0">
+              <div className="w-full sm:w-auto lg:w-full 2xl:w-auto shrink-0">
                 <select
                   value={selectedRevenueMonth}
                   onChange={(e) => {
@@ -786,7 +786,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
                       setShowCustomDate(false);
                     }
                   }}
-                  className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl px-3 py-1.5 focus:outline-none focus:border-emerald-500 transition cursor-pointer shadow-xs w-full sm:w-auto"
+                  className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl px-3 py-1.5 focus:outline-none focus:border-emerald-500 transition cursor-pointer shadow-xs w-full sm:w-auto lg:w-full 2xl:w-auto max-w-full truncate"
                 >
                   <option value="all">🌐 All Months (Combined)</option>
                   {availableRevenueMonths.map(m => (
@@ -1042,7 +1042,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
             </div>
           </div>
           
-          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5 sm:gap-2 text-center text-xs">
+          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-5 gap-1.5 sm:gap-2 text-center text-xs">
             <div 
               onClick={() => onSelectTab && onSelectTab('clients', { paymentFilter: 'full' })}
               className="bg-emerald-50 dark:bg-emerald-950/30 p-2 rounded-xl border border-emerald-100 dark:border-emerald-800/30 min-w-0 cursor-pointer hover:shadow-xs hover:scale-[1.02] transition-all"
