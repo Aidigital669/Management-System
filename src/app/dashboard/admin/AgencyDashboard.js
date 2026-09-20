@@ -428,6 +428,9 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
   // Total billing across all 58 clients in CRM (Expected Revenue)
   const totalAllClientsBilling = clients.reduce((sum, c) => sum + (c.packageAmount || 0), 0);
 
+  // Active extended clients count
+  const allExtendedClientsCount = clients.filter(c => c.active && ((c.extensionDays || 0) > 0 || getClientPlanHealth(c).status === 'Extended')).length;
+
   // --- PROJECTION TELEMETRY METRICS ---
   // 1. Projection Renewal: Total renewal pool = (clients with no renewal / not renewed) + (renewed)
   // Achieved renewal = how many persons renewed from the list and their amount
@@ -1330,6 +1333,17 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {allExtendedClientsCount > 0 && (
+              <button
+                type="button"
+                onClick={() => onSelectTab && onSelectTab('renewals', { renewalFilter: 'Extended' })}
+                className="px-2.5 py-1.5 rounded-xl bg-purple-100 hover:bg-purple-200 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 border border-purple-300 dark:border-purple-800 text-purple-800 dark:text-purple-300 text-xs font-black transition flex items-center gap-1 cursor-pointer shadow-xs"
+                title="Click to view all extended person & package lists in Renewals Hub"
+              >
+                <Clock className="w-3.5 h-3.5 text-purple-600" />
+                <span>{allExtendedClientsCount} Extended Clients</span>
+              </button>
+            )}
             <span className="px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/40 text-purple-700 dark:text-purple-300 text-xs font-black">
               Renewal Conversion: {renewalPercent}%
             </span>

@@ -2,11 +2,57 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import AgencyDashboard from './AgencyDashboard';
-import CampaignDeliveriesTable from './CampaignDeliveriesTable';
-import AdminSellerDashboard from './AdminSellerDashboard';
-import ClientOnboardingInspector from '../employee/ClientOnboardingInspector';
-import EmployeePerformanceHub from './EmployeePerformanceHub';
+import dynamic from 'next/dynamic';
+
+const AgencyDashboard = dynamic(() => import('./AgencyDashboard'), {
+  loading: () => (
+    <div className="flex items-center justify-center p-16 text-slate-400 gap-2">
+      <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      <span className="text-sm font-medium">Loading Agency Dashboard...</span>
+    </div>
+  ),
+  ssr: false
+});
+
+const CampaignDeliveriesTable = dynamic(() => import('./CampaignDeliveriesTable'), {
+  loading: () => (
+    <div className="flex items-center justify-center p-16 text-slate-400 gap-2">
+      <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      <span className="text-sm font-medium">Loading Campaign Deliveries...</span>
+    </div>
+  ),
+  ssr: false
+});
+
+const AdminSellerDashboard = dynamic(() => import('./AdminSellerDashboard'), {
+  loading: () => (
+    <div className="flex items-center justify-center p-16 text-slate-400 gap-2">
+      <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      <span className="text-sm font-medium">Loading Seller Dashboard...</span>
+    </div>
+  ),
+  ssr: false
+});
+
+const ClientOnboardingInspector = dynamic(() => import('../employee/ClientOnboardingInspector'), {
+  loading: () => (
+    <div className="flex items-center justify-center p-8 text-slate-400 gap-2">
+      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      <span className="text-xs">Loading Client Inspector...</span>
+    </div>
+  ),
+  ssr: false
+});
+
+const EmployeePerformanceHub = dynamic(() => import('./EmployeePerformanceHub'), {
+  loading: () => (
+    <div className="flex items-center justify-center p-16 text-slate-400 gap-2">
+      <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      <span className="text-sm font-medium">Loading Performance Hub...</span>
+    </div>
+  ),
+  ssr: false
+});
 import {
   Award,
   Users,
@@ -49,7 +95,9 @@ import {
   Eye,
   Loader2
 } from 'lucide-react';
-import ExcelImportModal from '@/components/ExcelImportModal';
+const ExcelImportModal = dynamic(() => import('@/components/ExcelImportModal'), {
+  ssr: false
+});
 import { uploadFileAction } from '@/app/actions/uploadAction';
 import {
   parseDbDate as parsePlanDbDate,
@@ -715,7 +763,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // Auth check
+  // Auth check & Progressive Hydration
   useEffect(() => {
     async function initDashboard() {
       try {
@@ -727,8 +775,69 @@ export default function AdminDashboard() {
         }
 
         setCurrentUser(data.user);
-        await refreshData();
+
+        // Fetch core and secondary data concurrently, but unblock UI as soon as core is ready!
+        const secondaryPromise = Promise.all([
+          fetchJson('/api/client-tasks'),
+          fetchJson('/api/client-deliveries'),
+          fetchJson('/api/client/feedback'),
+          fetchJson('/api/renewal-requests')
+        ]);
+
+        const [usersRes, tasksRes, leavesRes, attRes, clientsRes] = await Promise.all([
+          fetchJson('/api/users'),
+          fetchJson('/api/tasks'),
+          fetchJson('/api/leaves'),
+          fetchJson('/api/attendance'),
+          fetchJson('/api/clients')
+        ]);
+
+        const fetchedUsers = usersRes.data.users || [];
+        setUsersList(fetchedUsers);
+
+        const fetchedTasks = tasksRes.data.tasks || [];
+        setTasksList(fetchedTasks);
+
+        const fetchedLeaves = leavesRes.data.leaves || [];
+        setLeavesList(fetchedLeaves);
+
+        const fetchedAttendance = attRes.data.logs || [];
+        setAttendanceLogs(fetchedAttendance);
+
+        const fetchedClients = clientsRes.data.clients || [];
+        setClientsList(fetchedClients);
+        const activeIds = fetchedClients.filter(c => isClientActiveInMonth(c, currentLiveMonthKey)).map(c => c.clientId);
+        setActiveClientIds(new Set(activeIds));
+
+        // Calculate Overview Metrics immediately so the UI is ready to paint!
+        const totalStaff = fetchedUsers.filter(u => u.role === 'EMPLOYEE' || u.role === 'SALES').length;
+        const activeTasks = fetchedTasks.filter(t => t.status !== 'DONE').length;
+        const pendingLeaves = fetchedLeaves.filter(l => l.status === 'PENDING').length;
+        const todayStr = new Date().toISOString().split('T')[0];
+        const presentToday = fetchedAttendance.filter(a => a.date === todayStr).length;
+
+        setMetrics({
+          totalStaff,
+          activeTasks,
+          pendingLeaves,
+          presentToday
+        });
+
+        const employees = fetchedUsers.filter(u => u.role === 'EMPLOYEE' || u.role === 'SALES');
+        if (employees.length > 0 && !taskAssignee) {
+          setTaskAssignee(employees[0].id.toString());
+        }
+
+        // UNBLOCK UI IMMEDIATELY for fastest LCP!
         setLoading(false);
+
+        // Complete secondary data hydration in background
+        const [ctRes, cdRes, fbRes, renewalsRes] = await secondaryPromise;
+        setAllClientTasks(ctRes.data.tasks || []);
+        setAllClientDeliveries(cdRes.data.deliveries || []);
+        setFeedbacksList(fbRes.data.feedbacks || []);
+        setRenewalRequestsList(renewalsRes.data?.requests || []);
+
       } catch (err) {
         console.error(err);
         router.push('/');
@@ -781,26 +890,25 @@ export default function AdminDashboard() {
 
   const refreshData = async () => {
     try {
+      const secondaryPromise = Promise.all([
+        fetchJson('/api/client-tasks'),
+        fetchJson('/api/client-deliveries'),
+        fetchJson('/api/client/feedback'),
+        fetchJson('/api/renewal-requests')
+      ]);
+
       const [
         usersRes,
         tasksRes,
         leavesRes,
         attRes,
-        clientsRes,
-        ctRes,
-        cdRes,
-        fbRes,
-        renewalsRes
+        clientsRes
       ] = await Promise.all([
         fetchJson('/api/users'),
         fetchJson('/api/tasks'),
         fetchJson('/api/leaves'),
         fetchJson('/api/attendance'),
-        fetchJson('/api/clients'),
-        fetchJson('/api/client-tasks'),
-        fetchJson('/api/client-deliveries'),
-        fetchJson('/api/client/feedback'),
-        fetchJson('/api/renewal-requests')
+        fetchJson('/api/clients')
       ]);
 
       const fetchedUsers = usersRes.data.users || [];
@@ -820,13 +928,6 @@ export default function AdminDashboard() {
       // Update active client IDs set based on client active in the current live month
       const activeIds = fetchedClients.filter(c => isClientActiveInMonth(c, currentLiveMonthKey)).map(c => c.clientId);
       setActiveClientIds(new Set(activeIds));
-
-      setAllClientTasks(ctRes.data.tasks || []);
-
-      setAllClientDeliveries(cdRes.data.deliveries || []);
-
-      setFeedbacksList(fbRes.data.feedbacks || []);
-      setRenewalRequestsList(renewalsRes.data?.requests || []);
 
       // Calculate Metrics
       const totalStaff = fetchedUsers.filter(u => u.role === 'EMPLOYEE' || u.role === 'SALES').length;
@@ -848,6 +949,13 @@ export default function AdminDashboard() {
       if (employees.length > 0 && !taskAssignee) {
         setTaskAssignee(employees[0].id.toString());
       }
+
+      // Populate secondary in background
+      const [ctRes, cdRes, fbRes, renewalsRes] = await secondaryPromise;
+      setAllClientTasks(ctRes.data.tasks || []);
+      setAllClientDeliveries(cdRes.data.deliveries || []);
+      setFeedbacksList(fbRes.data.feedbacks || []);
+      setRenewalRequestsList(renewalsRes.data?.requests || []);
     } catch (err) {
       console.error('Error refreshing admin dashboard:', err);
     }
@@ -4879,9 +4987,14 @@ export default function AdminDashboard() {
               return isClientExpiringInMonth(c, renewalMonthFilter);
             });
 
+            const extendedClients = filteredActiveClients.filter(c => {
+              const s = getClientRenewalInfo(c).status;
+              return s === 'Extended' || (c.extensionDays || 0) > 0;
+            });
             const activeOnTrackClients = filteredActiveClients.filter(c => {
               const s = getClientRenewalInfo(c).status;
-              return s === 'Active' || s === 'Extended';
+              const hasExtension = (c.extensionDays || 0) > 0;
+              return (s === 'Active' || s === 'Extended') && !hasExtension;
             });
             const expiringSoonClients = filteredActiveClients.filter(c => {
               return getClientRenewalInfo(c).status === 'Expiring Soon';
@@ -4893,6 +5006,10 @@ export default function AdminDashboard() {
             let activeExpected = 0;
             let activeActual = 0;
             let activeCount = activeOnTrackClients.length;
+
+            let extendedExpected = 0;
+            let extendedActual = 0;
+            let extendedCount = extendedClients.length;
 
             let expiredExpected = 0;
             let expiredActual = 0;
@@ -4909,6 +5026,13 @@ export default function AdminDashboard() {
               activeActual += pInfo.paidAmount;
             });
 
+            extendedClients.forEach(c => {
+              const pkgAmt = c.packageAmount || 0;
+              const pInfo = getClientPaymentInfo(c);
+              extendedExpected += pkgAmt;
+              extendedActual += pInfo.paidAmount;
+            });
+
             expiringSoonClients.forEach(c => {
               const pkgAmt = c.packageAmount || 0;
               const pInfo = getClientPaymentInfo(c);
@@ -4923,9 +5047,9 @@ export default function AdminDashboard() {
               expiredActual += pInfo.paidAmount;
             });
 
-            const totalOngoingCount = activeCount + expiringSoonCount;
-            const totalOngoingExpected = activeExpected + expiringSoonExpected;
-            const totalOngoingActual = activeActual + expiringSoonActual;
+            const totalOngoingCount = activeCount + extendedCount + expiringSoonCount;
+            const totalOngoingExpected = activeExpected + extendedExpected + expiringSoonExpected;
+            const totalOngoingActual = activeActual + extendedActual + expiringSoonActual;
             const totalAllContracts = totalOngoingCount + expiredCount;
             const totalPoolRevenue = totalOngoingExpected + expiredExpected;
 
@@ -5249,6 +5373,7 @@ export default function AdminDashboard() {
                       {[
                         { key: 'All', label: 'All Contracts', count: totalAllContracts },
                         { key: 'Active', label: 'Active (Ongoing Plan)', count: totalOngoingCount, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-955/20' },
+                        { key: 'Extended', label: 'Extended Contracts (+Days)', count: extendedCount, color: 'text-purple-600 bg-purple-50 dark:bg-purple-950/20' },
                         { key: 'Expiring Soon', label: 'Expiring Soon (7 Days)', count: expiringSoonCount, color: 'text-orange-500 bg-orange-50 dark:bg-orange-955/20' },
                         { key: 'Expired', label: 'Expired (Renewal Due)', count: expiredCount, color: 'text-red-500 bg-red-50 dark:bg-red-950/20' }
                       ].map(btn => (
@@ -5826,6 +5951,201 @@ export default function AdminDashboard() {
                       </div>
                     )}
 
+                    {/* Extended Client Contracts & Package List (Granted Extra Days) */}
+                    {(renewalFilter === 'All' || renewalFilter === 'Extended') && (
+                      <div className="border border-purple-200 dark:border-purple-900/50 rounded-xl overflow-hidden shadow-sm bg-white dark:bg-slate-900">
+                        <div className="p-3.5 bg-gradient-to-r from-purple-50/80 via-indigo-50/40 to-white dark:from-purple-955/30 dark:via-slate-900 dark:to-slate-900 border-b border-purple-200 dark:border-purple-900/50 flex flex-wrap justify-between items-center gap-2">
+                          <div>
+                            <span className="text-[11px] font-black uppercase tracking-wider text-purple-800 dark:text-purple-300 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-purple-600 animate-ping"></span>
+                              <Clock className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                              Extended Person & Package List — Active Plan Extensions
+                            </span>
+                            <p className="text-[10px] text-purple-700/80 dark:text-purple-300/80 font-medium mt-0.5">
+                              Clients granted temporary pack extension by Admin or TL approval. Displays subscribed package, extended days, and revised expiry date.
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="px-2.5 py-1 bg-purple-600 text-white text-[9px] font-black rounded-md uppercase tracking-wider shadow-xs">
+                              Extended Contracts ({extendedCount})
+                            </span>
+                          </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-[850px] w-full text-left border-collapse">
+                            <thead>
+                              <tr className="bg-slate-50/50 dark:bg-slate-800/20 text-slate-500 font-semibold border-b border-slate-200 dark:border-slate-800 text-[9px] uppercase tracking-wider">
+                                <th className="p-4">Business & Contact Person</th>
+                                <th className="p-4">Social Media Exec</th>
+                                <th className="p-4">Subscribed Plan & Package</th>
+                                <th className="p-4">Original Cycle Expiry</th>
+                                <th className="p-4">Extension Granted</th>
+                                <th className="p-4">Revised Expiry & Due Date</th>
+                                <th className="p-4">Days Left</th>
+                                <th className="p-4">Status</th>
+                                <th className="p-4 text-right">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                              {(() => {
+                                const list = filteredRenewalClients
+                                  .filter(c => {
+                                    const s = getClientRenewalInfo(c).status;
+                                    return s === 'Extended' || (c.extensionDays || 0) > 0;
+                                  })
+                                  .filter(c => {
+                                    if (!renewalSearch) return true;
+                                    const q = renewalSearch.toLowerCase();
+                                    const sm = getClientSmExecutive(c, allClientTasks, allClientDeliveries);
+                                    return (
+                                      (c.businessName && c.businessName.toLowerCase().includes(q)) ||
+                                      (c.clientId && c.clientId.toLowerCase().includes(q)) ||
+                                      (c.clientName && c.clientName.toLowerCase().includes(q)) ||
+                                      (c.packageName && c.packageName.toLowerCase().includes(q)) ||
+                                      (sm && sm.toLowerCase().includes(q))
+                                    );
+                                  });
+
+                                if (list.length === 0) {
+                                  return (
+                                    <tr>
+                                      <td colSpan="9" className="p-8 text-center text-slate-400 italic">
+                                        No extended client contracts found matching calendar/search filter.
+                                      </td>
+                                    </tr>
+                                  );
+                                }
+
+                                return list.map(client => {
+                                  const info = getClientRenewalInfo(client);
+                                  const { cycleStartStr, baseExpiryDateStr, expiryDateStr, renewalDueStr, renewalMonthLabel, daysLeft } = info;
+                                  const smExec = getClientSmExecutive(client, allClientTasks, allClientDeliveries);
+
+                                  return (
+                                    <tr key={`extended-${client.id}`} className="hover:bg-purple-50/20 dark:hover:bg-purple-950/10 transition text-slate-700 dark:text-slate-300">
+                                      <td className="p-4">
+                                        <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                          {client.businessName}
+                                          <span className="px-1.5 py-0.5 bg-purple-600 text-white text-[7px] font-black rounded uppercase tracking-wider shrink-0">
+                                            EXTENDED
+                                          </span>
+                                        </div>
+                                        <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
+                                          ID: <strong className="font-mono text-slate-700 dark:text-slate-300">{client.clientId}</strong> • Person: <strong className="text-purple-700 dark:text-purple-400">{client.clientName || 'N/A'}</strong>
+                                        </div>
+                                        {smExec && (
+                                          <div className="mt-1 flex items-center gap-1">
+                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8.5px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
+                                              <UserCheck className="w-2.5 h-2.5 text-emerald-500" />
+                                              <span>SM: {smExec}</span>
+                                            </span>
+                                          </div>
+                                        )}
+                                      </td>
+
+                                      <td className="p-4">
+                                        {smExec ? (
+                                          <div className="flex items-center gap-2">
+                                            <div className="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 font-black text-[11px] flex items-center justify-center shrink-0">
+                                              {smExec.charAt(0).toUpperCase()}
+                                            </div>
+                                            <div>
+                                              <div className="font-bold text-xs text-slate-900 dark:text-white">{smExec}</div>
+                                              <div className="text-[9px] text-emerald-600 dark:text-emerald-400 font-semibold">Dedicated Exec</div>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <span className="text-[10px] text-slate-400 italic">Unassigned</span>
+                                        )}
+                                      </td>
+
+                                      <td className="p-4">
+                                        <div className="flex items-center gap-1.5 font-black text-xs text-blue-600 dark:text-blue-400">
+                                          <Tag className="w-3.5 h-3.5 shrink-0 text-blue-500" />
+                                          <span>{client.packageName || 'Standard Plan'}</span>
+                                          <span className="ml-1 px-1.5 py-0.5 rounded text-[8px] font-black bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800">
+                                            {info.durationLabel}
+                                          </span>
+                                        </div>
+                                        <div className="text-[10px] font-semibold text-slate-700 dark:text-slate-300 mt-0.5">{client.services}</div>
+                                        <div className="flex items-center gap-2 mt-1">
+                                          <span className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded text-[9px] font-extrabold border border-slate-200/60 dark:border-slate-700">
+                                            ₹{(client.packageAmount || 0).toLocaleString()} / cycle
+                                          </span>
+                                          {client.requirement && (
+                                            <span className="text-[8.5px] text-slate-400 italic truncate max-w-[130px]" title={client.requirement}>
+                                              📋 {client.requirement}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </td>
+
+                                      <td className="p-4 font-mono font-bold text-xs text-slate-500">
+                                        <div>{baseExpiryDateStr || cycleStartStr}</div>
+                                        <span className="text-[8.5px] text-slate-400 font-sans">Original End</span>
+                                      </td>
+
+                                      <td className="p-4">
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-300 dark:border-purple-800">
+                                          <Clock className="w-3 h-3 text-purple-600" />
+                                          +{client.extensionDays || info.extensionDays} Days Granted
+                                        </span>
+                                      </td>
+
+                                      <td className="p-4">
+                                        <div className="font-bold text-slate-900 dark:text-white text-xs">{expiryDateStr}</div>
+                                        <div className="text-[10px] text-purple-700 dark:text-purple-300 font-semibold mt-0.5">
+                                          Renewal Due: {renewalDueStr} ({renewalMonthLabel})
+                                        </div>
+                                      </td>
+
+                                      <td className="p-4 font-bold">
+                                        <span className="text-purple-600 dark:text-purple-400 font-extrabold flex items-center gap-1">
+                                          🕒 {daysLeft} day(s) left
+                                        </span>
+                                      </td>
+
+                                      <td className="p-4">
+                                        <span className="inline-block px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40">
+                                          Extended (+{client.extensionDays || info.extensionDays}d)
+                                        </span>
+                                      </td>
+
+                                      <td className="p-4 text-right">
+                                        <div className="flex items-center justify-end gap-1.5">
+                                          <button
+                                            onClick={() => {
+                                              setDirectExtensionModalClient(client);
+                                              setDirectExtensionDays(client.extensionDays || 10);
+                                              setDirectExtensionReason('');
+                                            }}
+                                            className="py-1 px-2 rounded-lg text-[9px] font-bold transition flex items-center gap-1 shadow-sm bg-amber-600 hover:bg-amber-700 text-white cursor-pointer"
+                                            title="Extend Further (Admin Authority: up to 10 days max)"
+                                          >
+                                            <Clock className="w-2.5 h-2.5" />
+                                            <span>Extend</span>
+                                          </button>
+                                          <button
+                                            onClick={() => handleRenewClientPlan(client.id, client.businessName)}
+                                            disabled={formLoading}
+                                            className="py-1 px-2.5 rounded-lg text-[9px] font-bold transition flex items-center gap-1 shadow-sm disabled:opacity-50 bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
+                                            title="Advance to next cycle"
+                                          >
+                                            <RefreshCw className={`w-2.5 h-2.5 ${formLoading ? 'animate-spin' : ''}`} />
+                                            <span>Renew</span>
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                });
+                              })()}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Active Contracts Table (Days 1 to 22, or all 1-30 if Active filter selected) */}
                     {(renewalFilter === 'All' || renewalFilter === 'Active') && (
                       <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
@@ -5836,11 +6156,11 @@ export default function AdminDashboard() {
                             </span>
                             {renewalFilter === 'Active' ? (
                               <span className="text-[10px] text-slate-400 font-semibold">
-                                ({totalOngoingCount} Total: <span className="text-emerald-600 font-bold">{activeCount} On-Track</span> + <span className="text-amber-600 font-bold">{expiringSoonCount} Expiring Soon</span>)
+                                ({totalOngoingCount} Total: <span className="text-emerald-600 font-bold">{activeCount} On-Track</span> + <span className="text-purple-600 font-bold">{extendedCount} Extended</span> + <span className="text-amber-600 font-bold">{expiringSoonCount} Expiring Soon</span>)
                               </span>
                             ) : (
                               <span className="text-[10px] text-slate-400 font-semibold">
-                                ({activeCount} On-Track • {expiringSoonCount} in Notice table above)
+                                ({activeCount} On-Track • {extendedCount} in Extended table above • {expiringSoonCount} in Notice table above)
                               </span>
                             )}
                           </div>
@@ -5872,8 +6192,8 @@ export default function AdminDashboard() {
                                     // When viewing Active filter, include ALL active ongoing contracts (both on-track, expiring soon, and extended)
                                     return s === 'Active' || s === 'Expiring Soon' || s === 'Extended';
                                   }
-                                  // In 'All' view, this table shows on-track and extended active clients (since Expiring Soon has its own table above)
-                                  return s === 'Active' || s === 'Extended';
+                                  // In 'All' view, this table shows on-track active clients (since Expiring Soon and Extended have their own dedicated tables above)
+                                  return s === 'Active' && (!c.extensionDays || c.extensionDays <= 0);
                                 })
                                 .filter(c => {
                                   if (!renewalSearch) return true;
@@ -6090,6 +6410,7 @@ export default function AdminDashboard() {
               active: isMonthScoped
                 ? clientsList.filter(c => isClientContractInMonth(c, clientMonthFilter, clientStartDate, clientEndDate)).length
                 : clientsList.filter(c => c.active && getClientPlanInfo(c).status !== 'Expired').length,
+              extended: clientsList.filter(c => (c.extensionDays || 0) > 0 || getClientPlanInfo(c).status === 'Extended').length,
               expiring_soon: clientsList.filter(c => c.active && getClientPlanInfo(c).status === 'Expiring Soon').length,
               expired: clientsList.filter(c => getClientPlanInfo(c).status === 'Expired').length,
               renewable: clientsList.filter(c => {
@@ -6119,6 +6440,9 @@ export default function AdminDashboard() {
               if (clientLifecycleFilter !== 'all') {
                 if (clientLifecycleFilter === 'active') {
                   if (!isClientPlanActive(c)) return false;
+                } else if (clientLifecycleFilter === 'extended') {
+                  const rInfo = getClientPlanInfo(c);
+                  if (!(rInfo.status === 'Extended' || (c.extensionDays || 0) > 0)) return false;
                 } else if (clientLifecycleFilter === 'expiring_soon') {
                   if (!c.active || planInfo.status !== 'Expiring Soon') return false;
                 } else if (clientLifecycleFilter === 'expired') {
@@ -6133,7 +6457,7 @@ export default function AdminDashboard() {
 
               // 2. Month Scope Filter:
               // Applies to calendar contracts and revenue. When viewing active clients, active clients are NOT mixed with month!
-              const shouldApplyMonth = (clientFilterScope === 'month' || isMonthScoped) && clientLifecycleFilter !== 'active';
+              const shouldApplyMonth = (clientFilterScope === 'month' || isMonthScoped) && clientLifecycleFilter !== 'active' && clientLifecycleFilter !== 'extended';
               if (shouldApplyMonth) {
                 if (clientStartDate || clientEndDate) {
                   if (!isClientContractInMonth(c, null, clientStartDate, clientEndDate)) return false;
@@ -6566,6 +6890,7 @@ export default function AdminDashboard() {
                       </span>
                       {[
                         { key: 'active', label: 'Active Clients', count: globalLifecycleCounts.active, color: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300' },
+                        { key: 'extended', label: 'Extended Clients (+Days)', count: globalLifecycleCounts.extended, color: 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300' },
                         { key: 'expiring_soon', label: 'Expiring Soon (Active)', count: globalLifecycleCounts.expiring_soon, color: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300' },
                         { key: 'expired', label: 'Expired (Inactive)', count: globalLifecycleCounts.expired, color: 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300' },
                         { key: 'inactive', label: 'Inactive Accounts', count: globalLifecycleCounts.inactive, color: 'bg-slate-100 dark:bg-slate-800 text-slate-500' },
@@ -6634,6 +6959,7 @@ export default function AdminDashboard() {
                       <span>
                         Showing <strong>{
                           clientLifecycleFilter === 'active' ? 'Active Clients (Ongoing & Expiring Soon)' :
+                          clientLifecycleFilter === 'extended' ? 'Extended Clients (Granted Extra Pack Days)' :
                           clientLifecycleFilter === 'expiring_soon' ? 'Expiring Soon (Active Contracts Within 7 Days)' :
                           clientLifecycleFilter === 'expired' ? 'Expired Contracts (Inactive - Renewal Required)' :
                           clientLifecycleFilter === 'renewable' ? 'Renewable / Renewed Subscriptions' : 'Inactive Accounts (Expired & Disabled)'
@@ -6864,6 +7190,12 @@ export default function AdminDashboard() {
                                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/40 whitespace-nowrap">
                                       {planInfo.durationLabel}
                                     </span>
+                                    {((client.extensionDays || 0) > 0 || planInfo.status === 'Extended') && (
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40 whitespace-nowrap inline-flex items-center gap-1">
+                                        <Clock className="w-2.5 h-2.5 text-purple-600 dark:text-purple-400" />
+                                        <span>Extended (+{client.extensionDays || planInfo.extensionDays}d)</span>
+                                      </span>
+                                    )}
                                     {planInfo.isRenewed && (
                                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 whitespace-nowrap">
                                         🔄 Cycle #{(client.renewalHistory?.length || 0) + 1}
@@ -6902,7 +7234,11 @@ export default function AdminDashboard() {
                                     <span>{planInfo.expiryDateStr}</span>
                                   </div>
                                   <div className="mt-1 flex items-center gap-1.5 whitespace-nowrap">
-                                    {isExpired ? (
+                                    {((client.extensionDays || 0) > 0 || planInfo.status === 'Extended') ? (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 dark:bg-purple-950/50 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-900/50 whitespace-nowrap">
+                                        🕒 Extended (+{client.extensionDays || planInfo.extensionDays}d) • {planInfo.daysLeft}d left (Due: {planInfo.renewalDueStr || planInfo.expiryDateStr})
+                                      </span>
+                                    ) : isExpired ? (
                                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 whitespace-nowrap">
                                         Expired ({planInfo.overdueDays || Math.abs(planInfo.daysLeft)}d ago)
                                       </span>
@@ -6933,11 +7269,13 @@ export default function AdminDashboard() {
                                 <td className="p-4 text-center whitespace-nowrap min-w-[100px]">
                                   {client.active && !isExpired ? (
                                     <span className={`inline-flex items-center justify-center px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                                      isExpiringSoon
+                                      ((client.extensionDays || 0) > 0 || planInfo.status === 'Extended')
+                                        ? 'bg-purple-600 text-white shadow-xs'
+                                        : isExpiringSoon
                                         ? 'bg-amber-500 text-white shadow-xs'
                                         : 'bg-emerald-500 text-white shadow-xs'
                                     }`}>
-                                      {isExpiringSoon ? 'EXPIRING' : 'ACTIVE'}
+                                      {((client.extensionDays || 0) > 0 || planInfo.status === 'Extended') ? 'EXTENDED' : isExpiringSoon ? 'EXPIRING' : 'ACTIVE'}
                                     </span>
                                   ) : (
                                     <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50">

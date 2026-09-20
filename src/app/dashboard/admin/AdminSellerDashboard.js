@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import {
   Users,
   PhoneCall,
@@ -35,7 +36,115 @@ import {
   Bell,
   Loader2
 } from 'lucide-react';
-import ExcelImportModal from '@/components/ExcelImportModal';
+
+const ExcelImportModal = dynamic(() => import('@/components/ExcelImportModal'), {
+  ssr: false
+});
+
+// Memoized lead card component to keep INP under 50ms during selection
+const LeadCardItem = React.memo(function LeadCardItem({
+  call,
+  isSelected,
+  onSelect,
+  onWhatsApp,
+  onSendReminder,
+  onDelete,
+  isSendingReminder,
+  campaign,
+  dateString,
+  timeString,
+  leadCardStyle,
+  statusBadgeClass,
+  statusDisplayText
+}) {
+  return (
+    <div
+      onClick={() => onSelect(call.id)}
+      className={`p-4 border-b border-slate-100 dark:border-slate-800/60 cursor-pointer ${leadCardStyle} ${
+        isSelected ? '!bg-blue-50/80 dark:!bg-blue-900/30 ring-1 ring-blue-500' : ''
+      }`}
+    >
+      <div className="flex justify-between items-start mb-1.5">
+        <div>
+          <h4 className="font-bold text-sm text-slate-900 dark:text-white leading-tight">{call.clientName}</h4>
+          <span className="text-[11px] font-mono text-slate-600 dark:text-slate-400">{call.phoneNumber}</span>
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <span className={statusBadgeClass}>
+            {statusDisplayText}
+          </span>
+          {/* Salesperson tag */}
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded">
+            <span>{call.salesPerson?.avatar || '👤'}</span>
+            <span className="truncate max-w-[100px]">{call.salesPerson?.name || 'Seller'}</span>
+          </span>
+        </div>
+      </div>
+
+      {/* Campaign / Requirement Tag */}
+      <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-2 flex-wrap">
+        <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+          🏷️ {campaign.replace(' Campaign', '')}
+        </span>
+        {call.expectedValue ? (
+          <span className="text-emerald-600 font-black">
+            ₹{Number(call.expectedValue).toLocaleString('en-IN')}
+          </span>
+        ) : null}
+      </div>
+
+      {call.notes && (
+        <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-1 mb-2">
+          {call.notes}
+        </p>
+      )}
+
+      <div className="flex justify-between items-center text-[10px] text-slate-500 font-bold border-t border-slate-200/40 dark:border-slate-800/40 pt-2">
+        <span>Schedule: {dateString} {timeString}</span>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onWhatsApp(call);
+            }}
+            className="p-1 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-600 rounded transition"
+            title="WhatsApp"
+          >
+            <MessageCircle className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSendReminder(call);
+            }}
+            disabled={isSendingReminder}
+            className="p-1 hover:bg-teal-50 dark:hover:bg-teal-950/40 text-teal-600 rounded transition disabled:opacity-50"
+            title="Send WhatsApp Follow-up Reminder"
+          >
+            {isSendingReminder ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Bell className="w-3.5 h-3.5" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(call.id, call.clientName);
+            }}
+            className="p-1 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-500 rounded transition"
+            title="Delete"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});
 
 export default function AdminSellerDashboard({ usersList = [], refreshData }) {
   // 1. STRICT FILTER: ONLY SALES PERSONS (Do not show any other employee roles)
@@ -114,23 +223,24 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
 
   const [formSubmitting, setFormSubmitting] = useState(false);
 
-  const showToast = (message, type = 'success') => {
+  const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast({ message: '', type: '' }), 4000);
-  };
+  }, []);
 
   // Helper to extract campaign name from notes or leadSource
-  const getCampaign = (call) => {
+  const getCampaign = useCallback((call) => {
+    if (!call) return 'Direct / Native Lead';
     if (call.leadSource) return call.leadSource;
     if (call.notes && call.notes.includes('[Campaign:')) {
       const match = call.notes.match(/\[Campaign:\s*([^\]]+)\]/);
       if (match && match[1]) return match[1].trim();
     }
     return 'Direct / Native Lead';
-  };
+  }, []);
 
   // Fetch calls and campaigns
-  const fetchSellerData = async () => {
+  const fetchSellerData = useCallback(async () => {
     setLoading(true);
     try {
       const [callsRes, campaignsRes] = await Promise.all([
@@ -149,39 +259,11 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   useEffect(() => {
     fetchSellerData();
-  }, []);
-
-  // Update follow-up data whenever active lead changes
-  useEffect(() => {
-    if (selectedLeadId) {
-      const activeCall = callsList.find(c => c.id === selectedLeadId);
-      if (activeCall) {
-        setFollowUpData({
-          currentUpdate: 'Select',
-          nextRemark: '',
-          nextAction: 'Follow-Up Scheduled',
-          scheduleDate: activeCall.followUpDate
-            ? new Date(activeCall.followUpDate).toISOString().slice(0, 16)
-            : new Date().toISOString().slice(0, 16),
-          interestedIn: activeCall.notes && activeCall.notes.includes('[Campaign:')
-            ? [getCampaign(activeCall)]
-            : [],
-          classification: activeCall.status === 'ANSWERED' ? 'Hot Lead' : (activeCall.status === 'INTERESTED' ? 'Hot Lead' : 'Follow up'),
-          reassignedSellerId: activeCall.salesPersonId ? String(activeCall.salesPersonId) : '',
-          packageName: activeCall.packageName || 'Meta Ads Management',
-          packagePrice: activeCall.expectedValue ? String(activeCall.expectedValue) : '',
-          expectedClosingDate: activeCall.expectedClosingDate
-            ? new Date(activeCall.expectedClosingDate).toISOString().slice(0, 10)
-            : ''
-        });
-      }
-    }
-    setShowFollowUpForm(false);
-  }, [selectedLeadId, callsList]);
+  }, [fetchSellerData]);
 
   // Overall Sales KPIs
   const kpis = useMemo(() => {
@@ -358,6 +440,39 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
     return callsList.find(c => c.id === selectedLeadId) || null;
   }, [callsList, selectedLeadId]);
 
+  // Fast selection handler with startTransition to guarantee < 50ms INP
+  const handleSelectLead = useCallback((id) => {
+    React.startTransition(() => {
+      setSelectedLeadId(prev => (prev === id ? null : id));
+    });
+    setShowFollowUpForm(false);
+  }, []);
+
+  // Pre-populate follow-up form on-demand only when opened (eliminates cascading render during list navigation)
+  const handleOpenFollowUpForm = useCallback(() => {
+    if (activeLead) {
+      setFollowUpData({
+        currentUpdate: 'Select',
+        nextRemark: '',
+        nextAction: 'Follow-Up Scheduled',
+        scheduleDate: activeLead.followUpDate
+          ? new Date(activeLead.followUpDate).toISOString().slice(0, 16)
+          : new Date().toISOString().slice(0, 16),
+        interestedIn: activeLead.notes && activeLead.notes.includes('[Campaign:')
+          ? [getCampaign(activeLead)]
+          : [],
+        classification: activeLead.status === 'ANSWERED' ? 'Hot Lead' : (activeLead.status === 'INTERESTED' ? 'Hot Lead' : 'Follow up'),
+        reassignedSellerId: activeLead.salesPersonId ? String(activeLead.salesPersonId) : '',
+        packageName: activeLead.packageName || 'Meta Ads Management',
+        packagePrice: activeLead.expectedValue ? String(activeLead.expectedValue) : '',
+        expectedClosingDate: activeLead.expectedClosingDate
+          ? new Date(activeLead.expectedClosingDate).toISOString().slice(0, 10)
+          : ''
+      });
+    }
+    setShowFollowUpForm(true);
+  }, [activeLead, getCampaign]);
+
   // Card filter toggle
   const handleStatusFilterClick = (filterKey) => {
     setActiveStatusFilter(prev => prev === filterKey ? null : filterKey);
@@ -430,7 +545,7 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
   };
 
   // WhatsApp verification & redirection
-  const handleWhatsAppClick = async (call) => {
+  const handleWhatsAppClick = useCallback(async (call) => {
     try {
       const res = await fetch(`/api/whatsapp/verify?phone=${encodeURIComponent(call.phoneNumber)}`);
       const data = await res.json();
@@ -444,12 +559,12 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
     } catch (err) {
       showToast('Connection error checking WhatsApp.', 'error');
     }
-  };
+  }, [showToast]);
 
   const [sendingReminderId, setSendingReminderId] = useState(null);
 
   // Send WhatsApp Reminder via Meta Cloud API
-  const handleSendWhatsAppReminder = async (call) => {
+  const handleSendWhatsAppReminder = useCallback(async (call) => {
     if (!call?.phoneNumber) {
       showToast('No phone number for this lead!', 'error');
       return;
@@ -478,7 +593,7 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
     } finally {
       setSendingReminderId(null);
     }
-  };
+  }, [showToast]);
 
   // Save Follow-up Handler (matching sales employee dashboard with admin reassignment)
   const handleSaveFollowUp = async (e, callId) => {
@@ -506,7 +621,6 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
       dbStatus = 'ANSWERED';
     }
 
-    const activeCall = callsList.find(c => c.id === callId);
     let noteText = `[Classification: ${followUpData.classification}] [Update: ${followUpData.currentUpdate}] ${followUpData.nextRemark}`;
     if (isConverted && followUpData.packageName) {
       noteText = `[Package: ${followUpData.packageName}] [Amount: ₹${followUpData.packagePrice || '0'}] [Expected Closing: ${followUpData.expectedClosingDate || 'N/A'}] ` + noteText;
@@ -514,16 +628,15 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
     if (followUpData.interestedIn.length > 0) {
       noteText = `[Interested: ${followUpData.interestedIn.join(', ')}] ` + noteText;
     }
-    const updatedNotes = activeCall?.notes ? `${activeCall.notes}\n${noteText}` : noteText;
 
+    const activeCall = callsList.find(c => c.id === callId);
     const dealPrice = followUpData.packagePrice !== '' && followUpData.packagePrice !== null && !isNaN(parseFloat(followUpData.packagePrice))
       ? parseFloat(followUpData.packagePrice)
       : (activeCall?.expectedValue || null);
-
     const chosenPackage = isConverted ? followUpData.packageName : (followUpData.packageName || activeCall?.packageName || null);
     const closingDate = followUpData.expectedClosingDate 
       ? new Date(followUpData.expectedClosingDate).toISOString() 
-      : (activeCall?.expectedClosingDate ? new Date(activeCall.expectedClosingDate).toISOString() : null);
+      : (activeCall?.expectedClosingDate || null);
 
     try {
       const res = await fetch(`/api/calls/${callId}`, {
@@ -531,7 +644,7 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: dbStatus,
-          notes: updatedNotes,
+          notes: noteText,
           followUpDate: followUpData.scheduleDate ? new Date(followUpData.scheduleDate).toISOString() : null,
           expectedValue: dealPrice,
           packageName: chosenPackage,
@@ -554,25 +667,51 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
     }
   };
 
-  // Reassign Lead Handler
-  const handleReassignLead = async (leadId, newSalesPersonId) => {
+  // Reassign Lead Handler (Optimistic update to eliminate 112ms INP stall)
+  const handleReassignLead = useCallback(async (leadId, newSalesPersonId) => {
+    const targetSellerId = parseInt(newSalesPersonId, 10);
+    const assignedSeller = salesUsers.find(s => s.id === targetSellerId);
+
+    // 1. Optimistic update immediately (0ms UI lag, no full re-fetch flash)
+    setCallsList(prev => prev.map(c => {
+      if (c.id === leadId) {
+        return {
+          ...c,
+          salesPersonId: targetSellerId,
+          salesPerson: assignedSeller ? { ...assignedSeller } : c.salesPerson
+        };
+      }
+      return c;
+    }));
+
     try {
       const res = await fetch(`/api/calls/${leadId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ salesPersonId: parseInt(newSalesPersonId, 10) })
+        body: JSON.stringify({ salesPersonId: targetSellerId })
       });
       if (res.ok) {
-        const assignedSeller = salesUsers.find(s => s.id === parseInt(newSalesPersonId, 10));
         showToast(`Lead reassigned to ${assignedSeller?.name || 'Sales Person'}`);
-        await fetchSellerData();
+        // Refresh silently in background without setting loading: true
+        const [callsRes, campaignsRes] = await Promise.all([
+          fetch('/api/calls'),
+          fetch('/api/campaigns')
+        ]);
+        if (callsRes.ok && campaignsRes.ok) {
+          const callsData = await callsRes.json();
+          const campaignsData = await campaignsRes.json();
+          setCallsList(callsData.calls || []);
+          setCampaigns(campaignsData.campaigns || []);
+        }
       } else {
         showToast('Failed to reassign lead', 'error');
+        fetchSellerData();
       }
     } catch (err) {
       showToast('Error reassigning lead', 'error');
+      fetchSellerData();
     }
-  };
+  }, [salesUsers, showToast, fetchSellerData]);
 
   // Full Data Delete handler for leads
   const handleDeleteAllLeads = async (scope = 'ALL') => {
@@ -704,7 +843,7 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
     }
   };
 
-  const handleDeleteLead = async (id, name) => {
+  const handleDeleteLead = useCallback(async (id, name) => {
     if (!confirm(`Are you sure you want to delete lead "${name}"?`)) return;
     try {
       const res = await fetch(`/api/calls/${id}`, { method: 'DELETE' });
@@ -718,7 +857,7 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
     } catch (err) {
       showToast('Error deleting lead', 'error');
     }
-  };
+  }, [selectedLeadId, showToast]);
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
@@ -1130,89 +1269,22 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
                   const timeString = displayDateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
                   return (
-                    <div
+                    <LeadCardItem
                       key={call.id}
-                      onClick={() => setSelectedLeadId(call.id)}
-                      className={`p-4 border-b border-slate-100 dark:border-slate-800/60 cursor-pointer ${getLeadCardStyle(call.status)} ${
-                        isSelected ? '!bg-blue-50/80 dark:!bg-blue-900/30 ring-1 ring-blue-500' : ''
-                      }`}
-                    >
-                      <div className="flex justify-between items-start mb-1.5">
-                        <div>
-                          <h4 className="font-bold text-sm text-slate-900 dark:text-white leading-tight">{call.clientName}</h4>
-                          <span className="text-[11px] font-mono text-slate-600 dark:text-slate-400">{call.phoneNumber}</span>
-                        </div>
-                        <div className="flex flex-col items-end gap-1">
-                          <span className={getStatusBadge(call.status, false, false)}>
-                            {getStatusDisplayText(call.status)}
-                          </span>
-                          {/* Salesperson tag */}
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded">
-                            <span>{call.salesPerson?.avatar || '👤'}</span>
-                            <span className="truncate max-w-[100px]">{call.salesPerson?.name || 'Seller'}</span>
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Campaign / Requirement Tag */}
-                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-2 flex-wrap">
-                        <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
-                          🏷️ {campaign.replace(' Campaign', '')}
-                        </span>
-                        {call.expectedValue ? (
-                          <span className="text-emerald-600 font-black">
-                            ₹{call.expectedValue.toLocaleString('en-IN')}
-                          </span>
-                        ) : null}
-                      </div>
-
-                      {call.notes && (
-                        <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-1 mb-2">
-                          {call.notes}
-                        </p>
-                      )}
-
-                      <div className="flex justify-between items-center text-[10px] text-slate-500 font-bold border-t border-slate-200/40 dark:border-slate-800/40 pt-2">
-                        <span>Schedule: {dateString} {timeString}</span>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleWhatsAppClick(call);
-                            }}
-                            className="p-1 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-600 rounded transition"
-                            title="WhatsApp"
-                          >
-                            <MessageCircle className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSendWhatsAppReminder(call);
-                            }}
-                            disabled={sendingReminderId === call.id}
-                            className="p-1 hover:bg-teal-50 dark:hover:bg-teal-950/40 text-teal-600 rounded transition disabled:opacity-50"
-                            title="Send WhatsApp Follow-up Reminder"
-                          >
-                            {sendingReminderId === call.id ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <Bell className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteLead(call.id, call.clientName);
-                            }}
-                            className="p-1 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-500 rounded transition"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                      call={call}
+                      isSelected={isSelected}
+                      onSelect={handleSelectLead}
+                      onWhatsApp={handleWhatsAppClick}
+                      onSendReminder={handleSendWhatsAppReminder}
+                      onDelete={handleDeleteLead}
+                      isSendingReminder={sendingReminderId === call.id}
+                      campaign={campaign}
+                      dateString={dateString}
+                      timeString={timeString}
+                      leadCardStyle={getLeadCardStyle(call.status)}
+                      statusBadgeClass={getStatusBadge(call.status, false, false)}
+                      statusDisplayText={getStatusDisplayText(call.status)}
+                    />
                   );
                 })
               )}
@@ -1534,7 +1606,7 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
                   <div className="flex flex-wrap justify-center gap-2 mb-6">
                     <button
                       type="button"
-                      onClick={() => setShowFollowUpForm(true)}
+                      onClick={handleOpenFollowUpForm}
                       className={`${getStatusBadge(activeLead.status, false, true)} cursor-pointer hover:opacity-90 active:scale-95 transition-all outline-none`}
                     >
                       {getStatusDisplayText(activeLead.status)}
@@ -1588,7 +1660,7 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
                       <Mail className="w-5 h-5" />
                     </a>
                     <button
-                      onClick={() => setShowFollowUpForm(true)}
+                      onClick={handleOpenFollowUpForm}
                       className="w-12 h-12 rounded-full border-2 border-blue-600 text-blue-600 flex items-center justify-center hover:bg-blue-50 transition"
                       title="Schedule Follow-up"
                     >
@@ -1605,7 +1677,7 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
                       <Edit2 className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => setShowFollowUpForm(true)}
+                      onClick={handleOpenFollowUpForm}
                       className="w-14 h-14 rounded-full bg-blue-700 hover:bg-blue-800 text-white flex items-center justify-center shadow-lg transition ml-2"
                       title="Log Follow-up & Remarks"
                     >

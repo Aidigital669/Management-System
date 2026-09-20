@@ -25,6 +25,27 @@ import {
 } from 'lucide-react';
 import AdminPreviewBanner from '@/components/AdminPreviewBanner';
 
+const safeISOString = (val, sliceLength = 16) => {
+  if (!val) return '';
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return '';
+    return d.toISOString().slice(0, sliceLength);
+  } catch {
+    return '';
+  }
+};
+
+const getCampaign = (call) => {
+  if (!call) return 'Direct / Native Lead';
+  if (call.leadSource) return call.leadSource;
+  if (call.notes && call.notes.includes('[Campaign:')) {
+    const match = call.notes.match(/\[Campaign:\s*([^\]]+)\]/);
+    if (match && match[1]) return match[1].trim();
+  }
+  return 'Direct / Native Lead';
+};
+
 export default function SalesDashboard() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState(null);
@@ -82,7 +103,7 @@ export default function SalesDashboard() {
           nextRemark: '',
           nextAction: 'Follow-Up Scheduled',
           scheduleDate: activeCall.followUpDate 
-            ? new Date(activeCall.followUpDate).toISOString().slice(0, 16) 
+            ? safeISOString(activeCall.followUpDate, 16) 
             : new Date().toISOString().slice(0, 16),
           interestedIn: activeCall.notes && activeCall.notes.includes('[Campaign:')
             ? [getCampaign(activeCall)]
@@ -90,9 +111,7 @@ export default function SalesDashboard() {
           classification: activeCall.status === 'ANSWERED' ? 'Hot Lead' : (activeCall.status === 'INTERESTED' ? 'Hot Lead' : 'Follow up'),
           packageName: activeCall.packageName || 'Meta Ads Management',
           packagePrice: activeCall.expectedValue ? String(activeCall.expectedValue) : '',
-          expectedClosingDate: activeCall.expectedClosingDate
-            ? new Date(activeCall.expectedClosingDate).toISOString().slice(0, 10)
-            : ''
+          expectedClosingDate: safeISOString(activeCall.expectedClosingDate, 10)
         });
       }
     }
@@ -170,32 +189,14 @@ export default function SalesDashboard() {
     return () => clearInterval(timer);
   }, [todayLog]);
 
-  useEffect(() => {
-    async function initDashboard() {
-      try {
-        const res = await fetch('/api/auth/me');
-        const data = await res.json();
-        if (!res.ok || !data.user || data.user.role !== 'SALES') {
-          router.push('/');
-          return;
-        }
-        setCurrentUser(data.user);
-        await refreshData(data.user.id);
-        setLoading(false);
-      } catch (err) {
-        console.error(err);
-        router.push('/');
-      }
-    }
-    initDashboard();
-  }, [router]);
-
   const refreshData = async (userId) => {
     try {
+      const currentId = userId || currentUser?.id;
+      const callsQuery = currentId ? `?salesPersonId=${currentId}` : '';
       const [tasksRes, attRes, callsRes, campaignsRes] = await Promise.all([
         fetch('/api/tasks'),
         fetch('/api/attendance'),
-        fetch(`/api/calls?salesPersonId=${userId || currentUser?.id}`),
+        fetch(`/api/calls${callsQuery}`),
         fetch('/api/campaigns')
       ]);
       const [tasksData, attData, callsData, campaignsData] = await Promise.all([
@@ -210,6 +211,27 @@ export default function SalesDashboard() {
       console.error('Error refreshing data:', err);
     }
   };
+
+  useEffect(() => {
+    async function initDashboard() {
+      try {
+        const res = await fetch('/api/auth/me');
+        const data = await res.json();
+        const allowedRoles = ['SALES', 'ADMIN', 'CEO'];
+        if (!res.ok || !data.user || !allowedRoles.includes(data.user.role)) {
+          router.push('/');
+          return;
+        }
+        setCurrentUser(data.user);
+        await refreshData(data.user.id);
+        setLoading(false);
+      } catch (err) {
+        console.error(err);
+        router.push('/');
+      }
+    }
+    initDashboard();
+  }, [router]);
 
   const handleClearAllLeads = async () => {
     if (!window.confirm('Are you sure you want to delete all test leads? This will reset your dashboard.')) return;
@@ -323,6 +345,7 @@ export default function SalesDashboard() {
       }
     } catch (err) {
       showToast('Connection error checking WhatsApp.', 'error');
+    }
   };
 
   const [sendingReminderId, setSendingReminderId] = useState(null);
@@ -359,14 +382,7 @@ export default function SalesDashboard() {
     }
   };
 
-  const getCampaign = (call) => {
-    if (call.leadSource) return call.leadSource;
-    if (call.notes && call.notes.includes('[Campaign:')) {
-      const match = call.notes.match(/\[Campaign:\s*([^\]]+)\]/);
-      if (match && match[1]) return match[1].trim();
-    }
-    return 'Direct / Native Lead';
-  };
+
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('DEFAULT');
@@ -1124,7 +1140,7 @@ export default function SalesDashboard() {
               <CheckSquare className="w-4 h-4" /> CRM Dashboard
             </button>
             <button onClick={() => { setActiveTab('followups'); setIsMobileMenuOpen(false); }} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === 'followups' ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
-              <Calendar className="w-4 h-4" /> Today's Followup
+              <Calendar className="w-4 h-4" /> Today&apos;s Followup
             </button>
           </nav>
         </div>
@@ -1610,7 +1626,7 @@ export default function SalesDashboard() {
             <div className="flex flex-col gap-4 animate-fade-in">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between shrink-0 gap-4">
                 <div>
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white">Today's Follow-ups</h3>
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white">Today&apos;s Follow-ups</h3>
                   <p className="text-slate-500 text-xs mt-1">Leads scheduled for call follow-up on {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}.</p>
                 </div>
               </div>
@@ -1856,5 +1872,4 @@ export default function SalesDashboard() {
       )}
     </div>
   );
-}
 }
