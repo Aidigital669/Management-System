@@ -318,10 +318,30 @@ export default function CeoDashboard() {
 
   // Helper to parse payment status and revenue breakdown
   const getClientPaymentInfo = (client) => {
-    if (!client) return { pStatus: 'Full', paidAmount: 0, totalAmount: 0, pendingBalance: 0, isPartial: false };
+    if (!client) return {
+      pStatus: 'Full',
+      paidAmount: 0,
+      totalAmount: 0,
+      pendingBalance: 0,
+      isPartial: false,
+      paymentDate: '',
+      paymentMethod: 'UPI',
+      utrNumber: '',
+      verificationStatus: 'UNVERIFIED',
+      isVerified: false,
+      isLegacyDate: true
+    };
     const totalAmount = client.packageAmount || 0;
     let pStatus = 'Full';
     let paidAmount = totalAmount;
+    let paymentDate = '';
+    let paymentMethod = 'UPI';
+    let utrNumber = '';
+    let verificationStatus = 'VERIFIED';
+    let isVerified = true;
+    let verifiedBy = null;
+    let verifiedAt = null;
+    let isLegacyDate = false;
 
     try {
       if (client.notes) {
@@ -329,9 +349,21 @@ export default function CeoDashboard() {
         if (parsed && typeof parsed === 'object') {
           pStatus = parsed.paymentStatus || 'Full';
           paidAmount = parsed.paidAmount !== undefined ? parseFloat(parsed.paidAmount) || 0 : (pStatus === 'Pending' ? 0 : totalAmount);
+          paymentDate = parsed.paymentDate || '';
+          paymentMethod = parsed.paymentMethod || 'UPI';
+          utrNumber = parsed.utrNumber || '';
+          verificationStatus = parsed.verificationStatus || (parsed.isVerified === false ? 'PENDING_VERIFICATION' : 'VERIFIED');
+          isVerified = verificationStatus === 'VERIFIED';
+          verifiedBy = parsed.verifiedBy || null;
+          verifiedAt = parsed.verifiedAt || null;
         }
       }
     } catch (e) { }
+
+    if (!paymentDate) {
+      paymentDate = client.joiningDate || '';
+      isLegacyDate = true;
+    }
 
     const pendingBalance = Math.max(0, totalAmount - paidAmount);
     const isPartial = pStatus === 'Half' || pStatus === 'Partial' || (pendingBalance > 0 && pStatus !== 'Pending');
@@ -341,7 +373,15 @@ export default function CeoDashboard() {
       paidAmount,
       totalAmount,
       pendingBalance,
-      isPartial
+      isPartial,
+      paymentDate,
+      paymentMethod,
+      utrNumber,
+      verificationStatus,
+      isVerified,
+      verifiedBy,
+      verifiedAt,
+      isLegacyDate
     };
   };
 

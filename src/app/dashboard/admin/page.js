@@ -53,6 +53,16 @@ const EmployeePerformanceHub = dynamic(() => import('./EmployeePerformanceHub'),
   ),
   ssr: false
 });
+
+const PaymentManagementHub = dynamic(() => import('./PaymentManagementHub'), {
+  loading: () => (
+    <div className="flex items-center justify-center p-16 text-slate-400 gap-2">
+      <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      <span className="text-sm font-medium">Loading Payment Hub...</span>
+    </div>
+  ),
+  ssr: false
+});
 import {
   Award,
   Users,
@@ -281,6 +291,12 @@ export default function AdminDashboard() {
   const [paymentStatus, setPaymentStatus] = useState('Full');
   const [paidAmount, setPaidAmount] = useState('19499');
   const [actualNotes, setActualNotes] = useState('');
+  const [clientPaymentDate, setClientPaymentDate] = useState('');
+  const [clientPaymentMethod, setClientPaymentMethod] = useState('UPI');
+  const [clientUtrNumber, setClientUtrNumber] = useState('');
+  const [clientVerificationStatus, setClientVerificationStatus] = useState('VERIFIED');
+  const [clientVerificationNotes, setClientVerificationNotes] = useState('');
+  const [clientPaymentHistory, setClientPaymentHistory] = useState([]);
 
   // Plan Renewal & Extension Approval States
   const [renewalRequestsList, setRenewalRequestsList] = useState([]);
@@ -593,12 +609,41 @@ export default function AdminDashboard() {
   };
 
   const getClientPaymentInfo = (client) => {
-    if (!client) return { pStatus: 'Full', paidAmount: 0, totalAmount: 0, pendingBalance: 0, isPartial: false, daysPassed: 0, isOverdue7Days: false, actualNotes: '' };
+    if (!client) return {
+      pStatus: 'Full',
+      paidAmount: 0,
+      totalAmount: 0,
+      pendingBalance: 0,
+      isPartial: false,
+      daysPassed: 0,
+      isOverdue7Days: false,
+      actualNotes: '',
+      paymentDate: '',
+      paymentMethod: 'UPI',
+      utrNumber: '',
+      verificationStatus: 'UNVERIFIED',
+      isVerified: false,
+      verifiedBy: null,
+      verifiedAt: null,
+      verificationNotes: '',
+      paymentHistory: [],
+      isLegacyDate: true
+    };
     
     const totalAmount = client.packageAmount || 0;
     let pStatus = 'Full';
     let paidAmount = totalAmount;
     let actualNotes = '';
+    let paymentDate = '';
+    let paymentMethod = 'UPI';
+    let utrNumber = '';
+    let verificationStatus = 'VERIFIED';
+    let isVerified = true;
+    let verifiedBy = null;
+    let verifiedAt = null;
+    let verificationNotes = '';
+    let paymentHistory = [];
+    let isLegacyDate = false;
 
     try {
       if (client.notes) {
@@ -607,6 +652,15 @@ export default function AdminDashboard() {
           pStatus = parsed.paymentStatus || 'Full';
           paidAmount = parsed.paidAmount !== undefined ? parseFloat(parsed.paidAmount) || 0 : totalAmount;
           actualNotes = parsed.actualNotes || '';
+          paymentDate = parsed.paymentDate || '';
+          paymentMethod = parsed.paymentMethod || 'UPI';
+          utrNumber = parsed.utrNumber || '';
+          verificationStatus = parsed.verificationStatus || (parsed.isVerified === false ? 'PENDING_VERIFICATION' : (parsed.isVerified === true ? 'VERIFIED' : (parsed.paymentDate ? 'VERIFIED' : 'UNVERIFIED')));
+          isVerified = verificationStatus === 'VERIFIED';
+          verifiedBy = parsed.verifiedBy || null;
+          verifiedAt = parsed.verifiedAt || null;
+          verificationNotes = parsed.verificationNotes || '';
+          paymentHistory = Array.isArray(parsed.paymentHistory) ? parsed.paymentHistory : [];
         } else {
           actualNotes = client.notes;
         }
@@ -615,11 +669,23 @@ export default function AdminDashboard() {
       actualNotes = client.notes || '';
     }
 
-    const pendingBalance = Math.max(0, totalAmount - paidAmount);
-    const isPartial = pStatus === 'Half' || pendingBalance > 0;
+    // Legacy fallback: if no explicit paymentDate, use joiningDate
+    if (!paymentDate) {
+      paymentDate = client.joiningDate || '';
+      isLegacyDate = true;
+      if (!verificationStatus || verificationStatus === 'VERIFIED') {
+        verificationStatus = 'VERIFIED';
+        isVerified = true;
+      }
+    }
 
+    const pendingBalance = Math.max(0, totalAmount - paidAmount);
+    const isPartial = pStatus === 'Half' || pStatus === 'Partial' || pendingBalance > 0;
+
+    // Calculate 7-day overdue aging using actual payment date (or joining date if no payment date)
     let daysPassed = 0;
-    if (client.joiningDate) {
+    const dateForAging = paymentDate || client.joiningDate;
+    if (dateForAging) {
       const parseToISO = (dateStr) => {
         if (!dateStr || typeof dateStr !== 'string') return null;
         if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.slice(0, 10);
@@ -634,7 +700,7 @@ export default function AdminDashboard() {
         return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
       };
 
-      const isoDate = parseToISO(client.joiningDate);
+      const isoDate = parseToISO(dateForAging);
       if (isoDate) {
         const start = new Date(isoDate);
         const now = new Date();
@@ -653,7 +719,17 @@ export default function AdminDashboard() {
       isPartial,
       daysPassed,
       isOverdue7Days,
-      actualNotes
+      actualNotes,
+      paymentDate,
+      paymentMethod,
+      utrNumber,
+      verificationStatus,
+      isVerified,
+      verifiedBy,
+      verifiedAt,
+      verificationNotes,
+      paymentHistory,
+      isLegacyDate
     };
   };
 
@@ -1010,6 +1086,12 @@ export default function AdminDashboard() {
       let pStatus = 'Full';
       let pAmt = client.packageAmount.toString();
       let aNotes = '';
+      let pDate = '';
+      let pMethod = 'UPI';
+      let utr = '';
+      let vStatus = 'VERIFIED';
+      let vNotes = '';
+      let pHistory = [];
       try {
         if (client.notes) {
           const parsed = JSON.parse(client.notes);
@@ -1017,6 +1099,12 @@ export default function AdminDashboard() {
             pStatus = parsed.paymentStatus || 'Full';
             pAmt = parsed.paidAmount !== undefined ? parsed.paidAmount.toString() : client.packageAmount.toString();
             aNotes = parsed.actualNotes || '';
+            pDate = parsed.paymentDate || '';
+            pMethod = parsed.paymentMethod || 'UPI';
+            utr = parsed.utrNumber || '';
+            vStatus = parsed.verificationStatus || (parsed.isVerified === false ? 'PENDING_VERIFICATION' : 'VERIFIED');
+            vNotes = parsed.verificationNotes || '';
+            pHistory = Array.isArray(parsed.paymentHistory) ? parsed.paymentHistory : [];
           } else {
             aNotes = client.notes;
           }
@@ -1027,6 +1115,12 @@ export default function AdminDashboard() {
       setPaymentStatus(pStatus);
       setPaidAmount(pAmt);
       setActualNotes(aNotes);
+      setClientPaymentDate(pDate || client.joiningDate || '');
+      setClientPaymentMethod(pMethod);
+      setClientUtrNumber(utr);
+      setClientVerificationStatus(vStatus);
+      setClientVerificationNotes(vNotes);
+      setClientPaymentHistory(pHistory);
 
       const clientTasksForThisClient = allClientTasks.filter(t => t.clientId === client.clientId);
       const clientDeliveriesForThisClient = allClientDeliveries.filter(d => d.clientId === client.clientId);
@@ -1081,6 +1175,12 @@ export default function AdminDashboard() {
       setPaymentStatus('Full');
       setPaidAmount('19499');
       setActualNotes('');
+      setClientPaymentDate(new Date().toISOString().split('T')[0]);
+      setClientPaymentMethod('UPI');
+      setClientUtrNumber('');
+      setClientVerificationStatus('VERIFIED');
+      setClientVerificationNotes('');
+      setClientPaymentHistory([]);
       setAssignedStaff({ c: 'AUTO', r: 'AUTO', a: 'AUTO', script: '', poster: '', sm: 'AUTO' });
     }
   };
@@ -1126,7 +1226,30 @@ export default function AdminDashboard() {
         notes: JSON.stringify({
           paymentStatus,
           paidAmount: parseFloat(paidAmount) || 0,
-          actualNotes
+          actualNotes,
+          paymentDate: clientPaymentDate || clientFormDate,
+          paymentMethod: clientPaymentMethod || 'UPI',
+          utrNumber: clientUtrNumber || '',
+          verificationStatus: clientVerificationStatus || 'VERIFIED',
+          isVerified: clientVerificationStatus === 'VERIFIED',
+          verifiedBy: clientVerificationStatus === 'VERIFIED' ? (currentUser?.name || 'Admin') : null,
+          verifiedAt: clientVerificationStatus === 'VERIFIED' ? new Date().toISOString() : null,
+          verificationNotes: clientVerificationNotes || '',
+          paymentHistory: clientPaymentHistory && clientPaymentHistory.length > 0
+            ? clientPaymentHistory
+            : [
+                {
+                  id: 1,
+                  date: clientPaymentDate || clientFormDate,
+                  amount: parseFloat(paidAmount) || 0,
+                  method: clientPaymentMethod || 'UPI',
+                  utr: clientUtrNumber || '',
+                  status: clientVerificationStatus || 'VERIFIED',
+                  verifiedBy: clientVerificationStatus === 'VERIFIED' ? (currentUser?.name || 'Admin') : null,
+                  verifiedAt: clientVerificationStatus === 'VERIFIED' ? new Date().toISOString() : null,
+                  notes: 'Initial Payment'
+                }
+              ]
         }),
         ...(mode === 'EDIT' ? { staffAssignments: customAssignments || assignedStaff } : {})
       };
@@ -2644,33 +2767,32 @@ export default function AdminDashboard() {
             </button>
 
             <button
-              onClick={() => handleSelectTab('pending-payments')}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === 'pending-payments'
-                  ? 'bg-amber-50 dark:bg-amber-955/40 text-amber-700 dark:text-amber-400 font-extrabold'
+              onClick={() => handleSelectTab('payments')}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition cursor-pointer ${
+                activeTab === 'payments' || activeTab === 'pending-payments'
+                  ? 'bg-blue-50 dark:bg-blue-955/40 text-blue-700 dark:text-blue-400 font-extrabold shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              <CreditCard className="w-4 h-4 text-amber-500" />
-              <span>Pending Payments</span>
+              <CreditCard className="w-4 h-4 text-blue-500" />
+              <span>Payments</span>
               {(() => {
+                const toVerifyCount = clientsList.filter(c => getClientPaymentInfo(c).verificationStatus === 'PENDING_VERIFICATION').length;
                 const overdueCount = clientsList.filter(c => getClientPaymentInfo(c).isOverdue7Days).length;
-                const totalPendingCount = clientsList.filter(c => getClientPaymentInfo(c).isPartial).length;
-                if (overdueCount > 0) {
-                  return (
-                    <span className="ml-auto px-1.5 py-0.5 bg-red-600 text-white rounded-full text-[10px] font-black animate-pulse">
-                      {overdueCount} Due
-                    </span>
-                  );
-                }
-                if (totalPendingCount > 0) {
-                  return (
-                    <span className="ml-auto px-1.5 py-0.5 bg-amber-500 text-white rounded-full text-[10px] font-bold">
-                      {totalPendingCount}
-                    </span>
-                  );
-                }
-                return null;
+                return (
+                  <div className="ml-auto flex items-center gap-1">
+                    {toVerifyCount > 0 && (
+                      <span className="px-1.5 py-0.5 bg-amber-500 text-white rounded-full text-[10px] font-black animate-pulse" title={`${toVerifyCount} payments to verify`}>
+                        {toVerifyCount} Verify
+                      </span>
+                    )}
+                    {overdueCount > 0 && (
+                      <span className="px-1.5 py-0.5 bg-red-600 text-white rounded-full text-[10px] font-black animate-pulse" title={`${overdueCount} payments overdue`}>
+                        {overdueCount} Due
+                      </span>
+                    )}
+                  </div>
+                );
               })()}
             </button>
 
@@ -4309,295 +4431,16 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* TAB: PENDING PAYMENTS */}
-          {activeTab === 'pending-payments' && (
-            <div className="space-y-6 animate-fade-in text-xs">
-              
-              {/* Top Metrics Cards & Filtered List */}
-              {(() => {
-                const availablePaymentMonths = (() => {
-                  const monthMap = new Map();
-                  clientsList.filter(c => getClientPaymentInfo(c).isPartial).forEach(c => {
-                    const mk = parseClientMonthKey(c);
-                    if (mk && mk.length >= 7) {
-                      if (!monthMap.has(mk)) {
-                        const [yyyy, mm] = mk.split('-');
-                        const d = new Date(parseInt(yyyy, 10), parseInt(mm, 10) - 1, 1);
-                        const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-                        monthMap.set(mk, { key: mk, label, count: 0 });
-                      }
-                      monthMap.get(mk).count += 1;
-                    }
-                  });
-                  return Array.from(monthMap.values()).sort((a, b) => b.key.localeCompare(a.key));
-                })();
-
-                const filteredPendingClients = clientsList
-                  .filter(c => getClientPaymentInfo(c).isPartial)
-                  .filter(c => {
-                    const q = paymentTabSearch.toLowerCase();
-                    const matchesSearch = !q || (
-                      c.businessName.toLowerCase().includes(q) ||
-                      c.clientId.toLowerCase().includes(q) ||
-                      (c.clientName && c.clientName.toLowerCase().includes(q)) ||
-                      (c.contact && c.contact.includes(q))
-                    );
-                    if (!matchesSearch) return false;
-
-                    if (paymentStartDate || paymentEndDate) {
-                      if (!isDateInRange(c.joiningDate, paymentStartDate, paymentEndDate)) return false;
-                    } else if (paymentMonthFilter !== 'all') {
-                      const mk = parseClientMonthKey(c);
-                      if (mk !== paymentMonthFilter) return false;
-                    }
-                    return true;
-                  });
-
-                const overdue7Clients = filteredPendingClients.filter(c => getClientPaymentInfo(c).isOverdue7Days);
-                const totalPendingBalance = filteredPendingClients.reduce((sum, c) => sum + getClientPaymentInfo(c).pendingBalance, 0);
-                const totalReceived = filteredPendingClients.reduce((sum, c) => sum + getClientPaymentInfo(c).paidAmount, 0);
-
-                return (
-                  <>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
-                        <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Clients with Pending Balance</span>
-                        <div className="text-xl font-bold text-slate-900 dark:text-white mt-1">{filteredPendingClients.length}</div>
-                        <span className="text-[9px] text-slate-400 font-medium">Partial / Half payment accounts</span>
-                      </div>
-
-                      <div className="bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/50 p-5 rounded-2xl shadow-sm flex flex-col gap-1 bg-amber-50/30 dark:bg-amber-955/10">
-                        <span className="text-[10px] text-amber-700 dark:text-amber-400 font-extrabold uppercase tracking-wider">Total Remaining Rupees Due</span>
-                        <div className="text-xl font-black text-amber-700 dark:text-amber-400 mt-1">₹{totalPendingBalance.toLocaleString()}</div>
-                        <span className="text-[9px] text-amber-600/80 dark:text-amber-400/80 font-medium">Uncollected package balance</span>
-                      </div>
-
-                      <div className="bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/50 p-5 rounded-2xl shadow-sm flex flex-col gap-1 bg-red-50/30 dark:bg-red-955/10">
-                        <span className="text-[10px] text-red-600 dark:text-red-400 font-extrabold uppercase tracking-wider">7-Day Overdue Follow-ups</span>
-                        <div className="text-xl font-black text-red-600 dark:text-red-400 mt-1">{overdue7Clients.length}</div>
-                        <span className="text-[9px] text-red-600/80 dark:text-red-400/80 font-medium">7 days elapsed since payment</span>
-                      </div>
-
-                      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
-                        <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Total Received Revenue</span>
-                        <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">₹{totalReceived.toLocaleString()}</div>
-                        <span className="text-[9px] text-slate-400 font-medium">Payments collected in period</span>
-                      </div>
-                    </div>
-
-                    {/* Toolbar */}
-                    <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1 flex-wrap">
-                        <div className="relative flex items-center flex-1 min-w-[200px] max-w-md">
-                          <Search className="absolute left-3 w-4 h-4 text-slate-400" />
-                          <input
-                            type="text"
-                            value={paymentTabSearch}
-                            onChange={(e) => setPaymentTabSearch(e.target.value)}
-                            placeholder="Search business, name, ID, contact..."
-                            className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-xl focus:outline-none focus:border-blue-600 text-xs transition"
-                          />
-                        </div>
-
-                        {/* Month Filter Selector */}
-                        <div className="flex items-center gap-1.5">
-                          <select
-                            value={paymentMonthFilter}
-                            onChange={(e) => handleMonthRangeChange(e.target.value, setPaymentMonthFilter, setPaymentStartDate, setPaymentEndDate)}
-                            className="px-3 py-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-sm"
-                          >
-                            <option value="all">📅 All Months</option>
-                            {availablePaymentMonths.map(m => (
-                              <option key={m.key} value={m.key}>
-                                📅 {m.label} ({m.count} pending)
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Date Range: Starting to Ending Date */}
-                        <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/80 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">From</span>
-                            <input
-                              type="date"
-                              value={paymentStartDate}
-                              onChange={(e) => { setPaymentStartDate(e.target.value); setPaymentMonthFilter('custom'); }}
-                              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-inner"
-                            />
-                          </div>
-                          <span className="text-slate-400 font-bold text-xs">-</span>
-                          <div className="flex items-center gap-1">
-                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">To</span>
-                            <input
-                              type="date"
-                              value={paymentEndDate}
-                              onChange={(e) => { setPaymentEndDate(e.target.value); setPaymentMonthFilter('custom'); }}
-                              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-inner"
-                            />
-                          </div>
-                          {(paymentStartDate || paymentEndDate) && (
-                            <button
-                              type="button"
-                              onClick={() => { setPaymentStartDate(''); setPaymentEndDate(''); setPaymentMonthFilter('all'); }}
-                              className="ml-1 px-1.5 py-0.5 text-[10px] font-black text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition cursor-pointer"
-                              title="Clear Date Range"
-                            >
-                              ✕
-                            </button>
-                          )}
-                        </div>
-
-                        {(paymentMonthFilter !== 'all' || paymentStartDate || paymentEndDate || paymentTabSearch) && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setPaymentMonthFilter('all');
-                              setPaymentStartDate('');
-                              setPaymentEndDate('');
-                              setPaymentTabSearch('');
-                            }}
-                            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold transition cursor-pointer"
-                          >
-                            Reset
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {['All', 'Overdue7', 'Within7'].map(mode => (
-                          <button
-                            key={mode}
-                            onClick={() => setPaymentTabFilter(mode)}
-                            className={`px-3 py-1.5 rounded-xl font-extrabold text-[11px] transition ${
-                              paymentTabFilter === mode
-                                ? mode === 'Overdue7' ? 'bg-red-600 text-white shadow' : 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow'
-                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
-                            }`}
-                          >
-                            {mode === 'All' ? 'All Pending' : mode === 'Overdue7' ? '⚠️ 7-Day Overdue' : '⏳ Within 7 Days'}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                );
-              })()}
-
-              {/* Pending Payments Table */}
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="min-w-[850px] w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase tracking-wider">
-                        <th className="p-4">Client / Business</th>
-                        <th className="p-4">Contact Info</th>
-                        <th className="p-4">Package & Services</th>
-                        <th className="p-4">Total Price</th>
-                        <th className="p-4">Paid (Received)</th>
-                        <th className="p-4">Remaining Rupees Due</th>
-                        <th className="p-4">Joining / Payment Date</th>
-                        <th className="p-4">7-Day Alert Status</th>
-                        <th className="p-4 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {(() => {
-                        const list = clientsList
-                          .filter(c => getClientPaymentInfo(c).isPartial)
-                          .filter(c => {
-                            if (paymentStartDate || paymentEndDate) {
-                              if (!isDateInRange(c.joiningDate, paymentStartDate, paymentEndDate)) return false;
-                            } else if (paymentMonthFilter !== 'all') {
-                              const mk = parseClientMonthKey(c);
-                              if (mk !== paymentMonthFilter) return false;
-                            }
-                            return true;
-                          })
-                          .filter(c => {
-                            const info = getClientPaymentInfo(c);
-                            if (paymentTabFilter === 'Overdue7') return info.isOverdue7Days;
-                            if (paymentTabFilter === 'Within7') return !info.isOverdue7Days;
-                            return true;
-                          })
-                          .filter(c => {
-                            if (!paymentTabSearch) return true;
-                            const q = paymentTabSearch.toLowerCase();
-                            return (
-                              c.businessName.toLowerCase().includes(q) ||
-                              c.clientId.toLowerCase().includes(q) ||
-                              (c.clientName && c.clientName.toLowerCase().includes(q)) ||
-                              (c.contact && c.contact.includes(q))
-                            );
-                          });
-
-                        if (list.length === 0) {
-                          return (
-                            <tr>
-                              <td colSpan="9" className="p-8 text-center text-slate-400 italic">No pending payment accounts match the current filter.</td>
-                            </tr>
-                          );
-                        }
-
-                        return list.map(client => {
-                          const info = getClientPaymentInfo(client);
-                          return (
-                            <tr key={`pay-${client.id}`} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/40 transition text-slate-700 dark:text-slate-300">
-                              <td className="p-4 font-bold">
-                                <div className="text-slate-900 dark:text-white">{client.businessName}</div>
-                                <div className="text-[9px] text-slate-400 font-semibold mt-0.5">ID: {client.clientId} | Person: {client.clientName || 'N/A'}</div>
-                              </td>
-                              <td className="p-4">
-                                <div className="font-semibold">{client.contact || 'No Phone'}</div>
-                                <div className="text-[9px] text-slate-400">{client.email || 'No Email'}</div>
-                              </td>
-                              <td className="p-4">
-                                <div className="font-bold text-blue-650 dark:text-blue-400">{client.packageName}</div>
-                                <div className="text-[9px] text-slate-400">{client.services}</div>
-                              </td>
-                              <td className="p-4 font-bold text-slate-900 dark:text-white">
-                                ₹{info.totalAmount.toLocaleString()}
-                              </td>
-                              <td className="p-4 font-bold text-emerald-600 dark:text-emerald-400">
-                                ₹{info.paidAmount.toLocaleString()}
-                              </td>
-                              <td className="p-4 font-black text-red-600 dark:text-red-400 text-sm">
-                                ₹{info.pendingBalance.toLocaleString()}
-                              </td>
-                              <td className="p-4 font-semibold text-slate-600 dark:text-slate-400">
-                                {client.joiningDate}
-                              </td>
-                              <td className="p-4">
-                                {info.isOverdue7Days ? (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black bg-red-100 text-red-700 dark:bg-red-955/50 dark:text-red-400 border border-red-300 dark:border-red-900/60 animate-pulse">
-                                    ⚠️ 7-Day Overdue ({info.daysPassed} days)
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-955/40 dark:text-amber-300 border border-amber-200/80 dark:border-amber-900/50">
-                                    ⏳ Day {info.daysPassed} of 7
-                                  </span>
-                                )}
-                              </td>
-                              <td className="p-4 text-right space-x-2">
-                                <button
-                                  onClick={() => handleMarkFullyPaid(client)}
-                                  disabled={formLoading}
-                                  className="py-1.5 px-3 rounded-xl text-[10px] font-bold transition inline-flex items-center gap-1 shadow-sm disabled:opacity-50 bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/10 cursor-pointer"
-                                >
-                                  <span>Mark Fully Paid</span>
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        });
-                      })()}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-            </div>
+          {/* TAB: PAYMENTS MANAGEMENT & VERIFICATION HUB */}
+          {(activeTab === 'payments' || activeTab === 'pending-payments') && (
+            <PaymentManagementHub
+              clientsList={clientsList}
+              getClientPaymentInfo={getClientPaymentInfo}
+              refreshData={refreshData}
+              currentUser={currentUser}
+              showToast={showToast}
+              openConfirmModal={openConfirmModal}
+            />
           )}
 
           {/* TAB 8: GLOBAL CAMPAIGN DELIVERIES */}
@@ -7933,13 +7776,13 @@ export default function AdminDashboard() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="font-bold text-slate-700 dark:text-slate-350">Joining Date</label>
+                    <label className="font-bold text-slate-700 dark:text-slate-350">Onboarding / Contract Start Date</label>
                     <input
                       type="text"
                       required
                       value={clientFormDate}
                       onChange={(e) => setClientFormDate(e.target.value)}
-                      placeholder="e.g. 02-May-2026"
+                      placeholder="e.g. 02-May-2026 or 2026-05-02"
                       className="w-full p-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none"
                     />
                   </div>
@@ -8164,6 +8007,63 @@ export default function AdminDashboard() {
                       placeholder="e.g. 5000"
                       className="w-full p-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none disabled:opacity-60 disabled:bg-slate-100 dark:disabled:bg-slate-900"
                     />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-700 dark:text-slate-350 flex items-center justify-between">
+                      <span>Actual Payment Date</span>
+                      <span className="text-[10px] text-blue-600 dark:text-blue-400 font-normal">Independent of Joining Date</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={clientPaymentDate}
+                      onChange={(e) => setClientPaymentDate(e.target.value)}
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none cursor-pointer text-xs font-bold"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-700 dark:text-slate-350">Payment Mode</label>
+                    <select
+                      value={clientPaymentMethod}
+                      onChange={(e) => setClientPaymentMethod(e.target.value)}
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none cursor-pointer text-xs font-bold"
+                    >
+                      <option value="UPI">UPI (Google Pay / PhonePe / Paytm)</option>
+                      <option value="Bank Transfer">Bank Transfer (IMPS / NEFT / RTGS)</option>
+                      <option value="Razorpay">Razorpay Gateway</option>
+                      <option value="Cash">Cash Deposit</option>
+                      <option value="Cheque">Cheque Deposit</option>
+                      <option value="Credit / Debit Card">Credit / Debit Card</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-700 dark:text-slate-350">UTR / Bank Transaction Ref</label>
+                    <input
+                      type="text"
+                      value={clientUtrNumber}
+                      onChange={(e) => setClientUtrNumber(e.target.value)}
+                      placeholder="e.g. HDFC-987654 or UPI-2940291"
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none font-mono text-xs"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-700 dark:text-slate-350">Bank Verification Status</label>
+                    <select
+                      value={clientVerificationStatus}
+                      onChange={(e) => setClientVerificationStatus(e.target.value)}
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none cursor-pointer text-xs font-bold"
+                    >
+                      <option value="VERIFIED">✅ Verified (Confirmed in Bank)</option>
+                      <option value="PENDING_VERIFICATION">⚠️ Pending Verification</option>
+                      <option value="UNVERIFIED">❌ Unverified</option>
+                    </select>
                   </div>
                 </div>
 
@@ -8512,12 +8412,13 @@ export default function AdminDashboard() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="font-bold text-slate-700 dark:text-slate-355">Joining Date</label>
+                    <label className="font-bold text-slate-700 dark:text-slate-355">Onboarding / Contract Start Date</label>
                     <input
                       type="text"
                       required
                       value={clientFormDate}
                       onChange={(e) => setClientFormDate(e.target.value)}
+                      placeholder="e.g. 02-May-2026 or 2026-05-02"
                       className="w-full p-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none"
                     />
                   </div>
@@ -8735,6 +8636,63 @@ export default function AdminDashboard() {
                       placeholder="e.g. 5000"
                       className="w-full p-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none disabled:opacity-60 disabled:bg-slate-100 dark:disabled:bg-slate-900"
                     />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-700 dark:text-slate-355 flex items-center justify-between">
+                      <span>Actual Payment Date</span>
+                      <span className="text-[10px] text-blue-600 dark:text-blue-400 font-normal">Independent of Joining Date</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={clientPaymentDate}
+                      onChange={(e) => setClientPaymentDate(e.target.value)}
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none cursor-pointer text-xs font-bold"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-700 dark:text-slate-355">Payment Mode</label>
+                    <select
+                      value={clientPaymentMethod}
+                      onChange={(e) => setClientPaymentMethod(e.target.value)}
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none cursor-pointer text-xs font-bold"
+                    >
+                      <option value="UPI">UPI (Google Pay / PhonePe / Paytm)</option>
+                      <option value="Bank Transfer">Bank Transfer (IMPS / NEFT / RTGS)</option>
+                      <option value="Razorpay">Razorpay Gateway</option>
+                      <option value="Cash">Cash Deposit</option>
+                      <option value="Cheque">Cheque Deposit</option>
+                      <option value="Credit / Debit Card">Credit / Debit Card</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-700 dark:text-slate-355">UTR / Bank Transaction Ref</label>
+                    <input
+                      type="text"
+                      value={clientUtrNumber}
+                      onChange={(e) => setClientUtrNumber(e.target.value)}
+                      placeholder="e.g. HDFC-987654 or UPI-2940291"
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none font-mono text-xs"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-700 dark:text-slate-355">Bank Verification Status</label>
+                    <select
+                      value={clientVerificationStatus}
+                      onChange={(e) => setClientVerificationStatus(e.target.value)}
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none cursor-pointer text-xs font-bold"
+                    >
+                      <option value="VERIFIED">✅ Verified (Confirmed in Bank)</option>
+                      <option value="PENDING_VERIFICATION">⚠️ Pending Verification</option>
+                      <option value="UNVERIFIED">❌ Unverified</option>
+                    </select>
                   </div>
                 </div>
 
