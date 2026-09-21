@@ -21,9 +21,11 @@ import {
   Menu,
   X,
   Bell,
-  Loader2
+  Loader2,
+  History
 } from 'lucide-react';
 import AdminPreviewBanner from '@/components/AdminPreviewBanner';
+import RemarksHistoryTimeline from '@/components/RemarksHistoryTimeline';
 
 const safeISOString = (val, sliceLength = 16) => {
   if (!val) return '';
@@ -59,6 +61,7 @@ export default function SalesDashboard() {
   const [callsList, setCallsList] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [otherOption, setOtherOption] = useState('Switch Off');
+  const [historyLeadFilter, setHistoryLeadFilter] = useState('');
 
   // Timer States
   const [timeStr, setTimeStr] = useState('');
@@ -506,9 +509,10 @@ export default function SalesDashboard() {
     }
 
     const activeCall = callsList.find(c => c.id === callId);
-    let noteText = `[Classification: ${followUpData.classification}] [Update: ${followUpData.currentUpdate}] ${followUpData.nextRemark}`;
+    const nowStamp = new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+    let noteText = `[${nowStamp}] [Classification: ${followUpData.classification}] [Update: ${followUpData.currentUpdate}] ${followUpData.nextRemark}`;
     if (isConverted && followUpData.packageName) {
-      noteText = `[Package: ${followUpData.packageName}] [Amount: ₹${followUpData.packagePrice || '0'}] [Expected Closing: ${followUpData.expectedClosingDate || 'N/A'}] ` + noteText;
+      noteText = `[${nowStamp}] [Package: ${followUpData.packageName}] [Amount: ₹${followUpData.packagePrice || '0'}] [Expected Closing: ${followUpData.expectedClosingDate || 'N/A'}] [Classification: ${followUpData.classification}] [Update: ${followUpData.currentUpdate}] ${followUpData.nextRemark}`;
     }
     if (followUpData.interestedIn.length > 0) {
       noteText = `[Interested: ${followUpData.interestedIn.join(', ')}] ` + noteText;
@@ -1026,27 +1030,41 @@ export default function SalesDashboard() {
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-center gap-3 w-full max-w-md mt-2">
-          <button onClick={() => handleStartCall(activeCall)} className="w-12 h-12 rounded-full border-2 border-blue-600 text-blue-600 flex items-center justify-center hover:bg-blue-50 active:scale-95 transition" title="Start Call"><PhoneCall className="w-5 h-5" /></button>
-          <button onClick={() => handleStartCall(activeCall)} className="w-12 h-12 rounded-full border-2 border-blue-600 text-blue-600 flex items-center justify-center hover:bg-blue-50 active:scale-95 transition" title="Start Call"><Phone className="w-5 h-5" /></button>
-          <button className="w-12 h-12 rounded-full border-2 border-blue-600 text-blue-600 flex items-center justify-center hover:bg-blue-50 transition"><Mail className="w-5 h-5" /></button>
-          <button onClick={() => handleWhatsAppClick(activeCall)} className="w-12 h-12 rounded-full border-2 border-emerald-600 text-emerald-600 flex items-center justify-center hover:bg-emerald-50 active:scale-95 transition" title="WhatsApp"><MessageCircle className="w-5 h-5" /></button>
+        <div className="flex flex-wrap items-center justify-center gap-3.5 w-full max-w-md mt-2">
           <button
-            onClick={() => handleSendWhatsAppReminder(activeCall)}
-            disabled={sendingReminderId === activeCall.id}
-            className="w-12 h-12 rounded-full border-2 border-teal-600 text-teal-600 flex items-center justify-center hover:bg-teal-50 active:scale-95 transition disabled:opacity-50"
-            title="Send WhatsApp Follow-up Reminder (Meta Cloud API)"
+            type="button"
+            onClick={() => handleStartCall(activeCall)}
+            className="w-12 h-12 rounded-full border-2 border-blue-600 text-blue-600 flex items-center justify-center hover:bg-blue-50 dark:hover:bg-blue-950/40 active:scale-95 transition shadow-2xs"
+            title="Start Call"
           >
-            {sendingReminderId === activeCall.id ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <Bell className="w-5 h-5" />
-            )}
+            <PhoneCall className="w-5 h-5" />
           </button>
-          <button className="w-12 h-12 rounded-full border-2 border-blue-600 text-blue-600 flex items-center justify-center hover:bg-blue-50 transition"><Search className="w-5 h-5" /></button>
-          <button className="w-12 h-12 rounded-full border-2 border-blue-600 text-blue-600 flex items-center justify-center hover:bg-blue-50 transition"><Clock className="w-5 h-5" /></button>
-          <button className="w-12 h-12 rounded-full border-2 border-blue-600 text-blue-600 flex items-center justify-center hover:bg-blue-50 transition"><FileText className="w-5 h-5" /></button>
-          <button className="w-14 h-14 rounded-full bg-blue-700 text-white flex items-center justify-center shadow-lg hover:bg-blue-600 transition ml-2"><MessageSquare className="w-6 h-6" fill="currentColor" /></button>
+          <a
+            href={`mailto:${activeCall.email || ''}`}
+            className="w-12 h-12 rounded-full border-2 border-blue-600 text-blue-600 flex items-center justify-center hover:bg-blue-50 dark:hover:bg-blue-950/40 active:scale-95 transition shadow-2xs"
+            title="Send Email"
+          >
+            <Mail className="w-5 h-5" />
+          </a>
+          <button
+            type="button"
+            onClick={() => handleWhatsAppClick(activeCall)}
+            className="w-12 h-12 rounded-full border-2 border-emerald-600 text-emerald-600 flex items-center justify-center hover:bg-emerald-50 dark:hover:bg-emerald-950/40 active:scale-95 transition shadow-2xs"
+            title="WhatsApp Chat"
+          >
+            <MessageCircle className="w-5 h-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setHistoryLeadFilter(activeCall.clientName);
+              setActiveTab('history');
+            }}
+            className="w-12 h-12 rounded-full border-2 border-indigo-600 text-indigo-600 flex items-center justify-center hover:bg-indigo-50 dark:hover:bg-indigo-950/40 active:scale-95 transition shadow-2xs"
+            title="View Remarks History"
+          >
+            <Clock className="w-5 h-5" />
+          </button>
         </div>
       </>
     );
@@ -1142,6 +1160,9 @@ export default function SalesDashboard() {
             <button onClick={() => { setActiveTab('followups'); setIsMobileMenuOpen(false); }} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === 'followups' ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
               <Calendar className="w-4 h-4" /> Today&apos;s Followup
             </button>
+            <button onClick={() => { setHistoryLeadFilter(''); setActiveTab('history'); setIsMobileMenuOpen(false); }} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === 'history' ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
+              <History className="w-4 h-4" /> History
+            </button>
           </nav>
         </div>
 
@@ -1156,7 +1177,7 @@ export default function SalesDashboard() {
       <main className="flex-1 overflow-y-auto relative h-[calc(100vh-65px)] md:h-screen w-full">
         <header className="sticky top-0 z-10 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3 flex items-center justify-between shrink-0">
           <h1 className="text-lg sm:text-xl font-bold capitalize">
-            {activeTab === 'tasks' ? 'Overview' : activeTab === 'followups' ? "Today's Followup" : 'Clock'}
+            {activeTab === 'tasks' ? 'Overview' : activeTab === 'followups' ? "Today's Followup" : activeTab === 'history' ? 'Remarks History' : 'Clock'}
           </h1>
           <div className="font-mono text-sm sm:text-base font-semibold bg-slate-100 dark:bg-slate-900 px-2.5 sm:px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
             {timeStr}
@@ -1715,6 +1736,16 @@ export default function SalesDashboard() {
                 );
               })()}
             </div>
+          )}
+
+          {activeTab === 'history' && (
+            <RemarksHistoryTimeline
+              calls={callsList}
+              currentUser={currentUser}
+              isAdmin={false}
+              initialLeadFilter={historyLeadFilter}
+              onClearLeadFilter={() => setHistoryLeadFilter('')}
+            />
           )}
         </div>
       </main>

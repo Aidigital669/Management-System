@@ -55,6 +55,16 @@ const PaymentManagementHub = dynamic(() => import('./PaymentManagementHub'), {
   ),
   ssr: false
 });
+
+const AdminRemarksHistoryHub = dynamic(() => import('./AdminRemarksHistoryHub'), {
+  loading: () => (
+    <div className="flex items-center justify-center p-16 text-slate-400 gap-2">
+      <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      <span className="text-sm font-medium">Loading Remarks History...</span>
+    </div>
+  ),
+  ssr: false
+});
 import {
   Award,
   Users,
@@ -95,7 +105,8 @@ import {
   PanelLeftOpen,
   Tag,
   Eye,
-  Loader2
+  Loader2,
+  History
 } from 'lucide-react';
 const ExcelImportModal = dynamic(() => import('@/components/ExcelImportModal'), {
   ssr: false
@@ -176,6 +187,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
 
   // Data states
+  const [remarksLeadFilter, setRemarksLeadFilter] = useState('');
   const [usersList, setUsersList] = useState([]);
   const [tasksList, setTasksList] = useState([]);
   const [leavesList, setLeavesList] = useState([]);
@@ -2896,6 +2908,21 @@ export default function AdminDashboard() {
             </button>
 
             <button
+              onClick={() => {
+                setRemarksLeadFilter('');
+                handleSelectTab('remarks-sales');
+              }}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
+                activeTab === 'remarks-sales'
+                  ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <History className="w-4 h-4 text-indigo-500" />
+              Remarks Sales Person
+            </button>
+
+            <button
               onClick={() => handleSelectTab('clients')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'clients'
@@ -3095,7 +3122,11 @@ export default function AdminDashboard() {
             </button>
 
             <h2 className="text-sm sm:text-base lg:text-xl font-bold tracking-tight text-slate-900 dark:text-white capitalize truncate">
-              {activeTab === 'overview' ? 'Administration Console' : activeTab.replace('-', ' ')}
+              {activeTab === 'overview'
+                ? 'Administration Console'
+                : activeTab === 'remarks-sales'
+                ? 'Remarks Sales Person'
+                : activeTab.replace('-', ' ')}
             </h2>
           </div>
           
@@ -3163,7 +3194,23 @@ export default function AdminDashboard() {
 
           {/* TAB: SELLER DASHBOARD */}
           {activeTab === 'seller-dashboard' && (
-            <AdminSellerDashboard usersList={usersList} refreshData={refreshData} />
+            <AdminSellerDashboard
+              usersList={usersList}
+              refreshData={refreshData}
+              onNavigateToRemarks={(lead) => {
+                setRemarksLeadFilter(lead?.clientName || '');
+                setActiveTab('remarks-sales');
+              }}
+            />
+          )}
+
+          {/* TAB: REMARKS SALES PERSON */}
+          {activeTab === 'remarks-sales' && (
+            <AdminRemarksHistoryHub
+              usersList={usersList}
+              refreshData={refreshData}
+              initialLeadFilter={remarksLeadFilter || ''}
+            />
           )}
 
           {/* TAB 1: OVERVIEW */}

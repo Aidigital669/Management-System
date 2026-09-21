@@ -146,7 +146,7 @@ const LeadCardItem = React.memo(function LeadCardItem({
   );
 });
 
-export default function AdminSellerDashboard({ usersList = [], refreshData }) {
+export default function AdminSellerDashboard({ usersList = [], refreshData, onNavigateToRemarks = null }) {
   // 1. STRICT FILTER: ONLY SALES PERSONS (Do not show any other employee roles)
   const salesUsers = useMemo(() => {
     return (usersList || []).filter(u => 
@@ -621,15 +621,17 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
       dbStatus = 'ANSWERED';
     }
 
-    let noteText = `[Classification: ${followUpData.classification}] [Update: ${followUpData.currentUpdate}] ${followUpData.nextRemark}`;
+    const nowStamp = new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+    let noteText = `[${nowStamp}] [Classification: ${followUpData.classification}] [Update: ${followUpData.currentUpdate}] ${followUpData.nextRemark}`;
     if (isConverted && followUpData.packageName) {
-      noteText = `[Package: ${followUpData.packageName}] [Amount: ₹${followUpData.packagePrice || '0'}] [Expected Closing: ${followUpData.expectedClosingDate || 'N/A'}] ` + noteText;
+      noteText = `[${nowStamp}] [Package: ${followUpData.packageName}] [Amount: ₹${followUpData.packagePrice || '0'}] [Expected Closing: ${followUpData.expectedClosingDate || 'N/A'}] [Classification: ${followUpData.classification}] [Update: ${followUpData.currentUpdate}] ${followUpData.nextRemark}`;
     }
     if (followUpData.interestedIn.length > 0) {
       noteText = `[Interested: ${followUpData.interestedIn.join(', ')}] ` + noteText;
     }
 
     const activeCall = callsList.find(c => c.id === callId);
+    const updatedNotes = activeCall?.notes ? `${activeCall.notes}\n${noteText}` : noteText;
     const dealPrice = followUpData.packagePrice !== '' && followUpData.packagePrice !== null && !isNaN(parseFloat(followUpData.packagePrice))
       ? parseFloat(followUpData.packagePrice)
       : (activeCall?.expectedValue || null);
@@ -644,7 +646,7 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: dbStatus,
-          notes: noteText,
+          notes: updatedNotes,
           followUpDate: followUpData.scheduleDate ? new Date(followUpData.scheduleDate).toISOString() : null,
           expectedValue: dealPrice,
           packageName: chosenPackage,
@@ -1624,64 +1626,62 @@ export default function AdminSellerDashboard({ usersList = [], refreshData }) {
                     </div>
                   )}
 
-                  {/* Action Buttons (Calling, WhatsApp, Mail, Notes) */}
+                  {/* Action Buttons (Calling, WhatsApp, Mail, History, Edit) */}
                   <div className="flex flex-wrap items-center justify-center gap-3 w-full max-w-md mt-2">
                     <a
                       href={`tel:${activeLead.phoneNumber}`}
-                      className="w-12 h-12 rounded-full border-2 border-blue-600 text-blue-600 flex items-center justify-center hover:bg-blue-50 active:scale-95 transition"
+                      className="w-12 h-12 rounded-full border-2 border-blue-600 text-blue-600 flex items-center justify-center hover:bg-blue-50 active:scale-95 transition shadow-2xs"
                       title="Direct Call"
                     >
                       <PhoneCall className="w-5 h-5" />
                     </a>
-                    <button
-                      onClick={() => handleWhatsAppClick(activeLead)}
-                      className="w-12 h-12 rounded-full border-2 border-emerald-600 text-emerald-600 flex items-center justify-center hover:bg-emerald-50 active:scale-95 transition"
-                      title="WhatsApp Chat"
-                    >
-                      <MessageCircle className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => handleSendWhatsAppReminder(activeLead)}
-                      disabled={sendingReminderId === activeLead.id}
-                      className="w-12 h-12 rounded-full border-2 border-teal-600 text-teal-600 flex items-center justify-center hover:bg-teal-50 active:scale-95 transition disabled:opacity-50"
-                      title="Send WhatsApp Follow-up Reminder (Meta Cloud API)"
-                    >
-                      {sendingReminderId === activeLead.id ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <Bell className="w-5 h-5" />
-                      )}
-                    </button>
                     <a
                       href={`mailto:${activeLead.email || ''}`}
-                      className="w-12 h-12 rounded-full border-2 border-blue-600 text-blue-600 flex items-center justify-center hover:bg-blue-50 transition"
+                      className="w-12 h-12 rounded-full border-2 border-blue-600 text-blue-600 flex items-center justify-center hover:bg-blue-50 transition shadow-2xs"
                       title="Send Email"
                     >
                       <Mail className="w-5 h-5" />
                     </a>
                     <button
-                      onClick={handleOpenFollowUpForm}
-                      className="w-12 h-12 rounded-full border-2 border-blue-600 text-blue-600 flex items-center justify-center hover:bg-blue-50 transition"
-                      title="Schedule Follow-up"
+                      type="button"
+                      onClick={() => handleWhatsAppClick(activeLead)}
+                      className="w-12 h-12 rounded-full border-2 border-emerald-600 text-emerald-600 flex items-center justify-center hover:bg-emerald-50 active:scale-95 transition shadow-2xs"
+                      title="WhatsApp Chat"
+                    >
+                      <MessageCircle className="w-5 h-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onNavigateToRemarks) {
+                          onNavigateToRemarks(activeLead);
+                        } else {
+                          handleOpenFollowUpForm();
+                        }
+                      }}
+                      className="w-12 h-12 rounded-full border-2 border-indigo-600 text-indigo-600 flex items-center justify-center hover:bg-indigo-50 dark:hover:bg-indigo-950/40 active:scale-95 transition shadow-2xs"
+                      title="View Remarks History"
                     >
                       <Clock className="w-5 h-5" />
                     </button>
                     <button
+                      type="button"
                       onClick={() => {
                         setSelectedLead(activeLead);
                         setShowEditLeadModal(true);
                       }}
-                      className="w-12 h-12 rounded-full border-2 border-blue-600 text-blue-600 flex items-center justify-center hover:bg-blue-50 transition"
+                      className="w-12 h-12 rounded-full border-2 border-slate-400 text-slate-600 hover:bg-slate-50 transition shadow-2xs"
                       title="Edit Lead Info"
                     >
                       <Edit2 className="w-5 h-5" />
                     </button>
                     <button
+                      type="button"
                       onClick={handleOpenFollowUpForm}
-                      className="w-14 h-14 rounded-full bg-blue-700 hover:bg-blue-800 text-white flex items-center justify-center shadow-lg transition ml-2"
+                      className="w-12 h-12 rounded-full bg-blue-700 hover:bg-blue-800 text-white flex items-center justify-center shadow-lg transition ml-1"
                       title="Log Follow-up & Remarks"
                     >
-                      <MessageSquare className="w-6 h-6" fill="currentColor" />
+                      <MessageSquare className="w-5 h-5" fill="currentColor" />
                     </button>
                   </div>
 
