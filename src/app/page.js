@@ -196,7 +196,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen w-full grid grid-cols-1 lg:grid-cols-12 bg-slate-50 text-slate-900">
+    <div className="h-full w-full overflow-y-auto grid grid-cols-1 lg:grid-cols-12 bg-slate-50 text-slate-900">
       {/* Left visual panel */}
       <div
         className="hidden lg:flex lg:col-span-7 relative flex-col justify-between p-16 text-white bg-cover bg-center overflow-hidden"
@@ -237,7 +237,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right form panel */}
-      <div className="lg:col-span-5 flex flex-col justify-between p-5 sm:p-10 md:p-16 bg-white shadow-2xl relative overflow-hidden min-h-screen lg:min-h-0">
+      <div className="lg:col-span-5 flex flex-col justify-between p-5 sm:p-10 md:p-16 bg-white shadow-2xl relative overflow-y-auto min-h-full">
         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50/50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none animate-pulse-soft"></div>
         <div className="w-full max-w-md mx-auto my-auto flex flex-col gap-6 sm:gap-8 relative z-10 animate-scale-in">
 

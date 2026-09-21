@@ -28,6 +28,7 @@ import {
   Receipt,
   Sparkles
 } from 'lucide-react';
+import { getClientPlanInfo } from '@/lib/planUtils';
 
 export default function PaymentManagementHub({
   clientsList = [],
@@ -139,7 +140,8 @@ export default function PaymentManagementHub({
     overdue7Count,
     fullCount,
     partialCount,
-    unpaidCount
+    unpaidCount,
+    expiringSoonCount
   } = useMemo(() => {
     let verifiedRev = 0;
     let pendingVerRev = 0;
@@ -149,9 +151,14 @@ export default function PaymentManagementHub({
     let fCount = 0;
     let pCount = 0;
     let uCount = 0;
+    let expSoonCount = 0;
 
     clientsList.forEach(client => {
       const info = getClientPaymentInfo(client);
+      const plan = getClientPlanInfo(client);
+      if (client.active !== false && (plan.status === 'Expiring Soon' || (plan.daysLeft >= 0 && plan.daysLeft <= 7 && !plan.isExpired))) {
+        expSoonCount += 1;
+      }
       if (info.isVerified && info.paidAmount > 0) {
         verifiedRev += info.paidAmount;
       }
@@ -205,6 +212,10 @@ export default function PaymentManagementHub({
       }
 
       // Status pill filter
+      if (statusFilter === 'EXPIRING_SOON') {
+        const p = getClientPlanInfo(client);
+        return client.active !== false && (p.status === 'Expiring Soon' || (p.daysLeft >= 0 && p.daysLeft <= 7 && !p.isExpired));
+      }
       if (statusFilter === 'PENDING_VERIFICATION') {
         return info.verificationStatus === 'PENDING_VERIFICATION';
       }
@@ -236,7 +247,8 @@ export default function PaymentManagementHub({
       overdue7Count: od7,
       fullCount: fCount,
       partialCount: pCount,
-      unpaidCount: uCount
+      unpaidCount: uCount,
+      expiringSoonCount: expSoonCount
     };
   }, [clientsList, dateBasis, monthFilter, startDate, endDate, statusFilter, searchQuery]);
 
@@ -718,6 +730,7 @@ export default function PaymentManagementHub({
           <div className="flex flex-wrap items-center gap-1.5">
             {[
               { key: 'ALL', label: 'All Payments', count: clientsList.length },
+              { key: 'EXPIRING_SOON', label: '⏳ Expiring Soon', count: expiringSoonCount, color: 'orange' },
               { key: 'PENDING_VERIFICATION', label: '⚠️ To Verify', count: pendingVerificationCount, color: 'amber' },
               { key: 'VERIFIED', label: '✅ Verified', count: clientsList.filter(c => getClientPaymentInfo(c).isVerified && getClientPaymentInfo(c).paidAmount > 0).length, color: 'emerald' },
               { key: 'PARTIAL', label: '⏳ Partial (Due)', count: partialCount, color: 'blue' },
@@ -828,13 +841,30 @@ export default function PaymentManagementHub({
                     >
                       {/* Client / Business */}
                       <td className="p-4">
-                        <div className="font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <div className="font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5 flex-wrap">
                           <span>{client.businessName}</span>
-                          {!client.active && (
+                          {!client.active ? (
                             <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-400 uppercase font-bold">
                               Inactive
                             </span>
-                          )}
+                          ) : (() => {
+                            const plan = getClientPlanInfo(client);
+                            if (plan.status === 'Expiring Soon') {
+                              return (
+                                <span className="text-[8.5px] px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-955/60 text-orange-700 dark:text-orange-400 border border-orange-300 dark:border-orange-800 font-extrabold uppercase shrink-0 animate-pulse">
+                                  ⏳ Expiring Soon ({plan.daysLeft === 0 ? 'Today' : `${plan.daysLeft}d left`})
+                                </span>
+                              );
+                            }
+                            if (plan.status === 'Expired') {
+                              return (
+                                <span className="text-[8.5px] px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-955/60 text-red-700 dark:text-red-400 border border-red-300 dark:border-red-800 font-extrabold uppercase shrink-0">
+                                  ⚠️ Expired ({plan.overdueDays}d)
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                         <div className="text-[10px] text-slate-400 font-semibold flex items-center gap-2 mt-0.5">
                           <span className="font-mono text-blue-600 dark:text-blue-400 font-bold">{client.clientId}</span>
@@ -855,7 +885,19 @@ export default function PaymentManagementHub({
                           <Calendar className="w-3.5 h-3.5 text-slate-400" />
                           <span>{client.joiningDate || 'N/A'}</span>
                         </div>
-                        <span className="text-[9px] text-slate-400 block mt-0.5">Contract Start</span>
+                        {(() => {
+                          const plan = getClientPlanInfo(client);
+                          if (!plan.expiryDateStr || plan.expiryDateStr === 'N/A') {
+                            return <span className="text-[9px] text-slate-400 block mt-0.5">Contract Start</span>;
+                          }
+                          return (
+                            <span className={`text-[9px] font-bold block mt-0.5 ${
+                              plan.status === 'Expiring Soon' ? 'text-orange-600 dark:text-orange-400 font-extrabold' : (plan.status === 'Expired' ? 'text-red-500 font-bold' : 'text-slate-400')
+                            }`}>
+                              Exp: {plan.expiryDateStr}
+                            </span>
+                          );
+                        })()}
                       </td>
 
                       {/* Actual Payment Date */}
@@ -957,9 +999,24 @@ export default function PaymentManagementHub({
                               ⏳ Day {info.daysPassed} of 7
                             </span>
                           )
-                        ) : (
-                          <span className="text-slate-400 text-[10px] font-medium">—</span>
-                        )}
+                        ) : (() => {
+                          const plan = getClientPlanInfo(client);
+                          if (client.active !== false && plan.status === 'Expiring Soon') {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-orange-100 text-orange-800 dark:bg-orange-955/40 dark:text-orange-300 border border-orange-300 dark:border-orange-800 animate-pulse">
+                                ⏳ Plan Ends ({plan.daysLeft === 0 ? 'Today' : `${plan.daysLeft}d left`})
+                              </span>
+                            );
+                          }
+                          if (client.active !== false && plan.status === 'Expired') {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-red-100 text-red-800 dark:bg-red-955/40 dark:text-red-300 border border-red-300 dark:border-red-800">
+                                ⚠️ Plan Expired ({plan.overdueDays}d)
+                              </span>
+                            );
+                          }
+                          return <span className="text-slate-400 text-[10px] font-medium">—</span>;
+                        })()}
                       </td>
 
                       {/* Actions */}

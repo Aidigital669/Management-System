@@ -218,27 +218,37 @@ export const getClientPlanInfo = (client, referenceDate = new Date()) => {
   let expiringSoonDays = 0;
   let displayText = 'Active';
 
+  const dayOfPlan = Math.min(Math.max(daysPassed + 1, 1), durationDays);
+  const expiringSoonDay = diffDays === 0
+    ? `Day ${durationDays} of ${durationDays} (Expires Today)`
+    : `Day ${dayOfPlan} of ${durationDays} (${diffDays}d left)`;
+
   if (client.active === false) {
-    if (diffDays <= 0) {
+    if (diffDays < 0) {
       status = 'Expired';
-      overdueDays = Math.abs(diffDays) + 1;
+      overdueDays = Math.abs(diffDays);
       displayText = extensionDays > 0 ? `Extension Expired (${overdueDays}d overdue)` : `Overdue (${overdueDays}d)`;
     } else {
       status = 'Inactive';
       overdueDays = 0;
       displayText = 'Inactive (Deactivated)';
     }
-  } else if (diffDays <= 0) {
+  } else if (diffDays < 0) {
     status = 'Expired';
-    overdueDays = Math.abs(diffDays) + 1;
+    overdueDays = Math.abs(diffDays);
     displayText = extensionDays > 0 ? `Extension Expired (${overdueDays}d overdue)` : `Overdue (${overdueDays}d)`;
+  } else if (diffDays <= 7) {
+    // Within 7 days or on final day (Day 23-30)
+    status = 'Expiring Soon';
+    expiringSoonDays = diffDays === 0 ? 7 : (7 - diffDays);
+    if (diffDays === 0) {
+      displayText = extensionDays > 0 ? `Extension Ends Today` : `Expires Today (Day ${durationDays} of ${durationDays})`;
+    } else {
+      displayText = extensionDays > 0 ? `Extension Ending (${diffDays}d left)` : `Expiring Soon (${diffDays}d left)`;
+    }
   } else if (extensionDays > 0) {
     status = 'Extended';
     displayText = `Extended (${diffDays}d left)`;
-  } else if (diffDays <= 7) {
-    status = 'Expiring Soon';
-    expiringSoonDays = 7 - diffDays;
-    displayText = `Expiring Soon (${diffDays}d left)`;
   } else {
     status = 'Active';
     displayText = `Active (${diffDays}d left)`;
@@ -257,7 +267,7 @@ export const getClientPlanInfo = (client, referenceDate = new Date()) => {
     expiryDate: expiry,
     expiryDateStr,
     isExpired: status === 'Expired' || status === 'Inactive',
-    isExpiringSoon: status === 'Expiring Soon',
+    isExpiringSoon: status === 'Expiring Soon' || (diffDays >= 0 && diffDays <= 7 && status !== 'Expired' && status !== 'Inactive'),
     renewalDueDate: renewalDue,
     renewalDueStr,
     renewalDueDateStr: renewalDueStr,
@@ -265,9 +275,11 @@ export const getClientPlanInfo = (client, referenceDate = new Date()) => {
     renewalMonthKey,
     cycleMonthLabel,
     renewalMonthLabel,
-    daysLeft: diffDays,
+    daysLeft: Math.max(diffDays, 0),
+    diffDays,
     daysPassed,
     overdueDays,
+    expiringSoonDay,
     expiringSoonDays,
     displayText,
     isRenewed,
@@ -289,28 +301,28 @@ export const isClientPlanActive = (client, referenceDate = new Date()) => {
 
 /**
  * Determines whether a client is an active client for the specified month or date range.
- * Agency Business Rule:
- * A client belongs to month M's active clients (e.g. September) if their package starts in that month.
- * If their package started in August, they are an August client, NOT a September client.
- * For custom date ranges [customStart, customEnd], the client's package start date must fall within the range.
+ * A client belongs to month M's active clients if their subscription cycle covers any active days in month M.
+ * For custom date ranges [customStart, customEnd], the client's subscription coverage must overlap the range.
  */
 export const isClientActiveInMonth = (client, monthKey, customStart = null, customEnd = null) => {
   if (!client || client.active === false) return false;
 
   const info = getClientPlanInfo(client);
-  if (!info.cycleStart) return false;
+  if (!info.cycleStart || !info.expiryDate) return false;
 
   const cStart = new Date(info.cycleStart);
   cStart.setHours(0, 0, 0, 0);
+  const cExpiry = new Date(info.expiryDate);
+  cExpiry.setHours(23, 59, 59, 999);
 
-  // Custom date range check: package start date must fall within [customStart, customEnd]
+  // Custom date range check: package coverage must overlap [customStart, customEnd]
   if (customStart || customEnd) {
     const rStart = customStart ? parseDbDate(customStart) : null;
     const rEnd = customEnd ? parseDbDate(customEnd) : null;
     if (rStart) rStart.setHours(0, 0, 0, 0);
     if (rEnd) rEnd.setHours(23, 59, 59, 999);
 
-    if (rStart && cStart.getTime() < rStart.getTime()) return false;
+    if (rStart && cExpiry.getTime() < rStart.getTime()) return false;
     if (rEnd && cStart.getTime() > rEnd.getTime()) return false;
     return true;
   }
@@ -330,8 +342,8 @@ export const isClientActiveInMonth = (client, monthKey, customStart = null, cust
   const lastDay = new Date(yyyy, mm, 0).getDate();
   const monthEnd = new Date(yyyy, mm - 1, lastDay, 23, 59, 59, 999).getTime();
 
-  // Package starts in this month (cycle start falls within monthStart and monthEnd)
-  return cStart.getTime() >= monthStart && cStart.getTime() <= monthEnd;
+  // Active in this month means the subscription covers active days in [monthStart, monthEnd]
+  return cStart.getTime() <= monthEnd && cExpiry.getTime() >= monthStart;
 };
 
 /**

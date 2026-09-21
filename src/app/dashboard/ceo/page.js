@@ -955,7 +955,7 @@ export default function CeoDashboard() {
   });
 
   return (
-    <div className={`min-h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 transition-colors duration-300`}>
+    <div className={`h-screen max-h-screen w-full flex bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 transition-colors duration-300 overflow-hidden`}>
 
       {/* Toast Alert */}
       {toast.message && (
@@ -979,7 +979,7 @@ export default function CeoDashboard() {
       )}
 
       {/* Responsive Sidebar Panel */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between shrink-0 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static ${mobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between shrink-0 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:h-full ${mobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
         }`}>
         <div className="overflow-y-auto flex-1">
           {/* Header Brand */}
@@ -1108,10 +1108,10 @@ export default function CeoDashboard() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-grow flex flex-col min-w-0 overflow-y-auto h-screen">
+      <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
 
         {/* Main Panel Header */}
-        <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-3 sm:px-6 lg:px-8 shrink-0 transition-colors duration-300">
+        <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-3 sm:px-6 lg:px-8 shrink-0 transition-colors duration-300 z-10">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             {/* Hamburger Button for Mobile/Tablet */}
             <button
@@ -1155,7 +1155,7 @@ export default function CeoDashboard() {
         </header>
 
         {/* Panel Main Content Container */}
-        <div className="p-3 sm:p-5 lg:p-8 flex-grow overflow-x-hidden">
+        <div className="p-3 sm:p-5 lg:p-8 flex-1 overflow-y-auto overflow-x-hidden">
 
           {/* TAB 1: OVERVIEW */}
           {activeTab === 'overview' && (

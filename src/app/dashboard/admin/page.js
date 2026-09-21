@@ -522,6 +522,7 @@ export default function AdminDashboard() {
   const [renewalEndDate, setRenewalEndDate] = useState('');
   const [renewalCalendarMode, setRenewalCalendarMode] = useState('activeMonth'); // 'activeMonth' | 'renewalMonth' | 'cycleMonth'
   const [expiredTableScope, setExpiredTableScope] = useState('all'); // 'all' (All Overdues) | 'month' (Selected Month)
+  const [expiringTableScope, setExpiringTableScope] = useState('all'); // 'all' (All Notice) | 'month' (Selected Month)
 
   // Deliverables Filters State
   const [deliverableMonthFilter, setDeliverableMonthFilter] = useState(currentLiveMonthKey);
@@ -2747,7 +2748,7 @@ export default function AdminDashboard() {
   const expiringCount = expiringClientsList.length;
 
   return (
-    <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 transition-colors duration-300">
+    <div className="h-screen max-h-screen w-full flex bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 transition-colors duration-300 overflow-hidden">
       
       {/* Toast Alert */}
       {toast.message && (
@@ -2787,7 +2788,7 @@ export default function AdminDashboard() {
 
       {/* Responsive Sidebar Panel */}
       <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between shrink-0 transform transition-all duration-300 ease-in-out ${
-        sidebarCollapsed ? 'lg:hidden' : 'lg:translate-x-0 lg:static'
+        sidebarCollapsed ? 'lg:hidden' : 'lg:translate-x-0 lg:static lg:h-full'
       } ${
         mobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
       }`}>
@@ -3062,10 +3063,10 @@ export default function AdminDashboard() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-grow flex flex-col min-w-0 overflow-y-auto h-screen">
+      <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         
         {/* Header */}
-        <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-3 sm:px-6 lg:px-8 shrink-0 transition-colors">
+        <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-3 sm:px-6 lg:px-8 shrink-0 transition-colors z-10">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             {/* Hamburger Button for Mobile/Tablet */}
             <button
@@ -3126,7 +3127,7 @@ export default function AdminDashboard() {
         </header>
 
         {/* Tab Content Container */}
-        <div className="p-3 sm:p-5 lg:p-8 flex-grow overflow-x-hidden">
+        <div className="p-3 sm:p-5 lg:p-8 flex-1 overflow-y-auto overflow-x-hidden">
           
           {/* TAB 0: AGENCY DASHBOARD */}
           {activeTab === 'agency-dashboard' && (
@@ -4999,6 +5000,29 @@ export default function AdminDashboard() {
               return isClientExpiringInMonth(c, renewalMonthFilter);
             });
 
+            // 4. All Expiring Soon clients across the agency (final week / within 7 days of contract end)
+            const allExpiringSoonClients = clientsList.filter(c => {
+              if (c.active === false) return false;
+              const info = getClientRenewalInfo(c);
+              return info.status === 'Expiring Soon' || (info.daysLeft >= 0 && info.daysLeft <= 7 && !info.isExpired);
+            });
+
+            // 5. Expiring Soon clients specifically expiring in selected month or date range
+            const monthScopedExpiringSoonClients = allExpiringSoonClients.filter(c => {
+              if (renewalStartDate || renewalEndDate) {
+                const info = getClientRenewalInfo(c);
+                if (!info.expiryDate) return false;
+                const expTime = info.expiryDate.getTime();
+                const rStart = renewalStartDate ? parsePlanDbDate(renewalStartDate) : null;
+                const rEnd = renewalEndDate ? parsePlanDbDate(renewalEndDate) : null;
+                if (rStart && expTime < rStart.getTime()) return false;
+                if (rEnd && expTime > rEnd.getTime()) return false;
+                return true;
+              }
+              if (!renewalMonthFilter || renewalMonthFilter === 'all') return true;
+              return isClientExpiringInMonth(c, renewalMonthFilter) || isClientActiveInMonth(c, renewalMonthFilter);
+            });
+
             const extendedClients = filteredActiveClients.filter(c => {
               const s = getClientRenewalInfo(c).status;
               return s === 'Extended' || (c.extensionDays || 0) > 0;
@@ -5006,14 +5030,16 @@ export default function AdminDashboard() {
             const activeOnTrackClients = filteredActiveClients.filter(c => {
               const s = getClientRenewalInfo(c).status;
               const hasExtension = (c.extensionDays || 0) > 0;
-              return (s === 'Active' || s === 'Extended') && !hasExtension;
+              return (s === 'Active' || s === 'Extended') && !hasExtension && s !== 'Expiring Soon';
             });
-            const expiringSoonClients = filteredActiveClients.filter(c => {
-              return getClientRenewalInfo(c).status === 'Expiring Soon';
-            });
+            const expiringSoonClients = (expiringTableScope === 'month' && renewalMonthFilter !== 'all')
+              ? monthScopedExpiringSoonClients
+              : allExpiringSoonClients;
 
-            // Combined list for compatibility
-            const filteredRenewalClients = [...filteredActiveClients, ...allUnrenewedExpiredClients];
+            // Combined list deduplicated by id/clientId for searches and compatibility
+            const filteredRenewalClients = Array.from(
+              new Map([...filteredActiveClients, ...allExpiringSoonClients, ...allUnrenewedExpiredClients].map(c => [c.id || c.clientId, c])).values()
+            );
 
             let activeExpected = 0;
             let activeActual = 0;
@@ -5029,7 +5055,7 @@ export default function AdminDashboard() {
 
             let expiringSoonExpected = 0;
             let expiringSoonActual = 0;
-            let expiringSoonCount = expiringSoonClients.length;
+            let expiringSoonCount = allExpiringSoonClients.length;
 
             activeOnTrackClients.forEach(c => {
               const pkgAmt = c.packageAmount || 0;
@@ -5811,7 +5837,7 @@ export default function AdminDashboard() {
                     {/* Expiring Soon Notice Table (Active Contracts Days 23 to 30) */}
                     {(renewalFilter === 'All' || renewalFilter === 'Expiring Soon') && (
                       <div className="border border-orange-200 dark:border-orange-900/50 rounded-xl overflow-hidden shadow-sm">
-                        <div className="p-3 bg-orange-50/70 dark:bg-orange-955/30 border-b border-orange-200 dark:border-orange-900/50 flex justify-between items-center">
+                        <div className="p-3 bg-orange-50/70 dark:bg-orange-955/30 border-b border-orange-200 dark:border-orange-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                           <div>
                             <span className="text-[11px] font-extrabold uppercase tracking-wider text-orange-700 dark:text-orange-400 flex items-center gap-1.5">
                               <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
@@ -5819,9 +5845,39 @@ export default function AdminDashboard() {
                             </span>
                             <p className="text-[10px] text-orange-600/80 dark:text-orange-300/70 font-medium mt-0.5">Plan remains active through Day 30. Renewal starts on Day 31 (next day after Day 30).</p>
                           </div>
-                          <span className="px-2 py-0.5 bg-orange-500 text-white text-[8px] font-bold rounded uppercase tracking-wider">
-                            Final Week Notice ({expiringSoonCount})
-                          </span>
+                          <div className="flex items-center gap-2">
+                            {renewalMonthFilter !== 'all' && (
+                              <div className="flex items-center bg-white dark:bg-slate-800 p-0.5 rounded-lg border border-orange-200 dark:border-orange-900/60 shadow-2xs">
+                                <button
+                                  type="button"
+                                  onClick={() => setExpiringTableScope('all')}
+                                  className={`px-2 py-1 text-[10px] font-bold rounded-md transition cursor-pointer ${
+                                    expiringTableScope === 'all'
+                                      ? 'bg-orange-500 text-white shadow-xs'
+                                      : 'text-slate-600 dark:text-slate-300 hover:text-orange-600'
+                                  }`}
+                                >
+                                  All Notice ({allExpiringSoonClients.length})
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setExpiringTableScope('month')}
+                                  className={`px-2 py-1 text-[10px] font-bold rounded-md transition cursor-pointer ${
+                                    expiringTableScope === 'month'
+                                      ? 'bg-orange-500 text-white shadow-xs'
+                                      : 'text-slate-600 dark:text-slate-300 hover:text-orange-600'
+                                  }`}
+                                >
+                                  {selectedMonthObj?.label || 'This Month'} ({monthScopedExpiringSoonClients.length})
+                                </button>
+                              </div>
+                            )}
+                            <span className="px-2.5 py-1 bg-orange-500 text-white text-[9px] font-extrabold rounded-md uppercase tracking-wider shadow-xs">
+                              {expiringTableScope === 'month' && renewalMonthFilter !== 'all'
+                                ? `Due in ${selectedMonthObj?.label || 'Month'} (${monthScopedExpiringSoonClients.length})`
+                                : `Final Week Notice (${allExpiringSoonClients.length})`}
+                            </span>
+                          </div>
                         </div>
                         <div className="overflow-x-auto">
                           <table className="min-w-[850px] w-full text-left border-collapse">
@@ -5840,13 +5896,26 @@ export default function AdminDashboard() {
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                             {(() => {
-                              const list = filteredRenewalClients
-                                .filter(c => getClientRenewalInfo(c).status === 'Expiring Soon')
+                              const baseExpiring = (expiringTableScope === 'month' && renewalMonthFilter !== 'all')
+                                ? monthScopedExpiringSoonClients
+                                : allExpiringSoonClients;
+
+                              const list = baseExpiring
                                 .filter(c => {
                                   if (!renewalSearch) return true;
                                   const q = renewalSearch.toLowerCase();
                                   const sm = getClientSmExecutive(c, allClientTasks, allClientDeliveries);
-                                  return c.businessName.toLowerCase().includes(q) || c.clientId.toLowerCase().includes(q) || (sm && sm.toLowerCase().includes(q));
+                                  return (
+                                    (c.businessName && c.businessName.toLowerCase().includes(q)) ||
+                                    (c.clientId && c.clientId.toLowerCase().includes(q)) ||
+                                    (c.clientName && c.clientName.toLowerCase().includes(q)) ||
+                                    (sm && sm.toLowerCase().includes(q))
+                                  );
+                                })
+                                .sort((a, b) => {
+                                  const infoA = getClientRenewalInfo(a);
+                                  const infoB = getClientRenewalInfo(b);
+                                  return (infoA.diffDays ?? infoA.daysLeft ?? 0) - (infoB.diffDays ?? infoB.daysLeft ?? 0);
                                 });
 
                               if (list.length === 0) {
@@ -5913,7 +5982,7 @@ export default function AdminDashboard() {
                                       </div>
                                     </td>
                                     <td className="p-4 font-bold">
-                                      <span className="text-orange-500 font-extrabold">Expiring Soon ({expiringSoonDay})</span>
+                                      <span className="text-orange-500 font-extrabold">{expiringSoonDay || `Expiring Soon (${info.daysLeft}d left)`}</span>
                                     </td>
                                     <td className="p-4">
                                       <div className="flex items-center gap-1.5 font-black text-xs text-blue-600 dark:text-blue-400">
