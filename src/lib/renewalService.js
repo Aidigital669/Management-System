@@ -91,6 +91,66 @@ export async function executeClientRenewal(clientDbId, requester = { name: 'Admi
     });
   }
 
+  // 1c. Reassign any existing pending/overdue tasks from inactive staff (Danish Khan, Divyansh, etc.)
+  const chosenStaff = options.assignedStaff || {};
+  const inactiveNames = ['Danish Khan', 'Danish', 'Divyansh', 'Swapnil', 'Sanmeet'];
+  const defaultGraphic = chosenStaff.graphic || activeEmployees.find(e => ((e.department || '') + ' ' + (e.designation || '')).toLowerCase().includes('graphic'))?.name || 'Nouman';
+  const defaultVideo = chosenStaff.video || 'Masoom';
+  const defaultAiVideo = chosenStaff.aiVideo || 'Masoom';
+
+  if (options.reassignInactiveTasks !== false) {
+    try {
+      // Reassign graphic tasks
+      await prisma.clientTask.updateMany({
+        where: {
+          clientId: client.clientId,
+          workingOn: { in: inactiveNames },
+          OR: [
+            { assignTo: { contains: 'Graphic', mode: 'insensitive' } },
+            { postType: { contains: 'Graphic', mode: 'insensitive' } },
+            { taskTitle: { contains: 'Graphic', mode: 'insensitive' } }
+          ]
+        },
+        data: {
+          workingOn: defaultGraphic,
+          status: 'Assigned'
+        }
+      });
+
+      // Reassign reel & video tasks
+      await prisma.clientTask.updateMany({
+        where: {
+          clientId: client.clientId,
+          workingOn: { in: inactiveNames },
+          OR: [
+            { assignTo: { in: ['Video Editor', 'Ai Video Editor'] } },
+            { postType: { in: ['Reel', 'AI Video'] } },
+            { taskTitle: { contains: 'Reel', mode: 'insensitive' } },
+            { taskTitle: { contains: 'Video', mode: 'insensitive' } }
+          ]
+        },
+        data: {
+          workingOn: defaultVideo,
+          status: 'Assigned'
+        }
+      });
+
+      // Reassign any remaining tasks assigned to Danish/Divyansh for this client
+      await prisma.clientTask.updateMany({
+        where: {
+          clientId: client.clientId,
+          workingOn: { in: inactiveNames }
+        },
+        data: {
+          workingOn: defaultVideo || defaultGraphic,
+          status: 'Assigned'
+        }
+      });
+    } catch (reassignErr) {
+      console.warn('Error reassigning inactive tasks during renewal:', reassignErr);
+    }
+  }
+
   // 2. Parse counts of creatives, reels, ai videos
   const { c: cCount, r: rCount, a: aCount } = parseRequirementCounts(client.requirement);
 
@@ -232,7 +292,7 @@ export async function executeClientRenewal(clientDbId, requester = { name: 'Admi
     });
   }
 
-  const dedicatedSmExec = getClientSmExecutive(client, existingTasks);
+  const dedicatedSmExec = chosenStaff.smExec || getClientSmExecutive(client, existingTasks) || 'Preet';
 
   // Create and auto-assign tasks
   for (let i = 0; i < tasksToCreate.length; i++) {
@@ -240,60 +300,47 @@ export async function executeClientRenewal(clientDbId, requester = { name: 'Admi
     let assignedEmployeeName = '';
 
     const dept = task.assignTo;
-    const deptEmployees = resolveStaff(dept) || activeEmployees.filter(e => e.department === dept);
 
-    // Dedicated SM Executive rule: Reports & Social Media postings handled by assigned SM Exec
-    if ((dept === 'Digital Marketing Executive' || task.postType === 'Report' || task.postType === 'Posting') && dedicatedSmExec) {
-      assignedEmployeeName = dedicatedSmExec;
-    } else if (dept === 'Ai Video Editor' || dept === 'AI Video Editor') {
-      const teamUsers = activeEmployees.filter(e => {
-        const userRole = ((e.department || '') + ' ' + (e.designation || '')).toLowerCase();
-        return userRole.includes('ai video') && !userRole.includes('lead');
-      });
-
-      if (teamUsers.length > 0) {
-        const match = (client.clientId || '').match(/\d+/);
-        const num = match ? parseInt(match[0], 10) : 1;
-        const idx = Math.abs(num - 1) % teamUsers.length;
-        assignedEmployeeName = teamUsers[idx].name;
+    // Explicit Admin Staff Overrides (Ensures Danish & Divyansh are NEVER assigned)
+    if (dept === 'Graphic Designer' || task.postType === 'Graphic') {
+      if (chosenStaff.graphic) {
+        assignedEmployeeName = chosenStaff.graphic;
+      } else {
+        const graphicStaff = resolveStaff('Graphic Designer');
+        assignedEmployeeName = graphicStaff && graphicStaff.length > 0 ? graphicStaff[0].name : defaultGraphic;
       }
-    } else if (deptEmployees && deptEmployees.length > 0) {
-      const taskDate = getFormattedDate(task.offset);
-      const monthYear = getMonthYearStr(taskDate);
-
-      if (rotationIndex[dept] === undefined) {
-        rotationIndex[dept] = 0;
+    } else if (dept === 'Video Editor' || task.postType === 'Reel') {
+      if (chosenStaff.video) {
+        assignedEmployeeName = chosenStaff.video;
+      } else {
+        const videoStaff = resolveStaff('Video Editor');
+        assignedEmployeeName = videoStaff && videoStaff.length > 0 ? videoStaff[0].name : defaultVideo;
       }
-
-      let attempts = 0;
-      let found = false;
-      const candidateCounts = [];
-
-      while (attempts < deptEmployees.length) {
-        const emp = deptEmployees[rotationIndex[dept]];
-        const count = await prisma.clientTask.count({
-          where: {
-            workingOn: emp.name,
-            date: {
-              endsWith: monthYear ? `-${monthYear}` : ''
-            }
-          }
+    } else if (dept === 'Ai Video Editor' || task.postType === 'AI Video') {
+      if (chosenStaff.aiVideo) {
+        assignedEmployeeName = chosenStaff.aiVideo;
+      } else {
+        const aiStaff = activeEmployees.filter(e => {
+          const userRole = ((e.department || '') + ' ' + (e.designation || '')).toLowerCase();
+          return userRole.includes('ai video') && !userRole.includes('lead');
         });
-
-        candidateCounts.push({ emp, count });
-        rotationIndex[dept] = (rotationIndex[dept] + 1) % deptEmployees.length;
-        attempts++;
-
-        if (count < 100) {
-          assignedEmployeeName = emp.name;
-          found = true;
-          break;
+        if (aiStaff.length > 0) {
+          const match = (client.clientId || '').match(/\d+/);
+          const num = match ? parseInt(match[0], 10) : 1;
+          const idx = Math.abs(num - 1) % aiStaff.length;
+          assignedEmployeeName = aiStaff[idx].name;
+        } else {
+          assignedEmployeeName = defaultAiVideo;
         }
       }
-
-      if (!found && candidateCounts.length > 0) {
-        candidateCounts.sort((a, b) => a.count - b.count);
-        assignedEmployeeName = candidateCounts[0].emp.name;
+    } else if (dept === 'Digital Marketing Executive' || task.postType === 'Report' || task.postType === 'Posting') {
+      assignedEmployeeName = dedicatedSmExec;
+    } else {
+      const deptEmployees = resolveStaff(dept) || activeEmployees.filter(e => e.department === dept);
+      if (deptEmployees && deptEmployees.length > 0) {
+        assignedEmployeeName = deptEmployees[0].name;
+      } else {
+        assignedEmployeeName = activeEmployees.length > 0 ? activeEmployees[0].name : '';
       }
     }
 

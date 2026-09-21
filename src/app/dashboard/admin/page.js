@@ -14,15 +14,7 @@ const AgencyDashboard = dynamic(() => import('./AgencyDashboard'), {
   ssr: false
 });
 
-const CampaignDeliveriesTable = dynamic(() => import('./CampaignDeliveriesTable'), {
-  loading: () => (
-    <div className="flex items-center justify-center p-16 text-slate-400 gap-2">
-      <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-      <span className="text-sm font-medium">Loading Campaign Deliveries...</span>
-    </div>
-  ),
-  ssr: false
-});
+import CampaignDeliveriesTable from './CampaignDeliveriesTable';
 
 const AdminSellerDashboard = dynamic(() => import('./AdminSellerDashboard'), {
   loading: () => (
@@ -316,6 +308,22 @@ export default function AdminDashboard() {
   const [renewModalNote, setRenewModalNote] = useState('');
   const [renewModalLoading, setRenewModalLoading] = useState(false);
   const [renewModalRequestId, setRenewModalRequestId] = useState(null);
+  const [renewModalStaff, setRenewModalStaff] = useState({
+    graphic: 'Nouman',
+    video: 'Masoom',
+    aiVideo: 'Masoom',
+    smExec: 'Preet'
+  });
+  const [renewModalReassignInactive, setRenewModalReassignInactive] = useState(true);
+  const [renewModalInactiveDetails, setRenewModalInactiveDetails] = useState({ danish: 0, divyansh: 0, other: 0, total: 0 });
+
+  // Global Inactive Staff Reassignment Modal State (Batch Transfer Danish & Divyansh)
+  const [batchReassignModal, setBatchReassignModal] = useState({
+    isOpen: false,
+    danishTarget: 'Nouman',
+    divyanshTarget: 'Masoom',
+    isLoading: false
+  });
 
   // Custom Confirmation & Warning Modal State (No native browser localhost dialogs)
   const [confirmModal, setConfirmModal] = useState({
@@ -1667,12 +1675,14 @@ export default function AdminDashboard() {
         setConfirmModal(prev => ({ ...prev, isLoading: true }));
         try {
           const res = await fetch(`/api/clients/${id}`, { method: 'DELETE' });
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(errData.details || errData.error || 'Failed to delete client');
+          const resData = await res.json().catch(() => ({}));
+          if (!res.ok && res.status !== 404) {
+            throw new Error(resData.details || resData.error || 'Failed to delete client');
           }
+          // Immediately remove client from local state so UI updates instantly
+          setClientsList(prev => prev.filter(c => c.id !== id && c.clientId !== id && c.businessName !== name));
           closeConfirmModal();
-          showToast(`Deleted client: ${name}`);
+          showToast(resData.alreadyDeleted ? `Client "${name}" was already removed.` : `Deleted client: ${name}`);
           await refreshData();
         } catch (err) {
           closeConfirmModal();
@@ -1904,6 +1914,41 @@ export default function AdminDashboard() {
     const dd = String(defaultDate.getDate()).padStart(2, '0');
     const defaultDateStr = `${yyyy}-${mm}-${dd}`;
 
+    // Inspect existing tasks on this client to detect tasks assigned to Danish Khan or Divyansh (or other inactive staff)
+    const clientTasks = (allClientTasks || []).filter(t => 
+      t.clientId === client.clientId || (client.businessName && t.businessName === client.businessName)
+    );
+    const danishTasks = clientTasks.filter(t => 
+      ['danish', 'danish khan'].includes((t.workingOn || '').toLowerCase()) &&
+      t.status !== 'Completed' && t.status !== 'DONE' && t.status !== 'Done'
+    );
+    const divyanshTasks = clientTasks.filter(t => 
+      (t.workingOn || '').toLowerCase().includes('divyansh') &&
+      t.status !== 'Completed' && t.status !== 'DONE' && t.status !== 'Done'
+    );
+    const otherInactive = clientTasks.filter(t => 
+      ['swapnil', 'sanmeet'].includes((t.workingOn || '').toLowerCase()) &&
+      t.status !== 'Completed' && t.status !== 'DONE' && t.status !== 'Done'
+    );
+    const totalInactive = danishTasks.length + divyanshTasks.length + otherInactive.length;
+
+    setRenewModalInactiveDetails({
+      danish: danishTasks.length,
+      divyansh: divyanshTasks.length,
+      other: otherInactive.length,
+      total: totalInactive
+    });
+    setRenewModalReassignInactive(totalInactive > 0);
+
+    // Dedicated SM Executive for this client
+    const dedicatedSm = getClientSmExecutive(client, clientTasks) || 'Preet';
+    setRenewModalStaff({
+      graphic: 'Nouman',
+      video: 'Masoom',
+      aiVideo: 'Masoom',
+      smExec: dedicatedSm
+    });
+
     setRenewModalClient(client);
     setRenewModalDate(defaultDateStr);
     setRenewModalNote('');
@@ -1940,7 +1985,9 @@ export default function AdminDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           renewalDate: renewModalDate,
-          adminNote: renewModalNote
+          adminNote: renewModalNote,
+          assignedStaff: renewModalStaff,
+          reassignInactiveTasks: renewModalReassignInactive
         })
       });
 
@@ -1953,17 +2000,27 @@ export default function AdminDashboard() {
       setRenewModalRequestId(null);
       setRenewModalLoading(false);
 
+      const detailsList = [
+        { label: 'Client', value: bizName },
+        { label: 'New Cycle Start', value: renewResult.newJoiningDate || renewModalDate },
+        { label: 'New Cycle Expiry', value: renewResult.newExpiryDate || 'Calculated' },
+        { label: 'Deliverables Scheduled', value: `${renewResult.taskCount || 0} Content Tasks` },
+        { label: 'Assigned Team', value: `🎨 ${renewModalStaff.graphic} • 🎬 ${renewModalStaff.video} • 📱 ${renewModalStaff.smExec}` }
+      ];
+
+      if (renewModalReassignInactive && renewModalInactiveDetails.total > 0) {
+        detailsList.push({
+          label: 'Inactive Tasks Reassigned',
+          value: `Transferred ${renewModalInactiveDetails.total} tasks from Danish & Divyansh to ${renewModalStaff.graphic} and ${renewModalStaff.video}`
+        });
+      }
+
       openSuccessNotice({
         title: 'Plan Successfully Renewed!',
         subtitle: `New contract cycle created for ${bizName}`,
         clientName: bizName,
         badge: 'Plan Renewed',
-        details: [
-          { label: 'Client', value: bizName },
-          { label: 'New Cycle Start', value: renewResult.newJoiningDate || renewModalDate },
-          { label: 'New Cycle Expiry', value: renewResult.newExpiryDate || 'Calculated' },
-          { label: 'Deliverables Scheduled', value: `${renewResult.taskCount || 0} Content Tasks` }
-        ],
+        details: detailsList,
         warningNote: 'All tasks scheduled starting from renewal date. Sundays are strictly excluded.'
       });
 
@@ -1972,6 +2029,51 @@ export default function AdminDashboard() {
     } catch (err) {
       setRenewModalLoading(false);
       showToast(err.message || 'Failed to renew plan', 'error');
+    }
+  };
+
+  const handleBatchReassignInactiveStaff = async () => {
+    setBatchReassignModal(prev => ({ ...prev, isLoading: true }));
+    try {
+      const danishTarget = batchReassignModal.danishTarget || 'Nouman';
+      const divyanshTarget = batchReassignModal.divyanshTarget || 'Masoom';
+
+      // 1. Reassign Danish Khan tasks
+      await fetch('/api/client-tasks/reassign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fromUser: 'Danish Khan',
+          toUser: danishTarget
+        })
+      });
+
+      // 2. Reassign Danish (if stored without 'Khan')
+      await fetch('/api/client-tasks/reassign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fromUser: 'Danish',
+          toUser: danishTarget
+        })
+      });
+
+      // 3. Reassign Divyansh tasks
+      await fetch('/api/client-tasks/reassign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fromUser: 'Divyansh',
+          toUser: divyanshTarget
+        })
+      });
+
+      setBatchReassignModal(prev => ({ ...prev, isOpen: false, isLoading: false }));
+      showToast(`Successfully reassigned all tasks from Danish Khan (${danishTarget}) and Divyansh (${divyanshTarget})!`);
+      await refreshData();
+    } catch (err) {
+      setBatchReassignModal(prev => ({ ...prev, isLoading: false }));
+      showToast(err.message || 'Failed to reassign inactive staff tasks', 'error');
     }
   };
 
@@ -5096,6 +5198,16 @@ export default function AdminDashboard() {
                     <span className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-bold rounded-xl border border-slate-200/60 dark:border-slate-700">
                       Expired/Expiring: <span className="text-orange-500 font-extrabold">{expiredCount + expiringSoonCount}</span>
                     </span>
+
+                    <button
+                      type="button"
+                      onClick={() => setBatchReassignModal(prev => ({ ...prev, isOpen: true }))}
+                      className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white text-[10px] font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                      title="Reassign Danish Khan & Divyansh tasks across all clients"
+                    >
+                      <Users className="w-3.5 h-3.5" />
+                      <span>Reassign Inactive Staff (Danish/Divyansh)</span>
+                    </button>
                   </div>
                 </div>
 
@@ -9540,6 +9652,33 @@ export default function AdminDashboard() {
         const planInfo = getClientPlanInfo(client);
         const planDuration = getPlanDurationDays(client.packageName, client.requirement, client.services);
         
+        // Active staff resolution for renewal deliverables (Excluding Danish Khan & Divyansh)
+        const activeStaffList = usersList.filter(u => 
+          (u.role === 'EMPLOYEE' || u.role === 'TL') && 
+          u.status !== 'INACTIVE' &&
+          !['danish khan', 'danish', 'divyansh', 'swapnil', 'sanmeet'].includes((u.name || '').toLowerCase())
+        );
+
+        const availableStaff = activeStaffList.length > 0 ? activeStaffList : [
+          { id: 21, name: 'Nouman', department: 'Ai Video Editor' },
+          { id: 22, name: 'Masoom', department: 'Ai Video Editor' },
+          { id: 25, name: 'Preet', department: 'Digital Marketing Executive' },
+          { id: 24, name: 'Pujan', department: 'Digital Marketing Executive' }
+        ];
+
+        const availableAiStaff = availableStaff.filter(u => 
+          ((u.department || '') + ' ' + (u.designation || '')).toLowerCase().includes('video') ||
+          ['masoom', 'nouman'].includes((u.name || '').toLowerCase())
+        );
+        const finalAiStaff = availableAiStaff.length > 0 ? availableAiStaff : availableStaff;
+
+        const availableSmStaff = availableStaff.filter(u => 
+          ((u.department || '') + ' ' + (u.designation || '')).toLowerCase().includes('market') ||
+          ((u.department || '') + ' ' + (u.designation || '')).toLowerCase().includes('social') ||
+          ['preet', 'pujan'].includes((u.name || '').toLowerCase())
+        );
+        const finalSmStaff = availableSmStaff.length > 0 ? availableSmStaff : availableStaff;
+
         // Calculate dynamic preview expiry based on selected renewModalDate
         let previewExpiryStr = 'N/A';
         let isSelectedSunday = false;
@@ -9740,6 +9879,128 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
+                {/* Deliverable Staff Assignment & Inactive Staff Resolution (Danish & Divyansh) */}
+                <div className="p-4 bg-purple-50/70 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-purple-950 dark:text-purple-200 font-extrabold text-xs">
+                      <Users className="w-4 h-4 text-purple-600 shrink-0" />
+                      <span>Deliverable Team Assignment & Inactive Staff Resolution</span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide bg-purple-200 text-purple-800 dark:bg-purple-900/80 dark:text-purple-300">
+                      Active Staff Only
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                    <strong>Note:</strong> Danish Khan and Divyansh are no longer in the system. Select active team members who will handle this client&apos;s upcoming renewal deliverables:
+                  </p>
+
+                  {/* 4 Staff Selectors */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    {/* Graphic Designer */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        🎨 Graphic Designer
+                      </label>
+                      <select
+                        value={renewModalStaff.graphic}
+                        onChange={(e) => setRenewModalStaff(prev => ({ ...prev, graphic: e.target.value }))}
+                        className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-purple-300 dark:border-purple-700 rounded-lg text-xs font-bold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                      >
+                        {availableStaff.map(emp => (
+                          <option key={emp.id || emp.name} value={emp.name}>
+                            {emp.name} {emp.name === 'Nouman' ? '(Recommended)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Video / Reel Editor */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        🎬 Reel / Video Editor
+                      </label>
+                      <select
+                        value={renewModalStaff.video}
+                        onChange={(e) => setRenewModalStaff(prev => ({ ...prev, video: e.target.value }))}
+                        className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-purple-300 dark:border-purple-700 rounded-lg text-xs font-bold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                      >
+                        {availableStaff.map(emp => (
+                          <option key={emp.id || emp.name} value={emp.name}>
+                            {emp.name} {emp.name === 'Masoom' ? '(Recommended)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* AI Video Editor */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        🤖 AI Video Editor
+                      </label>
+                      <select
+                        value={renewModalStaff.aiVideo}
+                        onChange={(e) => setRenewModalStaff(prev => ({ ...prev, aiVideo: e.target.value }))}
+                        className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-purple-300 dark:border-purple-700 rounded-lg text-xs font-bold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                      >
+                        {finalAiStaff.map(emp => (
+                          <option key={emp.id || emp.name} value={emp.name}>
+                            {emp.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Social Media Executive */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        📱 Social Media Exec (Posting & Reports)
+                      </label>
+                      <select
+                        value={renewModalStaff.smExec}
+                        onChange={(e) => setRenewModalStaff(prev => ({ ...prev, smExec: e.target.value }))}
+                        className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-purple-300 dark:border-purple-700 rounded-lg text-xs font-bold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                      >
+                        {finalSmStaff.map(emp => (
+                          <option key={emp.id || emp.name} value={emp.name}>
+                            {emp.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Inactive Tasks Reassignment Toggle Card */}
+                  <div className={`p-3 rounded-lg border transition ${
+                    renewModalInactiveDetails.total > 0 
+                      ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800' 
+                      : 'bg-white/70 dark:bg-slate-800/70 border-purple-200 dark:border-purple-800/50'
+                  }`}>
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={renewModalReassignInactive}
+                        onChange={(e) => setRenewModalReassignInactive(e.target.checked)}
+                        className="w-4 h-4 mt-0.5 rounded text-purple-600 border-purple-300 focus:ring-purple-500 cursor-pointer"
+                      />
+                      <div className="space-y-0.5">
+                        <span className="font-bold text-slate-900 dark:text-white text-xs block">
+                          Reassign pending & overdue tasks from Danish Khan & Divyansh
+                        </span>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                          {renewModalInactiveDetails.total > 0 ? (
+                            <span className="text-amber-800 dark:text-amber-200 font-semibold">
+                              ⚠️ Found {renewModalInactiveDetails.total} overdue/pending tasks on this client ({renewModalInactiveDetails.danish > 0 ? `${renewModalInactiveDetails.danish} Danish, ` : ''}{renewModalInactiveDetails.divyansh > 0 ? `${renewModalInactiveDetails.divyansh} Divyansh` : ''}). Reassigning will transfer Danish&apos;s graphics to <strong>{renewModalStaff.graphic}</strong> and Divyansh&apos;s reels/videos to <strong>{renewModalStaff.video}</strong>.
+                            </span>
+                          ) : (
+                            <span>Automatically reassign any past tasks assigned to Danish Khan or Divyansh on this client to the chosen active staff.</span>
+                          )}
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
                 {/* Deliverables Scheduling Notice */}
                 <div className="p-3 bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/40 rounded-xl text-[11px] text-blue-800 dark:text-blue-300 space-y-1">
                   <div className="font-bold flex items-center gap-1.5 text-blue-900 dark:text-blue-200">
@@ -9790,6 +10051,125 @@ export default function AdminDashboard() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Global Inactive Staff Reassignment Modal (Batch Danish Khan & Divyansh Transfer) */}
+      {batchReassignModal.isOpen && (() => {
+        const activeStaffList = usersList.filter(u => 
+          (u.role === 'EMPLOYEE' || u.role === 'TL') && 
+          u.status !== 'INACTIVE' &&
+          !['danish khan', 'danish', 'divyansh', 'swapnil', 'sanmeet'].includes((u.name || '').toLowerCase())
+        );
+        const fallbackStaff = activeStaffList.length > 0 ? activeStaffList : [
+          { id: 21, name: 'Nouman', department: 'Ai Video Editor' },
+          { id: 22, name: 'Masoom', department: 'Ai Video Editor' },
+          { id: 25, name: 'Preet', department: 'Digital Marketing Executive' },
+          { id: 24, name: 'Pujan', department: 'Digital Marketing Executive' }
+        ];
+
+        // Total count of tasks currently assigned to Danish Khan & Divyansh
+        const totalDanishTasks = (allClientTasks || []).filter(t => ['danish', 'danish khan'].includes((t.workingOn || '').toLowerCase())).length;
+        const totalDivyanshTasks = (allClientTasks || []).filter(t => (t.workingOn || '').toLowerCase().includes('divyansh')).length;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-fadeIn text-xs">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-lg overflow-hidden animate-scaleIn flex flex-col">
+              <div className="p-5 bg-gradient-to-r from-amber-600 to-orange-600 text-white flex justify-between items-center">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs shadow-inner">
+                    <Users className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-base leading-tight">Batch Reassign Inactive Staff Tasks</h3>
+                    <p className="text-[11px] text-amber-100 font-medium">Reassign all tasks from Danish Khan &amp; Divyansh across the system</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setBatchReassignModal(prev => ({ ...prev, isOpen: false }))}
+                  className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-xl text-xs space-y-1">
+                  <span className="font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                    Inactive Staff Overview
+                  </span>
+                  <p className="text-slate-600 dark:text-slate-300 text-[11px]">
+                    Danish Khan and Divyansh are no longer in the organization. Currently:
+                  </p>
+                  <ul className="text-[11px] text-slate-700 dark:text-slate-200 font-semibold list-disc pl-4 pt-1 space-y-0.5">
+                    <li><strong>{totalDanishTasks} tasks</strong> assigned to Danish Khan (mostly Graphic Design)</li>
+                    <li><strong>{totalDivyanshTasks} tasks</strong> assigned to Divyansh (mostly Reels / AI Video)</li>
+                  </ul>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">
+                      Transfer all Danish Khan tasks to:
+                    </label>
+                    <select
+                      value={batchReassignModal.danishTarget}
+                      onChange={(e) => setBatchReassignModal(prev => ({ ...prev, danishTarget: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                    >
+                      {fallbackStaff.map(emp => (
+                        <option key={emp.id || emp.name} value={emp.name}>
+                          {emp.name} {emp.name === 'Nouman' ? '(Recommended for Graphics)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">
+                      Transfer all Divyansh tasks to:
+                    </label>
+                    <select
+                      value={batchReassignModal.divyanshTarget}
+                      onChange={(e) => setBatchReassignModal(prev => ({ ...prev, divyanshTarget: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                    >
+                      {fallbackStaff.map(emp => (
+                        <option key={emp.id || emp.name} value={emp.name}>
+                          {emp.name} {emp.name === 'Masoom' ? '(Recommended for Videos/Reels)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-[11px] text-slate-600 dark:text-slate-300">
+                  ⚡ This action updates all client tasks, deliveries, and internal assignments in the database, moving all pending work to the selected active team members.
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setBatchReassignModal(prev => ({ ...prev, isOpen: false }))}
+                  className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBatchReassignInactiveStaff}
+                  disabled={batchReassignModal.isLoading}
+                  className="py-2.5 px-5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow-md shadow-orange-500/20 disabled:opacity-50 cursor-pointer"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${batchReassignModal.isLoading ? 'animate-spin' : ''}`} />
+                  <span>{batchReassignModal.isLoading ? 'Reassigning All Tasks...' : `Reassign ${totalDanishTasks + totalDivyanshTasks} Tasks Now`}</span>
+                </button>
+              </div>
             </div>
           </div>
         );

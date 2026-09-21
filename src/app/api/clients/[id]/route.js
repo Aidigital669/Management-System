@@ -254,7 +254,7 @@ export async function PUT(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     const { id: idParam } = await params;
-    const id = parseInt(idParam);
+    const id = parseInt(idParam, 10);
     
     const cookieStore = await cookies();
     const requester = await getRequester(cookieStore);
@@ -263,59 +263,191 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const targetClient = await prisma.client.findUnique({ where: { id } });
-    if (!targetClient) {
-      return NextResponse.json({ error: 'Client not found' }, { status: 404 });
-    }
+    // 1. Look up target client in Client table by integer ID or by clientId string
+    let targetClient = !isNaN(id) 
+      ? await prisma.client.findUnique({ where: { id } })
+      : null;
 
-    const userOrConditions = [{ department: targetClient.clientId }];
-    if (targetClient.email) {
-      userOrConditions.push({ email: targetClient.email });
-    }
-
-    // 1. Delete associated client portal user accounts if any
-    const usersToDelete = await prisma.user.findMany({
-      where: {
-        role: 'CLIENT',
-        OR: userOrConditions
-      },
-      select: { id: true }
-    });
-
-    if (usersToDelete.length > 0) {
-      const userIds = usersToDelete.map(u => u.id);
-      
-      // Clean up CallRecords to prevent foreign key constraint violations
-      await prisma.callRecord.deleteMany({
-        where: { salesPersonId: { in: userIds } }
-      });
-
-      // Delete the user accounts
-      await prisma.user.deleteMany({
-        where: { id: { in: userIds } }
+    if (!targetClient && idParam) {
+      targetClient = await prisma.client.findFirst({
+        where: {
+          OR: [
+            { clientId: idParam },
+            { clientId: { equals: idParam, mode: 'insensitive' } },
+            { businessName: { equals: idParam, mode: 'insensitive' } }
+          ]
+        }
       });
     }
 
-    // 2. Delete internal employee tasks referencing this client
-    await prisma.task.deleteMany({
-      where: {
-        OR: [
-          { description: { contains: targetClient.clientId } },
-          { description: { contains: targetClient.businessName } }
-        ]
-      }
-    });
+    // 2. Also check if this is a Client portal user in User table (role: 'CLIENT')
+    let targetUserClient = null;
+    if (!targetClient && idParam) {
+      targetUserClient = await prisma.user.findFirst({
+        where: {
+          role: 'CLIENT',
+          OR: [
+            ...(!isNaN(id) ? [{ id }] : []),
+            { department: idParam },
+            { name: { equals: idParam, mode: 'insensitive' } }
+          ]
+        }
+      });
+    }
 
-    // 3. Delete Client record (Prisma cascade handles ClientTask, ClientDelivery, ClientFeedback)
-    await prisma.client.delete({ where: { id } });
+    // If neither exists in the database, the client was already deleted!
+    if (!targetClient && !targetUserClient) {
+      return NextResponse.json({ 
+        success: true, 
+        alreadyDeleted: true, 
+        message: 'Client was already removed or does not exist.' 
+      }, { status: 200 });
+    }
 
-    await prisma.auditLog.create({
-      data: {
-        action: `Deleted client account: ${targetClient.businessName} (${targetClient.clientId})`,
-        performedByName: requester.name,
-        performedByRole: requester.role
-      }
-    });
+    // CASE A: Client exists in Client table
+    if (targetClient) {
+      const clientIdStr = targetClient.clientId;
+      const bizName = targetClient.businessName;
+
+      // Clean up RenewalRequests referencing this client
+      try {
+        await prisma.renewalRequest.deleteMany({
+          where: {
+            OR: [
+              { clientDbId: targetClient.id },
+              { clientId: clientIdStr }
+            ]
+          }
+        });
+      } catch (e) {}
+
+      // Clean up ClientTask, ClientDelivery, ClientFeedback
+      try {
+        await prisma.clientTask.deleteMany({
+          where: { clientId: clientIdStr }
+        });
+      } catch (e) {}
+
+      try {
+        await prisma.clientDelivery.deleteMany({
+          where: { clientId: clientIdStr }
+        });
+      } catch (e) {}
+
+      try {
+        await prisma.clientFeedback.deleteMany({
+          where: { clientId: clientIdStr }
+        });
+      } catch (e) {}
+
+      // Clean up internal Task model referencing this client
+      try {
+        await prisma.task.deleteMany({
+          where: {
+            OR: [
+              { description: { contains: clientIdStr } },
+              { description: { contains: bizName } },
+              { title: { contains: clientIdStr } },
+              { title: { contains: bizName } }
+            ]
+          }
+        });
+      } catch (e) {}
+
+      // Clean up associated portal user accounts in User table
+      try {
+        const userOrConditions = [{ department: clientIdStr }];
+        if (targetClient.email) {
+          userOrConditions.push({ email: targetClient.email });
+        }
+        userOrConditions.push({ name: bizName });
+
+        const usersToDelete = await prisma.user.findMany({
+          where: {
+            role: 'CLIENT',
+            OR: userOrConditions
+          },
+          select: { id: true }
+        });
+
+        if (usersToDelete.length > 0) {
+          const userIds = usersToDelete.map(u => u.id);
+          await prisma.callRecord.deleteMany({
+            where: { salesPersonId: { in: userIds } }
+          });
+          await prisma.user.deleteMany({
+            where: { id: { in: userIds } }
+          });
+        }
+      } catch (e) {}
+
+      // Finally, delete the Client record from Client table
+      await prisma.client.delete({
+        where: { id: targetClient.id }
+      });
+
+      try {
+        await prisma.auditLog.create({
+          data: {
+            action: `Deleted client account: ${bizName} (${clientIdStr})`,
+            performedByName: requester.name,
+            performedByRole: requester.role
+          }
+        });
+      } catch (e) {}
+
+      return NextResponse.json({ success: true, message: `Deleted client: ${bizName}` });
+    }
+
+    // CASE B: Client only exists in User table
+    if (targetUserClient) {
+      const userClientId = targetUserClient.department || `USER-${targetUserClient.id}`;
+      const userName = targetUserClient.name;
+
+      try {
+        await prisma.clientTask.deleteMany({
+          where: {
+            OR: [
+              { clientId: userClientId },
+              { businessName: userName }
+            ]
+          }
+        });
+      } catch (e) {}
+
+      try {
+        await prisma.clientDelivery.deleteMany({
+          where: {
+            OR: [
+              { clientId: userClientId },
+              { clientName: userName }
+            ]
+          }
+        });
+      } catch (e) {}
+
+      try {
+        await prisma.callRecord.deleteMany({
+          where: { salesPersonId: targetUserClient.id }
+        });
+      } catch (e) {}
+
+      await prisma.user.delete({
+        where: { id: targetUserClient.id }
+      });
+
+      try {
+        await prisma.auditLog.create({
+          data: {
+            action: `Deleted client user account: ${userName} (${userClientId})`,
+            performedByName: requester.name,
+            performedByRole: requester.role
+          }
+        });
+      } catch (e) {}
+
+      return NextResponse.json({ success: true, message: `Deleted client account: ${userName}` });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

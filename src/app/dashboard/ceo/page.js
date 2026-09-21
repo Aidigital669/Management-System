@@ -646,11 +646,12 @@ export default function CeoDashboard() {
     if (!confirm(`Are you sure you want to delete client account "${name}"?`)) return;
     try {
       const res = await fetch(`/api/clients/${id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.details || errData.error || 'Failed to delete client');
+      const resData = await res.json().catch(() => ({}));
+      if (!res.ok && res.status !== 404) {
+        throw new Error(resData.details || resData.error || 'Failed to delete client');
       }
-      showToast(`Deleted client: ${name}`);
+      setClientsList(prev => prev.filter(c => c.id !== id && c.clientId !== id && c.businessName !== name));
+      showToast(resData.alreadyDeleted ? `Client "${name}" was already removed.` : `Deleted client: ${name}`);
       await refreshData();
     } catch (err) {
       alert(`Delete Error: ${err.message}`);
