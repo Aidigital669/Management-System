@@ -310,6 +310,13 @@ export default function AdminDashboard() {
   const [directExtensionReason, setDirectExtensionReason] = useState('');
   const [directExtensionLoading, setDirectExtensionLoading] = useState(false);
 
+  // Dedicated Client Plan Renewal Modal States (Date & Task Scheduling Form)
+  const [renewModalClient, setRenewModalClient] = useState(null);
+  const [renewModalDate, setRenewModalDate] = useState('');
+  const [renewModalNote, setRenewModalNote] = useState('');
+  const [renewModalLoading, setRenewModalLoading] = useState(false);
+  const [renewModalRequestId, setRenewModalRequestId] = useState(null);
+
   // Custom Confirmation & Warning Modal State (No native browser localhost dialogs)
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
@@ -587,9 +594,21 @@ export default function AdminDashboard() {
       if (client.notes && client.notes.toLowerCase().includes('renew')) isRenewed = true;
       if (client.notes && client.notes.trim().startsWith('{')) {
         const parsed = JSON.parse(client.notes);
-        if (parsed.isRenewed || parsed.renewalCycle || parsed.renewed) isRenewed = true;
+        if (parsed.isRenewed || parsed.renewalCycle || parsed.renewed || (parsed.renewalCount && parsed.renewalCount > 0)) isRenewed = true;
       }
     } catch (e) {}
+
+    if (!isRenewed && client.createdAt && client.joiningDate) {
+      const createdDt = parseDbDate(client.createdAt);
+      const joiningDt = parseDbDate(client.joiningDate);
+      if (createdDt && joiningDt) {
+        const createdMonth = createdDt.getFullYear() * 12 + createdDt.getMonth();
+        const joiningMonth = joiningDt.getFullYear() * 12 + joiningDt.getMonth();
+        if (joiningMonth > createdMonth) {
+          isRenewed = true;
+        }
+      }
+    }
 
     if (isRenewed) {
       return {
@@ -1865,47 +1884,95 @@ export default function AdminDashboard() {
     return getClientRenewalInfo(client);
   };
 
-  const handleRenewClientPlan = (clientDbId, bizName) => {
-    openConfirmModal({
-      title: 'Renew Client Plan',
-      badge: 'Contract Renewal',
-      clientName: bizName,
-      message: `Are you sure you want to renew the plan for "${bizName}"?`,
-      warningNotice: 'Setup and onboarding tasks will be skipped. Only content deliverables (Creatives, Reels, AI Videos, Weekly Reports) will be scheduled for the new contract cycle.',
-      confirmText: 'Renew Plan Now',
-      confirmVariant: 'emerald',
-      onConfirm: async () => {
-        setConfirmModal(prev => ({ ...prev, isLoading: true }));
-        try {
-          const res = await fetch(`/api/clients/${clientDbId}/renew`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'Failed to renew plan');
-          
-          closeConfirmModal();
-          openSuccessNotice({
-            title: 'Plan Successfully Renewed!',
-            subtitle: `New contract cycle created for ${bizName}`,
-            clientName: bizName,
-            badge: 'Plan Renewed',
-            details: [
-              { label: 'Client', value: bizName },
-              { label: 'New Cycle Start', value: data.newJoiningDate || 'Today' },
-              { label: 'Deliverables Scheduled', value: `${data.taskCount || 0} Content Tasks` }
-            ],
-            warningNote: 'Sundays are strictly excluded from deliverable scheduling.'
-          });
+  const openRenewModal = (client, requestId = null) => {
+    if (!client) return;
+    const planInfo = getClientPlanInfo(client);
+    let defaultDate = new Date();
 
-          showToast(`Plan successfully renewed for ${bizName}! ${data.taskCount} content tasks generated starting from ${data.newJoiningDate}.`);
-          await refreshData();
-        } catch (err) {
-          closeConfirmModal();
-          showToast(err.message || 'Failed to renew plan', 'error');
-        }
-      }
-    });
+    // If client current cycle expiry date is in the future or today, suggest day after expiry
+    if (planInfo.expiryDate && planInfo.expiryDate >= new Date()) {
+      defaultDate = new Date(planInfo.expiryDate);
+      defaultDate.setDate(defaultDate.getDate() + 1);
+    }
+    // Sunday exclusion rule: advance to Monday
+    if (defaultDate.getDay() === 0) {
+      defaultDate.setDate(defaultDate.getDate() + 1);
+    }
+
+    const yyyy = defaultDate.getFullYear();
+    const mm = String(defaultDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(defaultDate.getDate()).padStart(2, '0');
+    const defaultDateStr = `${yyyy}-${mm}-${dd}`;
+
+    setRenewModalClient(client);
+    setRenewModalDate(defaultDateStr);
+    setRenewModalNote('');
+    setRenewModalRequestId(requestId);
+  };
+
+  const handleRenewClientPlan = (clientDbId, bizName) => {
+    const client = clientsList.find(c => c.id === clientDbId || c.id === parseInt(clientDbId));
+    if (client) {
+      openRenewModal(client);
+    } else {
+      openRenewModal({ id: clientDbId, businessName: bizName });
+    }
+  };
+
+  const handleExecuteRenewal = async (e) => {
+    if (e) e.preventDefault();
+    if (!renewModalClient || !renewModalDate) {
+      showToast('Please select a valid renewal date.', 'warning');
+      return;
+    }
+
+    setRenewModalLoading(true);
+    const client = renewModalClient;
+    const bizName = client.businessName || 'Client';
+
+    try {
+      const endpoint = renewModalRequestId
+        ? `/api/renewal-requests/${renewModalRequestId}/approve`
+        : `/api/clients/${client.id}/renew`;
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          renewalDate: renewModalDate,
+          adminNote: renewModalNote
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to renew plan');
+
+      const renewResult = data.renewalResult || data;
+
+      setRenewModalClient(null);
+      setRenewModalRequestId(null);
+      setRenewModalLoading(false);
+
+      openSuccessNotice({
+        title: 'Plan Successfully Renewed!',
+        subtitle: `New contract cycle created for ${bizName}`,
+        clientName: bizName,
+        badge: 'Plan Renewed',
+        details: [
+          { label: 'Client', value: bizName },
+          { label: 'New Cycle Start', value: renewResult.newJoiningDate || renewModalDate },
+          { label: 'New Cycle Expiry', value: renewResult.newExpiryDate || 'Calculated' },
+          { label: 'Deliverables Scheduled', value: `${renewResult.taskCount || 0} Content Tasks` }
+        ],
+        warningNote: 'All tasks scheduled starting from renewal date. Sundays are strictly excluded.'
+      });
+
+      showToast(`Plan successfully renewed for ${bizName}! ${renewResult.taskCount || 0} tasks created starting from ${renewResult.newJoiningDate || renewModalDate}.`);
+      await refreshData();
+    } catch (err) {
+      setRenewModalLoading(false);
+      showToast(err.message || 'Failed to renew plan', 'error');
+    }
   };
 
   const handleApproveRenewalRequest = async (req) => {
@@ -5377,7 +5444,14 @@ export default function AdminDashboard() {
                                         <td className="p-3 text-right">
                                           <div className="flex items-center justify-end gap-1.5">
                                             <button
-                                              onClick={() => handleApproveRenewalRequest(req)}
+                                              onClick={() => {
+                                                if (!isExtension) {
+                                                  const client = clientsList.find(c => c.id === req.clientDbId || c.clientId === req.clientId);
+                                                  openRenewModal(client || { id: req.clientDbId, businessName: req.businessName, clientId: req.clientId }, req.id);
+                                                } else {
+                                                  handleApproveRenewalRequest(req);
+                                                }
+                                              }}
                                               disabled={processingRequestId === req.id}
                                               className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition flex items-center gap-1 shadow-sm disabled:opacity-50 cursor-pointer"
                                             >
@@ -6251,16 +6325,17 @@ export default function AdminDashboard() {
                 ? clientsList.filter(c => isClientContractInMonth(c, clientMonthFilter, clientStartDate, clientEndDate)).length
                 : clientsList.length,
               active: isMonthScoped
-                ? clientsList.filter(c => isClientContractInMonth(c, clientMonthFilter, clientStartDate, clientEndDate)).length
-                : clientsList.filter(c => c.active && getClientPlanInfo(c).status !== 'Expired').length,
-              extended: clientsList.filter(c => (c.extensionDays || 0) > 0 || getClientPlanInfo(c).status === 'Extended').length,
-              expiring_soon: clientsList.filter(c => c.active && getClientPlanInfo(c).status === 'Expiring Soon').length,
-              expired: clientsList.filter(c => getClientPlanInfo(c).status === 'Expired').length,
+                ? clientsList.filter(c => isClientPlanActive(c) && isClientContractInMonth(c, clientMonthFilter, clientStartDate, clientEndDate)).length
+                : clientsList.filter(c => isClientPlanActive(c)).length,
+              extended: clientsList.filter(c => ((c.extensionDays || 0) > 0 || getClientPlanInfo(c).status === 'Extended') && (!isMonthScoped || isClientContractInMonth(c, clientMonthFilter, clientStartDate, clientEndDate))).length,
+              expiring_soon: clientsList.filter(c => c.active && getClientPlanInfo(c).status === 'Expiring Soon' && (!isMonthScoped || isClientContractInMonth(c, clientMonthFilter, clientStartDate, clientEndDate))).length,
+              expired: clientsList.filter(c => getClientPlanInfo(c).status === 'Expired' && (!isMonthScoped || isClientContractInMonth(c, clientMonthFilter, clientStartDate, clientEndDate))).length,
               renewable: clientsList.filter(c => {
                 const info = getClientPlanInfo(c);
-                return info.isRenewed || info.status === 'Expired' || (c.active && info.status === 'Expiring Soon');
+                const isRenew = info.isRenewed || info.status === 'Expired' || (c.active && info.status === 'Expiring Soon');
+                return isRenew && (!isMonthScoped || isClientContractInMonth(c, clientMonthFilter, clientStartDate, clientEndDate));
               }).length,
-              inactive: clientsList.filter(c => !isClientPlanActive(c) && getClientPlanInfo(c).status !== 'Expired').length
+              inactive: clientsList.filter(c => (!isClientPlanActive(c) && getClientPlanInfo(c).status !== 'Expired') && (!isMonthScoped || isClientContractInMonth(c, clientMonthFilter, clientStartDate, clientEndDate))).length
             };
 
             const filteredClients = clientsList.filter(c => {
@@ -6298,9 +6373,8 @@ export default function AdminDashboard() {
                 }
               }
 
-              // 2. Month Scope Filter:
-              // Applies to calendar contracts and revenue. When viewing active clients, active clients are NOT mixed with month!
-              const shouldApplyMonth = (clientFilterScope === 'month' || isMonthScoped) && clientLifecycleFilter !== 'active' && clientLifecycleFilter !== 'extended';
+              // 2. Month Scope / Date Range Filter:
+              const shouldApplyMonth = clientFilterScope === 'month' || isMonthScoped;
               if (shouldApplyMonth) {
                 if (clientStartDate || clientEndDate) {
                   if (!isClientContractInMonth(c, null, clientStartDate, clientEndDate)) return false;
@@ -6746,9 +6820,6 @@ export default function AdminDashboard() {
                             key={pill.key}
                             onClick={() => {
                               setClientLifecycleFilter(pill.key);
-                              if (pill.key !== 'all') {
-                                setClientFilterScope('all_clients');
-                              }
                             }}
                             className={`px-3 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${
                               isSelected
@@ -6771,7 +6842,12 @@ export default function AdminDashboard() {
                     <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px] font-bold">
                       <button
                         type="button"
-                        onClick={() => setClientFilterScope('all_clients')}
+                        onClick={() => {
+                          setClientFilterScope('all_clients');
+                          setClientMonthFilter('all');
+                          setClientStartDate('');
+                          setClientEndDate('');
+                        }}
                         className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
                           clientFilterScope === 'all_clients'
                             ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs font-black'
@@ -6783,7 +6859,14 @@ export default function AdminDashboard() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setClientFilterScope('month')}
+                        onClick={() => {
+                          setClientFilterScope('month');
+                          if (clientMonthFilter === 'all') {
+                            setClientMonthFilter(currentLiveMonthKey);
+                            setClientStartDate(currentLiveMonthStart);
+                            setClientEndDate(currentLiveMonthEnd);
+                          }
+                        }}
                         className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
                           clientFilterScope === 'month'
                             ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs font-black'
@@ -6806,7 +6889,7 @@ export default function AdminDashboard() {
                           clientLifecycleFilter === 'expiring_soon' ? 'Expiring Soon (Active Contracts Within 7 Days)' :
                           clientLifecycleFilter === 'expired' ? 'Expired Contracts (Inactive - Renewal Required)' :
                           clientLifecycleFilter === 'renewable' ? 'Renewable / Renewed Subscriptions' : 'Inactive Accounts (Expired & Disabled)'
-                        }</strong> from {clientFilterScope === 'all_clients' ? '🌐 All Clients in the agency' : `📅 ${currentMonthLabel}`}.
+                        }</strong> from {(!isMonthScoped && clientFilterScope === 'all_clients') ? '🌐 All Clients in the agency' : `📅 ${currentMonthLabel}`}.
                       </span>
                       <button
                         onClick={() => {
@@ -6839,7 +6922,14 @@ export default function AdminDashboard() {
                     <div className="flex items-center gap-1.5">
                       <select
                         value={clientMonthFilter}
-                        onChange={(e) => handleMonthRangeChange(e.target.value, setClientMonthFilter, setClientStartDate, setClientEndDate)}
+                        onChange={(e) => {
+                          handleMonthRangeChange(e.target.value, setClientMonthFilter, setClientStartDate, setClientEndDate);
+                          if (e.target.value !== 'all') {
+                            setClientFilterScope('month');
+                          } else {
+                            setClientFilterScope('all_clients');
+                          }
+                        }}
                         className="px-3 py-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-sm"
                       >
                         <option value="all">📅 All Months</option>
@@ -6859,7 +6949,7 @@ export default function AdminDashboard() {
                         <input
                           type="date"
                           value={clientStartDate}
-                          onChange={(e) => { setClientStartDate(e.target.value); setClientMonthFilter('custom'); }}
+                          onChange={(e) => { setClientStartDate(e.target.value); setClientMonthFilter('custom'); setClientFilterScope('month'); }}
                           className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-inner"
                         />
                       </div>
@@ -6869,13 +6959,13 @@ export default function AdminDashboard() {
                         <input
                           type="date"
                           value={clientEndDate}
-                          onChange={(e) => { setClientEndDate(e.target.value); setClientMonthFilter('custom'); }}
+                          onChange={(e) => { setClientEndDate(e.target.value); setClientMonthFilter('custom'); setClientFilterScope('month'); }}
                           className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-inner"
                         />
                       </div>
                       {(clientStartDate || clientEndDate) && (
                         <button
-                          onClick={() => { setClientStartDate(''); setClientEndDate(''); setClientMonthFilter('all'); }}
+                          onClick={() => { setClientStartDate(''); setClientEndDate(''); setClientMonthFilter('all'); setClientFilterScope('all_clients'); }}
                           className="ml-1 px-1.5 py-0.5 text-[10px] font-black text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition cursor-pointer"
                           title="Clear Date Range"
                         >
@@ -7148,6 +7238,13 @@ export default function AdminDashboard() {
                                       className="py-1 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-lg text-xs transition cursor-pointer"
                                     >
                                       Details
+                                    </button>
+                                    <button
+                                      onClick={() => openRenewModal(client)}
+                                      className="p-1.5 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg text-emerald-600 dark:text-emerald-400 transition cursor-pointer border border-transparent hover:border-emerald-200 dark:hover:border-emerald-800"
+                                      title="Renew Plan (Select Date & Schedule Tasks)"
+                                    >
+                                      <RefreshCw className="w-3.5 h-3.5" />
                                     </button>
                                     <button
                                       onClick={() => {
@@ -9436,6 +9533,267 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* Dedicated Client Plan Renewal Modal (Custom Date & Deliverable Generation) */}
+      {renewModalClient && (() => {
+        const client = renewModalClient;
+        const planInfo = getClientPlanInfo(client);
+        const planDuration = getPlanDurationDays(client.packageName, client.requirement, client.services);
+        
+        // Calculate dynamic preview expiry based on selected renewModalDate
+        let previewExpiryStr = 'N/A';
+        let isSelectedSunday = false;
+        let effectiveMondayDateStr = '';
+        if (renewModalDate) {
+          const parsed = parsePlanDbDate(renewModalDate);
+          if (parsed && !isNaN(parsed.getTime())) {
+            if (parsed.getDay() === 0) {
+              isSelectedSunday = true;
+              const mon = new Date(parsed);
+              mon.setDate(mon.getDate() + 1);
+              effectiveMondayDateStr = formatDateToDb(mon);
+            }
+            const exp = new Date(parsed);
+            exp.setDate(exp.getDate() + planDuration);
+            previewExpiryStr = formatDateToDb(exp);
+          }
+        }
+
+        // Quick date shortcuts
+        const setQuickDate = (type) => {
+          const today = new Date();
+          let target = new Date();
+          if (type === 'today') {
+            target = today;
+          } else if (type === 'tomorrow') {
+            target = new Date(today);
+            target.setDate(target.getDate() + 1);
+          } else if (type === 'expiry_next') {
+            if (planInfo.expiryDate) {
+              target = new Date(planInfo.expiryDate);
+              target.setDate(target.getDate() + 1);
+            } else {
+              target = today;
+            }
+          } else if (type === 'first_next_month') {
+            target = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+          }
+          if (target.getDay() === 0) {
+            target.setDate(target.getDate() + 1);
+          }
+          const yyyy = target.getFullYear();
+          const mm = String(target.getMonth() + 1).padStart(2, '0');
+          const dd = String(target.getDate()).padStart(2, '0');
+          setRenewModalDate(`${yyyy}-${mm}-${dd}`);
+        };
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-fadeIn text-xs">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-xl overflow-hidden animate-scaleIn flex flex-col max-h-[92vh]">
+              {/* Modal Header */}
+              <div className="p-5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white flex justify-between items-center shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs shadow-inner">
+                    <RefreshCw className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-base leading-tight">Renew Client Plan & Schedule Tasks</h3>
+                    <p className="text-[11px] text-emerald-100 font-medium">Specify renewal date • Content deliverables automatically scheduled</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRenewModalClient(null)}
+                  className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Modal Body / Form */}
+              <form onSubmit={handleExecuteRenewal} className="p-6 space-y-4 overflow-y-auto flex-1">
+                {/* Client Information Card */}
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-slate-900 dark:text-white text-sm">
+                        {client.businessName}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                        ID: {client.clientId} • {client.services}
+                      </p>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
+                      {client.packageName || 'Standard Plan'} ({planDuration} Days)
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 text-[11px]">
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block">Current Cycle</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-200">
+                        {client.joiningDate || 'N/A'} → {planInfo.expiryDateStr || 'N/A'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block">Billing Amount</span>
+                      <span className="font-bold text-slate-900 dark:text-white">
+                        ₹{(client.packageAmount || 0).toLocaleString()} / cycle
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block">Current Health</span>
+                      <span className={`font-bold ${planInfo.daysLeft <= 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                        {planInfo.daysLeft <= 0 ? `Expired (${Math.abs(planInfo.daysLeft)}d ago)` : `${planInfo.daysLeft}d remaining`}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Date Selection Section */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-black text-slate-800 dark:text-slate-200">
+                      📅 Effective Renewal Start Date <span className="text-red-500">*</span>
+                    </label>
+                    <span className="text-[10px] text-slate-400 font-medium">Tasks start from this date</span>
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type="date"
+                      required
+                      value={renewModalDate}
+                      onChange={(e) => setRenewModalDate(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600 transition shadow-xs cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Quick Date Shortcuts */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Quick Select:</span>
+                    <button
+                      type="button"
+                      onClick={() => setQuickDate('today')}
+                      className="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700 dark:hover:text-emerald-300 text-slate-600 dark:text-slate-300 rounded-lg text-[10px] font-bold transition border border-slate-200 dark:border-slate-700 cursor-pointer"
+                    >
+                      ⚡ Today
+                    </button>
+                    {planInfo.expiryDate && (
+                      <button
+                        type="button"
+                        onClick={() => setQuickDate('expiry_next')}
+                        className="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700 dark:hover:text-emerald-300 text-slate-600 dark:text-slate-300 rounded-lg text-[10px] font-bold transition border border-slate-200 dark:border-slate-700 cursor-pointer"
+                      >
+                        ➡️ Day After Expiry
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setQuickDate('tomorrow')}
+                      className="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700 dark:hover:text-emerald-300 text-slate-600 dark:text-slate-300 rounded-lg text-[10px] font-bold transition border border-slate-200 dark:border-slate-700 cursor-pointer"
+                    >
+                      🌅 Tomorrow
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQuickDate('first_next_month')}
+                      className="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700 dark:hover:text-emerald-300 text-slate-600 dark:text-slate-300 rounded-lg text-[10px] font-bold transition border border-slate-200 dark:border-slate-700 cursor-pointer"
+                    >
+                      🗓️ 1st Next Month
+                    </button>
+                  </div>
+                </div>
+
+                {/* Sunday Alert Banner (if user picked a Sunday) */}
+                {isSelectedSunday && (
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 rounded-xl text-[11px] text-amber-800 dark:text-amber-300 flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold">Sunday Exclusion Rule Applied</p>
+                      <p className="text-slate-600 dark:text-slate-300 mt-0.5">
+                        The date you selected lands on a Sunday. Per agency rules, the renewal start date and deliverable tasks will automatically advance to Monday ({effectiveMondayDateStr}).
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* New Plan Cycle Preview Card */}
+                <div className="p-3.5 bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 rounded-xl space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                      New Contract Cycle Preview
+                    </span>
+                    <span className="font-black text-emerald-700 dark:text-emerald-300">
+                      {planDuration} Days Package
+                    </span>
+                  </div>
+                  <div className="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                    <span className="px-2 py-0.5 bg-white dark:bg-slate-800 rounded border border-emerald-200 dark:border-emerald-800">
+                      Start: {renewModalDate || 'Select Date'}
+                    </span>
+                    <span className="text-slate-400">→</span>
+                    <span className="px-2 py-0.5 bg-white dark:bg-slate-800 rounded border border-emerald-200 dark:border-emerald-800">
+                      Expiry: {previewExpiryStr}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Deliverables Scheduling Notice */}
+                <div className="p-3 bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/40 rounded-xl text-[11px] text-blue-800 dark:text-blue-300 space-y-1">
+                  <div className="font-bold flex items-center gap-1.5 text-blue-900 dark:text-blue-200">
+                    <AlertCircle className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span>Deliverable Scheduling Workflow</span>
+                  </div>
+                  <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                    • <strong>Setup & Onboarding skipped</strong>: Only ongoing content deliverables (Creatives, Reels, AI Videos, and Weekly Reports) are scheduled.
+                  </p>
+                  <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                    • <strong>Strict Sunday Exclusion</strong>: Any deliverable scheduled for a Sunday automatically advances to Monday.
+                  </p>
+                  <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                    • <strong>Dedicated Staff</strong>: Weekly Reports and postings are assigned to the client's dedicated Social Media Executive.
+                  </p>
+                </div>
+
+                {/* Optional Admin Note */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Renewal Note / Reference (Optional)
+                  </label>
+                  <textarea
+                    value={renewModalNote}
+                    onChange={(e) => setRenewModalNote(e.target.value)}
+                    rows={2}
+                    placeholder="e.g. Plan renewed for October cycle. Payment of ₹3,499 received via UPI (UTR #...)"
+                    className="w-full p-2.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 resize-none"
+                  />
+                </div>
+
+                {/* Modal Footer Actions */}
+                <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 -mx-6 -mb-6 flex justify-end gap-2.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setRenewModalClient(null)}
+                    className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={renewModalLoading || !renewModalDate}
+                    className="py-2.5 px-5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow-md shadow-emerald-500/20 disabled:opacity-50 cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${renewModalLoading ? 'animate-spin' : ''}`} />
+                    <span>{renewModalLoading ? 'Scheduling Tasks...' : 'Confirm & Renew Plan'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Excel Sheet Bulk Upload Modal */}
       <ExcelImportModal

@@ -295,9 +295,21 @@ export default function CeoDashboard() {
       if (client.notes && client.notes.toLowerCase().includes('renew')) isRenewed = true;
       if (client.notes && client.notes.trim().startsWith('{')) {
         const parsed = JSON.parse(client.notes);
-        if (parsed.isRenewed || parsed.renewalCycle || parsed.renewed) isRenewed = true;
+        if (parsed.isRenewed || parsed.renewalCycle || parsed.renewed || (parsed.renewalCount && parsed.renewalCount > 0)) isRenewed = true;
       }
     } catch (e) { }
+
+    if (!isRenewed && client.createdAt && client.joiningDate) {
+      const createdDt = parseDbDate(client.createdAt);
+      const joiningDt = parseDbDate(client.joiningDate);
+      if (createdDt && joiningDt) {
+        const createdMonth = createdDt.getFullYear() * 12 + createdDt.getMonth();
+        const joiningMonth = joiningDt.getFullYear() * 12 + joiningDt.getMonth();
+        if (joiningMonth > createdMonth) {
+          isRenewed = true;
+        }
+      }
+    }
 
     if (isRenewed) {
       return {
@@ -1926,15 +1938,16 @@ export default function CeoDashboard() {
                 ? clientsList.filter(c => isClientContractInMonth(c, clientMonthFilter, clientStartDate, clientEndDate)).length
                 : clientsList.length,
               active: isMonthScoped
-                ? clientsList.filter(c => isClientContractInMonth(c, clientMonthFilter, clientStartDate, clientEndDate)).length
+                ? clientsList.filter(c => isClientPlanActive(c) && isClientContractInMonth(c, clientMonthFilter, clientStartDate, clientEndDate)).length
                 : clientsList.filter(c => isClientPlanActive(c)).length,
-              expiring_soon: clientsList.filter(c => c.active && getClientPlanInfo(c).status === 'Expiring Soon').length,
-              expired: clientsList.filter(c => getClientPlanInfo(c).status === 'Expired').length,
+              expiring_soon: clientsList.filter(c => c.active && getClientPlanInfo(c).status === 'Expiring Soon' && (!isMonthScoped || isClientContractInMonth(c, clientMonthFilter, clientStartDate, clientEndDate))).length,
+              expired: clientsList.filter(c => getClientPlanInfo(c).status === 'Expired' && (!isMonthScoped || isClientContractInMonth(c, clientMonthFilter, clientStartDate, clientEndDate))).length,
               renewable: clientsList.filter(c => {
                 const info = getClientPlanInfo(c);
-                return info.isRenewed || info.status === 'Expired' || (c.active && info.status === 'Expiring Soon');
+                const isRenew = info.isRenewed || info.status === 'Expired' || (c.active && info.status === 'Expiring Soon');
+                return isRenew && (!isMonthScoped || isClientContractInMonth(c, clientMonthFilter, clientStartDate, clientEndDate));
               }).length,
-              inactive: clientsList.filter(c => !isClientPlanActive(c) && getClientPlanInfo(c).status !== 'Expired').length
+              inactive: clientsList.filter(c => (!isClientPlanActive(c) && getClientPlanInfo(c).status !== 'Expired') && (!isMonthScoped || isClientContractInMonth(c, clientMonthFilter, clientStartDate, clientEndDate))).length
             };
 
             const filteredClients = clientsList.filter(c => {
@@ -1967,9 +1980,8 @@ export default function CeoDashboard() {
                 }
               }
 
-              // 2. Month Scope Filter:
-              // Applies to calendar contracts and revenue. When viewing active clients, active clients are NOT mixed with month!
-              const shouldApplyMonth = (clientFilterScope === 'month' || isMonthScoped) && clientLifecycleFilter !== 'active';
+              // 2. Month Scope / Date Range Filter:
+              const shouldApplyMonth = clientFilterScope === 'month' || isMonthScoped;
               if (shouldApplyMonth) {
                 if (clientStartDate || clientEndDate) {
                   if (!isClientContractInMonth(c, null, clientStartDate, clientEndDate)) return false;
@@ -2415,9 +2427,6 @@ export default function CeoDashboard() {
                             key={pill.key}
                             onClick={() => {
                               setClientLifecycleFilter(pill.key);
-                              if (pill.key !== 'all') {
-                                setClientFilterScope('all_clients');
-                              }
                             }}
                             className={`px-3 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${isSelected
                               ? 'bg-blue-600 text-white shadow-sm'
@@ -2438,7 +2447,12 @@ export default function CeoDashboard() {
                     <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px] font-bold">
                       <button
                         type="button"
-                        onClick={() => setClientFilterScope('all_clients')}
+                        onClick={() => {
+                          setClientFilterScope('all_clients');
+                          setClientMonthFilter('all');
+                          setClientStartDate('');
+                          setClientEndDate('');
+                        }}
                         className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${clientFilterScope === 'all_clients'
                           ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs font-black'
                           : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -2449,7 +2463,14 @@ export default function CeoDashboard() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setClientFilterScope('month')}
+                        onClick={() => {
+                          setClientFilterScope('month');
+                          if (clientMonthFilter === 'all') {
+                            setClientMonthFilter(currentLiveMonthKey);
+                            setClientStartDate(currentLiveMonthStart);
+                            setClientEndDate(currentLiveMonthEnd);
+                          }
+                        }}
                         className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${clientFilterScope === 'month'
                           ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs font-black'
                           : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -2470,7 +2491,7 @@ export default function CeoDashboard() {
                             clientLifecycleFilter === 'expiring_soon' ? 'Expiring Soon (Within 7 Days)' :
                               clientLifecycleFilter === 'expired' ? 'Expired / Renewal Due' :
                                 clientLifecycleFilter === 'renewable' ? 'Renewable / Renewed Subscriptions' : 'Inactive Accounts'
-                        }</strong> from {clientFilterScope === 'all_clients' ? '🌐 All Clients in the agency (not restricted by month)' : `📅 ${currentMonthLabel}`}.
+                        }</strong> from {(!isMonthScoped && clientFilterScope === 'all_clients') ? '🌐 All Clients in the agency (not restricted by month)' : `📅 ${currentMonthLabel}`}.
                       </span>
                       <button
                         onClick={() => {
@@ -2503,7 +2524,14 @@ export default function CeoDashboard() {
                     <div className="flex items-center gap-1.5">
                       <select
                         value={clientMonthFilter}
-                        onChange={(e) => handleMonthRangeChange(e.target.value, setClientMonthFilter, setClientStartDate, setClientEndDate)}
+                        onChange={(e) => {
+                          handleMonthRangeChange(e.target.value, setClientMonthFilter, setClientStartDate, setClientEndDate);
+                          if (e.target.value !== 'all') {
+                            setClientFilterScope('month');
+                          } else {
+                            setClientFilterScope('all_clients');
+                          }
+                        }}
                         className="px-3 py-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-sm"
                       >
                         <option value="all">📅 All Months</option>
@@ -2523,7 +2551,7 @@ export default function CeoDashboard() {
                         <input
                           type="date"
                           value={clientStartDate}
-                          onChange={(e) => { setClientStartDate(e.target.value); setClientMonthFilter('custom'); }}
+                          onChange={(e) => { setClientStartDate(e.target.value); setClientMonthFilter('custom'); setClientFilterScope('month'); }}
                           className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-inner"
                         />
                       </div>
@@ -2533,13 +2561,13 @@ export default function CeoDashboard() {
                         <input
                           type="date"
                           value={clientEndDate}
-                          onChange={(e) => { setClientEndDate(e.target.value); setClientMonthFilter('custom'); }}
+                          onChange={(e) => { setClientEndDate(e.target.value); setClientMonthFilter('custom'); setClientFilterScope('month'); }}
                           className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer shadow-inner"
                         />
                       </div>
                       {(clientStartDate || clientEndDate) && (
                         <button
-                          onClick={() => { setClientStartDate(''); setClientEndDate(''); setClientMonthFilter('all'); }}
+                          onClick={() => { setClientStartDate(''); setClientEndDate(''); setClientMonthFilter('all'); setClientFilterScope('all_clients'); }}
                           className="ml-1 px-1.5 py-0.5 text-[10px] font-black text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition cursor-pointer"
                           title="Clear Date Range"
                         >

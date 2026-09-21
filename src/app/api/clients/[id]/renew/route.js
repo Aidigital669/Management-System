@@ -19,7 +19,8 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'Unauthorized: Only Admin and CEO can approve and renew plans.' }, { status: 403 });
     }
 
-    const result = await executeClientRenewal(id, requester);
+    const body = await request.json().catch(() => ({}));
+    const result = await executeClientRenewal(id, requester, body);
     return NextResponse.json(result);
 
   } catch (error) {

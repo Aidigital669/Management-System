@@ -197,9 +197,21 @@ export const getClientPlanInfo = (client, referenceDate = new Date()) => {
     }
     if (client.notes && client.notes.trim().startsWith('{')) {
       const parsed = JSON.parse(client.notes);
-      if (parsed.isRenewed || parsed.renewalCycle || parsed.renewed) isRenewed = true;
+      if (parsed.isRenewed || parsed.renewalCycle || parsed.renewed || (parsed.renewalCount && parsed.renewalCount > 0)) isRenewed = true;
     }
   } catch (e) {}
+
+  // Fallback: If client creation month is strictly earlier than contract/joining month, it is an established renewal
+  if (!isRenewed && client.createdAt && start) {
+    const createdDt = parseDbDate(client.createdAt);
+    if (createdDt) {
+      const createdMonth = createdDt.getFullYear() * 12 + createdDt.getMonth();
+      const joiningMonth = start.getFullYear() * 12 + start.getMonth();
+      if (joiningMonth > createdMonth) {
+        isRenewed = true;
+      }
+    }
+  }
 
   let status = 'Active';
   let overdueDays = 0;

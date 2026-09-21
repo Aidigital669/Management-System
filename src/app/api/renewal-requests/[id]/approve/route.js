@@ -41,7 +41,7 @@ export async function POST(request, { params }) {
 
     // --- CASE 1: RENEWAL APPROVAL ---
     if (reqRecord.requestType === 'RENEWAL') {
-      const renewalResult = await executeClientRenewal(reqRecord.clientDbId, approver);
+      const renewalResult = await executeClientRenewal(reqRecord.clientDbId, approver, body);
 
       await prisma.renewalRequest.update({
         where: { id: requestId },

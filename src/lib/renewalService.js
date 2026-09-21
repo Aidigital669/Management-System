@@ -2,31 +2,7 @@
 // Centralized, robust client plan renewal service
 
 import { prisma } from './db.js';
-import { getPlanDurationDays } from './planUtils.js';
-
-const parseDbDate = (dateStr) => {
-  if (!dateStr || typeof dateStr !== 'string') return null;
-  const parts = dateStr.split('-');
-  if (parts.length === 3) {
-    const day = parseInt(parts[0]);
-    const monthName = parts[1];
-    const year = parseInt(parts[2]);
-    const months = {
-      jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
-      jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
-    };
-    const month = months[monthName.toLowerCase()];
-    if (month !== undefined && !isNaN(day) && !isNaN(year)) {
-      return new Date(year, month, day);
-    }
-  }
-  const d = new Date(dateStr);
-  return isNaN(d.getTime()) ? null : d;
-};
-
-const formatDateToDb = (date) => {
-  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
-};
+import { getPlanDurationDays, parseDbDate, formatDateToDb, getClientSmExecutive, isSocialMediaExecutive } from './planUtils.js';
 
 const getMonthYearStr = (dateStr) => {
   if (!dateStr || typeof dateStr !== 'string') return '';
@@ -54,27 +30,41 @@ const parseRequirementCounts = (reqStr) => {
   return { c, r, a };
 };
 
-export async function executeClientRenewal(clientDbId, requester = { name: 'Admin', role: 'ADMIN' }) {
+export async function executeClientRenewal(clientDbId, requester = { name: 'Admin', role: 'ADMIN' }, options = {}) {
   const client = await prisma.client.findUnique({ where: { id: parseInt(clientDbId) } });
   if (!client) {
     throw new Error('Client not found');
   }
 
-  // 1. Calculate new cycle start date using plan duration (30, 90, 180, 365 days)
+  // 1. Calculate new cycle start date using specified renewal date or plan duration (30, 90, 180, 365 days)
   const today = new Date();
   const currentStart = parseDbDate(client.joiningDate);
-  let newStart = new Date(today);
   const planDuration = getPlanDurationDays(client.packageName, client.requirement, client.services);
+  let newStart = null;
 
-  if (currentStart) {
-    const currentExpiry = new Date(currentStart);
-    currentExpiry.setDate(currentExpiry.getDate() + planDuration);
-
-    // If previous plan is still active, start new plan the day after expiry
-    if (currentExpiry >= today) {
-      newStart = new Date(currentExpiry);
-      newStart.setDate(newStart.getDate() + 1);
+  if (options && options.renewalDate) {
+    const parsedCustom = parseDbDate(options.renewalDate);
+    if (parsedCustom && !isNaN(parsedCustom.getTime())) {
+      newStart = new Date(parsedCustom.getFullYear(), parsedCustom.getMonth(), parsedCustom.getDate());
     }
+  }
+
+  if (!newStart) {
+    newStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    if (currentStart) {
+      const currentExpiry = new Date(currentStart);
+      currentExpiry.setDate(currentExpiry.getDate() + planDuration);
+      // If previous plan is still active, start new plan the day after expiry
+      if (currentExpiry >= today) {
+        newStart = new Date(currentExpiry);
+        newStart.setDate(newStart.getDate() + 1);
+      }
+    }
+  }
+
+  // Sunday Exclusion: If renewal start date falls on Sunday, advance to Monday
+  if (newStart.getDay() === 0) {
+    newStart.setDate(newStart.getDate() + 1);
   }
 
   const newStartStr = formatDateToDb(newStart);
@@ -242,6 +232,8 @@ export async function executeClientRenewal(clientDbId, requester = { name: 'Admi
     });
   }
 
+  const dedicatedSmExec = getClientSmExecutive(client, existingTasks);
+
   // Create and auto-assign tasks
   for (let i = 0; i < tasksToCreate.length; i++) {
     const task = tasksToCreate[i];
@@ -250,7 +242,10 @@ export async function executeClientRenewal(clientDbId, requester = { name: 'Admi
     const dept = task.assignTo;
     const deptEmployees = resolveStaff(dept) || activeEmployees.filter(e => e.department === dept);
 
-    if (dept === 'Ai Video Editor' || dept === 'AI Video Editor') {
+    // Dedicated SM Executive rule: Reports & Social Media postings handled by assigned SM Exec
+    if ((dept === 'Digital Marketing Executive' || task.postType === 'Report' || task.postType === 'Posting') && dedicatedSmExec) {
+      assignedEmployeeName = dedicatedSmExec;
+    } else if (dept === 'Ai Video Editor' || dept === 'AI Video Editor') {
       const teamUsers = activeEmployees.filter(e => {
         const userRole = ((e.department || '') + ' ' + (e.designation || '')).toLowerCase();
         return userRole.includes('ai video') && !userRole.includes('lead');
@@ -333,9 +328,14 @@ export async function executeClientRenewal(clientDbId, requester = { name: 'Admi
       const parsed = JSON.parse(updatedNotes);
       parsed.isRenewed = true;
       parsed.lastRenewedAt = new Date().toISOString();
+      parsed.renewalDate = newStartStr;
+      if (options && options.adminNote) {
+        parsed.renewalNote = options.adminNote;
+      }
       updatedNotes = JSON.stringify(parsed);
     } else {
-      updatedNotes = updatedNotes ? `${updatedNotes} [Plan Renewed]` : '[Plan Renewed]';
+      const noteAddition = options && options.adminNote ? ` [Plan Renewed: ${options.adminNote}]` : ' [Plan Renewed]';
+      updatedNotes = updatedNotes ? `${updatedNotes}${noteAddition}` : noteAddition.trim();
     }
   } catch (e) {
     updatedNotes = `${updatedNotes} [Plan Renewed]`;
