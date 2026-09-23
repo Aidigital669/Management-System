@@ -33,14 +33,5 @@
     "eslint-config-next": "16.2.10",
     "prisma": "8.0.0-rc.15",
     "tailwindcss": "^4"
-  },
-  "overrides": {
-    "@effect/platform-bun": "4.0.0-rc.112",
-    "@effect/platform-node": "4.0.0-rc.112",
-    "@effect/platform-node-shared": "4.0.0-rc.112",
-    "@effect/sql-d1": "4.0.0-rc.112",
-    "@effect/sql-pg": "4.0.0-rc.112",
-    "@effect/vitest": "4.0.0-rc.112",
-    "effect": "4.0.0-rc.112"
   }
 }
