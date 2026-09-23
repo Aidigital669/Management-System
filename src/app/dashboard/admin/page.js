@@ -16,6 +16,9 @@ const AgencyDashboard = dynamic(() => import('./AgencyDashboard'), {
 
 import CampaignDeliveriesTable from './CampaignDeliveriesTable';
 
+const CollectionReportModal = dynamic(() => import('@/components/CollectionReportModal'), { ssr: false });
+
+
 const AdminSellerDashboard = dynamic(() => import('./AdminSellerDashboard'), {
   loading: () => (
     <div className="flex items-center justify-center p-16 text-slate-400 gap-2">
@@ -188,6 +191,10 @@ export default function AdminDashboard() {
 
   // Data states
   const [remarksLeadFilter, setRemarksLeadFilter] = useState('');
+
+  // Collection Report Modal State
+  const [showCollectionReportModal, setShowCollectionReportModal] = useState(false);
+
   const [usersList, setUsersList] = useState([]);
   const [tasksList, setTasksList] = useState([]);
   const [leavesList, setLeavesList] = useState([]);
@@ -3131,6 +3138,13 @@ export default function AdminDashboard() {
           </div>
           
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <button
+              onClick={() => setShowCollectionReportModal(true)}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-1.5 cursor-pointer"
+            >
+              <TrendingUp className="w-4 h-4" />
+              <span className="hidden sm:inline">Collection Report</span>
+            </button>
             <button 
               onClick={toggleDarkMode}
               className="px-2.5 sm:px-3 py-1.5 border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur-md rounded-xl flex items-center gap-1.5 sm:gap-2 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-xs hover:shadow-md transition-all duration-300 transform active:scale-95 cursor-pointer"
@@ -3170,6 +3184,7 @@ export default function AdminDashboard() {
               attendance={attendanceLogs}
               feedbacks={feedbacksList}
               onSelectTab={handleSelectTab}
+              onOpenCollectionReport={() => setShowCollectionReportModal(true)}
               refreshData={refreshData}
             />
           )}
@@ -6869,62 +6884,6 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  {/* Expected Revenue (Total Billing) */}
-                  <div 
-                    onClick={() => {
-                      setClientPaymentFilter('all');
-                      setClientLifecycleFilter('all');
-                      setClientRevenueStreamFilter('all');
-                      setClientFilterScope('all_clients');
-                      setClientMonthFilter('all');
-                      setClientStartDate('');
-                      setClientEndDate('');
-                    }}
-                    className={`bg-white dark:bg-slate-900 border p-5 rounded-2xl shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all ${
-                      clientFilterScope === 'all_clients' && clientPaymentFilter === 'all' && clientLifecycleFilter === 'all' && clientRevenueStreamFilter === 'all'
-                        ? 'border-indigo-500 ring-2 ring-indigo-400/20 bg-indigo-50/20 dark:bg-indigo-950/20'
-                        : 'border-slate-200 dark:border-slate-800 hover:border-indigo-300'
-                    }`}
-                    title="Click to view all 58 clients amount (Reset filters to All Clients)"
-                  >
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-extrabold uppercase tracking-wider">Expected Revenue</span>
-                      <BarChart2 className="w-4 h-4 text-indigo-500" />
-                    </div>
-                    <div className="my-2">
-                      <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
-                        ₹{totalAll58ClientsBilling.toLocaleString()}
-                      </div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">
-                        All {clientsList.length} CRM Clients Target Billing
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-1 mt-1 text-[9px] font-medium text-slate-500 dark:text-slate-400">
-                      <span 
-                        onClick={(e) => { e.stopPropagation(); setClientRevenueStreamFilter(clientRevenueStreamFilter === 'NewPurchase' ? 'all' : 'NewPurchase'); }}
-                        className="cursor-pointer hover:underline"
-                        title="Click to filter Sales clients"
-                      >
-                        Target Sale: <b className="text-indigo-600 font-bold">₹{all58SalesExpected.toLocaleString()}</b>
-                      </span>
-                      <span>•</span>
-                      <span 
-                        onClick={(e) => { e.stopPropagation(); setClientRevenueStreamFilter(clientRevenueStreamFilter === 'Renewal' ? 'all' : 'Renewal'); }}
-                        className="cursor-pointer hover:underline"
-                        title="Click to filter Renewal clients"
-                      >
-                        Target Renewal: <b className="text-purple-600 font-bold">₹{all58RenewalsExpected.toLocaleString()}</b>
-                      </span>
-                      <span>•</span>
-                      <span 
-                        onClick={(e) => { e.stopPropagation(); setClientRevenueStreamFilter(clientRevenueStreamFilter === 'ActiveRetainer' ? 'all' : 'ActiveRetainer'); }}
-                        className="cursor-pointer hover:underline"
-                        title="Click to filter Retainer clients"
-                      >
-                        Ret: <b className="text-blue-600 font-bold">₹{all58RetainersExpected.toLocaleString()}</b>
-                      </span>
-                    </div>
-                  </div>
 
                   {/* Pending Revenue (Outstanding) */}
                   <div 
@@ -10578,6 +10537,11 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* Collection Report Modal */}
+      <CollectionReportModal 
+        isOpen={showCollectionReportModal} 
+        onClose={() => setShowCollectionReportModal(false)} 
+      />
     </div>
   );
 }

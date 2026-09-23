@@ -1,33 +1,32 @@
 {
-  "timestamp": "2026-09-21T05:58:16.727Z",
+  "timestamp": "2026-09-23T12:28:08.463Z",
   "summary": {
     "totalClients": 58,
-    "totalClientTasks": 1277,
+    "totalClientTasks": 1386,
     "totalClientDeliveries": 0,
     "tasksByWorkingOn": {
-      "Pujan": 284,
-      "Swapnil": 111,
-      "Divyansh": 85,
-      "Sanmeet": 66,
-      "Preet": 345,
-      "Nouman": 114,
-      "Masoom": 112,
-      "Danish Khan": 140,
-      "Rama": 13,
-      "UNASSIGNED": 5,
+      "Pujan": 366,
+      "Swapnil": 86,
+      "Divyansh": 52,
+      "Sanmeet": 46,
+      "Preet": 379,
+      "Nouman": 176,
+      "Masoom": 147,
+      "Danish Khan": 121,
+      "Rama": 9,
+      "UNASSIGNED": 2,
       "Harshit Gajbhiye": 2
     }
   },
   "aiVideoBreakdown": {
     "Masoom": {
-      "count": 112,
+      "count": 147,
       "clients": [
         "AID-0004 (A Siddhanatth Car's)",
         "AID-0005 (Shree Renuka Opticals)",
         "AID-0009 (SM Multi Feet Car Services)",
-        "AID-0012 (Apple Multispeciality)",
         "AID-0013 (Niyathhi Scaffolding)",
-        "AID-0019 (Canal Touch Resort )",
+        "AID-0017 (Prashantam Yoga)",
         "AID-0024 (LIC)",
         "AID-0028 (Ganesh Auto & Mechanical Works)",
         "AID-0030 (ONS Rudra Electrical & Construction Pvt Ltd)",
@@ -45,20 +44,20 @@
         "AID-0064 (The Andaa Co. )",
         "AID-0065 (Kotak Recruitment )",
         "AID-0066 (COC Placement)",
-        "AID-0068 (Fortune Life)"
+        "AID-0068 (Fortune Life)",
+        "AID-0054 (Very Essential)"
       ]
     },
     "Nouman": {
-      "count": 114,
+      "count": 176,
       "clients": [
         "AID-0002 (HIT-OFFICE(Google))",
         "AID-0008 (Mountain Bliss)",
         "AID-0010 (Bitaplus Solar Energy)",
         "AID-0011 (AS Account Solution)",
         "AID-0014 (UPSC Decoded)",
-        "AID-0017 (Prashantam Yoga)",
         "AID-0018 (Rentofurnished)",
-        "AID-0023 (Ayush Vikas Foundation)",
+        "AID-0019 (Canal Touch Resort )",
         "AID-0026 (PAATH)",
         "AID-0029 (Transition Software Institute)",
         "AID-0032 (Lakme Salon Golghar)",
@@ -71,11 +70,15 @@
         "AID-0044 (Ketan Properties)",
         "AID-0046 (PurePlush)",
         "AID-0048 (Niketh Estates)",
+        "AID-0051 (Sharadam Salads and Soups)",
         "AID-0056 (Timeer's Badminton Academy)",
         "AID-0059 (LIC)",
         "AID-0060 (Tradewise)",
         "AID-0061 (KreerKraft)",
-        "AID-0067 (\t Peachy Clothing)"
+        "AID-0067 (\t Peachy Clothing)",
+        "AID-0069 (Ayush Vikas Foundation)",
+        "AID-0070 (Canal Touch Resort )",
+        "AID-0017 (Prashantam Yoga)"
       ]
     }
   },
@@ -144,16 +147,9 @@
       "packageAmount": 2499
     },
     {
-      "clientId": "AID-0012",
-      "businessName": "Apple Multispeciality",
-      "joiningDate": "2026-07-04",
-      "packageName": "Basic",
-      "packageAmount": 2000
-    },
-    {
       "clientId": "AID-0013",
       "businessName": "Niyathhi Scaffolding",
-      "joiningDate": "27-Aug-2026",
+      "joiningDate": "04-Sept-2026",
       "packageName": "Basic",
       "packageAmount": 2499
     },
@@ -174,28 +170,21 @@
     {
       "clientId": "AID-0017",
       "businessName": "Prashantam Yoga",
-      "joiningDate": "02-Sept-2026",
+      "joiningDate": "05-Sept-2026",
       "packageName": "Basic",
       "packageAmount": 2499
     },
     {
       "clientId": "AID-0018",
       "businessName": "Rentofurnished",
-      "joiningDate": "2026-08-02",
+      "joiningDate": "02-Sept-2026",
       "packageName": "Basic",
       "packageAmount": 2499
     },
     {
       "clientId": "AID-0019",
       "businessName": "Canal Touch Resort ",
-      "joiningDate": "2026-08-02",
-      "packageName": "Standard (Monthly)",
-      "packageAmount": 3999
-    },
-    {
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "joiningDate": "30-Aug-2026",
+      "joiningDate": "2026-09-02",
       "packageName": "Standard (Monthly)",
       "packageAmount": 3999
     },
@@ -216,7 +205,7 @@
     {
       "clientId": "AID-0026",
       "businessName": "PAATH",
-      "joiningDate": "2026-09-01",
+      "joiningDate": "01-Sept-2026",
       "packageName": "Basic",
       "packageAmount": 2499
     },
@@ -230,7 +219,7 @@
     {
       "clientId": "AID-0028",
       "businessName": "Ganesh Auto & Mechanical Works",
-      "joiningDate": "2026-08-01",
+      "joiningDate": "19-Sept-2026",
       "packageName": "Basic",
       "packageAmount": 6999
     },
@@ -363,7 +352,7 @@
     {
       "clientId": "AID-0051",
       "businessName": "Sharadam Salads and Soups",
-      "joiningDate": "2026-08-03",
+      "joiningDate": "01-Sept-2026",
       "packageName": "Standard (Monthly)",
       "packageAmount": 3999
     },
@@ -384,7 +373,7 @@
     {
       "clientId": "AID-0054",
       "businessName": "Very Essential",
-      "joiningDate": "2026-08-11",
+      "joiningDate": "11-Aug-2026",
       "packageName": "Basic",
       "packageAmount": 2499
     },
@@ -398,7 +387,7 @@
     {
       "clientId": "AID-0056",
       "businessName": "Timeer's Badminton Academy",
-      "joiningDate": "2026-08-13",
+      "joiningDate": "19-Aug-2026",
       "packageName": "Basic",
       "packageAmount": 2499
     },
@@ -485,6 +474,20 @@
       "joiningDate": "2026-09-03",
       "packageName": "Basic",
       "packageAmount": 3499
+    },
+    {
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "joiningDate": "2026-09-12",
+      "packageName": "Standard (Monthly)",
+      "packageAmount": 3999
+    },
+    {
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "joiningDate": "2026-09-02",
+      "packageName": "Standard (Monthly)",
+      "packageAmount": 3999
     }
   ],
   "clientTasks": [
@@ -2788,182 +2791,6 @@
       "postType": "Posting"
     },
     {
-      "taskId": "AID-T-MSBUSYCX-7059-0",
-      "clientId": "AID-0012",
-      "businessName": "Apple Multispeciality",
-      "taskTitle": "Client Login / Access Collection",
-      "date": "04-Jul-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Preet",
-      "status": "Completion",
-      "postType": "Onboarding"
-    },
-    {
-      "taskId": "AID-T-MSBUSYQ2-2866-1",
-      "clientId": "AID-0012",
-      "businessName": "Apple Multispeciality",
-      "taskTitle": "Graphic 1",
-      "date": "06-Jul-2026",
-      "assignTo": "Graphic Designer",
-      "workingOn": "Danish Khan",
-      "status": "Completion",
-      "postType": "Graphic"
-    },
-    {
-      "taskId": "AID-T-MSBUSZG9-9815-3",
-      "clientId": "AID-0012",
-      "businessName": "Apple Multispeciality",
-      "taskTitle": "AI Video 1",
-      "date": "07-Jul-2026",
-      "assignTo": "Ai Video Editor",
-      "workingOn": "Masoom",
-      "status": "Completion",
-      "postType": "AI Video"
-    },
-    {
-      "taskId": "AID-T-MSBUSZTD-4931-4",
-      "clientId": "AID-0012",
-      "businessName": "Apple Multispeciality",
-      "taskTitle": "Ads Run",
-      "date": "07-Jul-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Preet",
-      "status": "Completion",
-      "postType": "Ads"
-    },
-    {
-      "taskId": "AID-T-MSBUT06G-2648-5",
-      "clientId": "AID-0012",
-      "businessName": "Apple Multispeciality",
-      "taskTitle": "Graphic 2",
-      "date": "08-Jul-2026",
-      "assignTo": "Graphic Designer",
-      "workingOn": "Danish Khan",
-      "status": "Completion",
-      "postType": "Graphic"
-    },
-    {
-      "taskId": "AID-T-MSBUT0JL-9399-6",
-      "clientId": "AID-0012",
-      "businessName": "Apple Multispeciality",
-      "taskTitle": "Post Graphic 2",
-      "date": "Trigger on Approval",
-      "assignTo": "Content Posting",
-      "workingOn": "Preet",
-      "status": "Posted",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MSBUT0WO-7500-7",
-      "clientId": "AID-0012",
-      "businessName": "Apple Multispeciality",
-      "taskTitle": "Reel 1",
-      "date": "15-Jul-2026",
-      "assignTo": "Video Editor",
-      "workingOn": "Divyansh",
-      "status": "Overdue",
-      "postType": "Reel"
-    },
-    {
-      "taskId": "AID-T-MSBUT19Q-5153-8",
-      "clientId": "AID-0012",
-      "businessName": "Apple Multispeciality",
-      "taskTitle": "Post Reel 1",
-      "date": "Trigger on Approval",
-      "assignTo": "Content Posting",
-      "workingOn": "Preet",
-      "status": "Assigned",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MSBUT1MS-7910-9",
-      "clientId": "AID-0012",
-      "businessName": "Apple Multispeciality",
-      "taskTitle": "Graphic 3",
-      "date": "22-Jul-2026",
-      "assignTo": "Graphic Designer",
-      "workingOn": "Danish Khan",
-      "status": "Completion",
-      "postType": "Graphic"
-    },
-    {
-      "taskId": "AID-T-MSBUT1ZZ-8823-10",
-      "clientId": "AID-0012",
-      "businessName": "Apple Multispeciality",
-      "taskTitle": "Post Graphic 3",
-      "date": "Trigger on Approval",
-      "assignTo": "Content Posting",
-      "workingOn": "Preet",
-      "status": "Posted",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MSBUT2D2-8383-11",
-      "clientId": "AID-0012",
-      "businessName": "Apple Multispeciality",
-      "taskTitle": "Weekly Report 1",
-      "date": "13-Jul-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Preet",
-      "status": "Completion",
-      "postType": "Report"
-    },
-    {
-      "taskId": "AID-T-MSBUT2Q6-4387-12",
-      "clientId": "AID-0012",
-      "businessName": "Apple Multispeciality",
-      "taskTitle": "Weekly Report 2",
-      "date": "21-Jul-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Preet",
-      "status": "Completion",
-      "postType": "Report"
-    },
-    {
-      "taskId": "AID-T-MSBUT3AP-9032-13",
-      "clientId": "AID-0012",
-      "businessName": "Apple Multispeciality",
-      "taskTitle": "Weekly Report 3",
-      "date": "29-Jul-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Preet",
-      "status": "Completion",
-      "postType": "Report"
-    },
-    {
-      "taskId": "AID-T-MSBUT3NS-8806-14",
-      "clientId": "AID-0012",
-      "businessName": "Apple Multispeciality",
-      "taskTitle": "Weekly Report 4",
-      "date": "06-Aug-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Preet",
-      "status": "Completion",
-      "postType": "Report"
-    },
-    {
-      "taskId": "AID-T-MSBUSYQ2-2866-1-POST-MSBUTCID-8981",
-      "clientId": "AID-0012",
-      "businessName": "Apple Multispeciality",
-      "taskTitle": "Post Graphic 1",
-      "date": "Trigger on Approval",
-      "assignTo": "Content Posting",
-      "workingOn": "Preet",
-      "status": "Posted",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MSBUSZG9-9815-3-POST-MSBUTCPE-7671",
-      "clientId": "AID-0012",
-      "businessName": "Apple Multispeciality",
-      "taskTitle": "Post AI Video 1",
-      "date": "Trigger on Approval",
-      "assignTo": "Content Posting",
-      "workingOn": "Preet",
-      "status": "Posted",
-      "postType": "Posting"
-    },
-    {
       "taskId": "AID-T-MSBV0E3L-9425-0",
       "clientId": "AID-0013",
       "businessName": "Niyathhi Scaffolding",
@@ -2981,8 +2808,8 @@
       "taskTitle": "Graphic 1",
       "date": "06-Jul-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
-      "status": "Completion",
+      "workingOn": "Masoom",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -3014,8 +2841,8 @@
       "taskTitle": "Graphic 2",
       "date": "08-Jul-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
-      "status": "Completion",
+      "workingOn": "Masoom",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -3036,7 +2863,7 @@
       "taskTitle": "Graphic 3",
       "date": "10-Jul-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
+      "workingOn": "Masoom",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -3058,7 +2885,7 @@
       "taskTitle": "Graphic 4",
       "date": "13-Jul-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
+      "workingOn": "Masoom",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -3080,7 +2907,7 @@
       "taskTitle": "Graphic 5",
       "date": "15-Jul-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
+      "workingOn": "Masoom",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -3102,7 +2929,7 @@
       "taskTitle": "Graphic 6",
       "date": "17-Jul-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
+      "workingOn": "Masoom",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -3124,7 +2951,7 @@
       "taskTitle": "Graphic 7",
       "date": "20-Jul-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
+      "workingOn": "Masoom",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -3146,8 +2973,8 @@
       "taskTitle": "Graphic 8",
       "date": "22-Jul-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
-      "status": "Completion",
+      "workingOn": "Masoom",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -3564,7 +3391,7 @@
       "taskTitle": "Client Login / Access Collection",
       "date": "01-Aug-2026",
       "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
+      "workingOn": "Preet",
       "status": "Overdue",
       "postType": "Onboarding"
     },
@@ -3575,7 +3402,7 @@
       "taskTitle": "Graphic 1",
       "date": "03-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Sanmeet",
+      "workingOn": "Masoom",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -3586,8 +3413,8 @@
       "taskTitle": "AI Video 1",
       "date": "04-Aug-2026",
       "assignTo": "Ai Video Editor",
-      "workingOn": "Divyansh",
-      "status": "Completion",
+      "workingOn": "Masoom",
+      "status": "Overdue",
       "postType": "AI Video"
     },
     {
@@ -3597,7 +3424,7 @@
       "taskTitle": "Ads Run",
       "date": "04-Aug-2026",
       "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
+      "workingOn": "Preet",
       "status": "Overdue",
       "postType": "Ads"
     },
@@ -3608,7 +3435,7 @@
       "taskTitle": "Graphic 2",
       "date": "05-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Sanmeet",
+      "workingOn": "Masoom",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -3619,7 +3446,7 @@
       "taskTitle": "Post Graphic 2",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
+      "workingOn": "Preet",
       "status": "Assigned",
       "postType": "Posting"
     },
@@ -3630,7 +3457,7 @@
       "taskTitle": "Reel 1",
       "date": "12-Aug-2026",
       "assignTo": "Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Masoom",
       "status": "Overdue",
       "postType": "Reel"
     },
@@ -3641,7 +3468,7 @@
       "taskTitle": "Post Reel 1",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
+      "workingOn": "Preet",
       "status": "Assigned",
       "postType": "Posting"
     },
@@ -3652,7 +3479,7 @@
       "taskTitle": "Graphic 3",
       "date": "19-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Sanmeet",
+      "workingOn": "Masoom",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -3663,7 +3490,7 @@
       "taskTitle": "Post Graphic 3",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
+      "workingOn": "Preet",
       "status": "Assigned",
       "postType": "Posting"
     },
@@ -3674,7 +3501,7 @@
       "taskTitle": "Weekly Report 1",
       "date": "10-Aug-2026",
       "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
+      "workingOn": "Preet",
       "status": "Overdue",
       "postType": "Report"
     },
@@ -3685,7 +3512,7 @@
       "taskTitle": "Weekly Report 2",
       "date": "18-Aug-2026",
       "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
+      "workingOn": "Preet",
       "status": "Overdue",
       "postType": "Report"
     },
@@ -3696,7 +3523,7 @@
       "taskTitle": "Weekly Report 3",
       "date": "26-Aug-2026",
       "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
+      "workingOn": "Preet",
       "status": "Overdue",
       "postType": "Report"
     },
@@ -3707,7 +3534,7 @@
       "taskTitle": "Post Graphic 1",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
+      "workingOn": "Preet",
       "status": "Not Started",
       "postType": "Posting"
     },
@@ -3718,7 +3545,7 @@
       "taskTitle": "Post AI Video 1",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
+      "workingOn": "Preet",
       "status": "Posted",
       "postType": "Posting"
     },
@@ -3740,8 +3567,8 @@
       "taskTitle": "Graphic 1",
       "date": "04-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Danish Khan",
-      "status": "Completion",
+      "workingOn": "Nouman",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -3773,8 +3600,8 @@
       "taskTitle": "Graphic 2",
       "date": "06-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Danish Khan",
-      "status": "Completion",
+      "workingOn": "Nouman",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -3817,7 +3644,7 @@
       "taskTitle": "Graphic 3",
       "date": "13-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Danish Khan",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -3839,7 +3666,7 @@
       "taskTitle": "Graphic 4",
       "date": "17-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Danish Khan",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -3861,7 +3688,7 @@
       "taskTitle": "Graphic 5",
       "date": "20-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Danish Khan",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -3883,7 +3710,7 @@
       "taskTitle": "Graphic 6",
       "date": "24-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Danish Khan",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -3932,17 +3759,6 @@
       "postType": "Report"
     },
     {
-      "taskId": "AID-T-MSBZSWEP-3838-20",
-      "clientId": "AID-0018",
-      "businessName": "Rentofurnished",
-      "taskTitle": "Weekly Report 4",
-      "date": "04-Sept-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Pujan",
-      "status": "Overdue",
-      "postType": "Report"
-    },
-    {
       "taskId": "AID-T-MSBZSP8L-6739-1-POST-MSBZT5WU-5593",
       "clientId": "AID-0018",
       "businessName": "Rentofurnished",
@@ -3971,7 +3787,7 @@
       "taskTitle": "Client Login / Access Collection",
       "date": "03-Aug-2026",
       "assignTo": "AI Video Editor",
-      "workingOn": "Masoom",
+      "workingOn": "Pujan",
       "status": "Overdue",
       "postType": "Onboarding"
     },
@@ -3982,7 +3798,7 @@
       "taskTitle": "Graphic 1",
       "date": "04-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Sanmeet",
+      "workingOn": "Nouman",
       "status": "Completion",
       "postType": "Graphic"
     },
@@ -3993,7 +3809,7 @@
       "taskTitle": "AI Video 1",
       "date": "05-Aug-2026",
       "assignTo": "Ai Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "AI Video"
     },
@@ -4004,7 +3820,7 @@
       "taskTitle": "Ads Run",
       "date": "05-Aug-2026",
       "assignTo": "AI Video Editor",
-      "workingOn": "Masoom",
+      "workingOn": "Pujan",
       "status": "Completion",
       "postType": "Ads"
     },
@@ -4015,7 +3831,7 @@
       "taskTitle": "Graphic 2",
       "date": "06-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Sanmeet",
+      "workingOn": "Nouman",
       "status": "Completion",
       "postType": "Graphic"
     },
@@ -4026,7 +3842,7 @@
       "taskTitle": "Post Graphic 2",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Masoom",
+      "workingOn": "Pujan",
       "status": "Assigned",
       "postType": "Posting"
     },
@@ -4037,7 +3853,7 @@
       "taskTitle": "Reel 1",
       "date": "08-Aug-2026",
       "assignTo": "Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Reel"
     },
@@ -4048,7 +3864,7 @@
       "taskTitle": "Post Reel 1",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Masoom",
+      "workingOn": "Pujan",
       "status": "Assigned",
       "postType": "Posting"
     },
@@ -4059,7 +3875,7 @@
       "taskTitle": "Graphic 3",
       "date": "11-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Sanmeet",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -4070,7 +3886,7 @@
       "taskTitle": "Post Graphic 3",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Masoom",
+      "workingOn": "Pujan",
       "status": "Assigned",
       "postType": "Posting"
     },
@@ -4081,7 +3897,7 @@
       "taskTitle": "AI Video 2",
       "date": "14-Aug-2026",
       "assignTo": "Ai Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "AI Video"
     },
@@ -4092,7 +3908,7 @@
       "taskTitle": "Post AI Video 2",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Masoom",
+      "workingOn": "Pujan",
       "status": "Assigned",
       "postType": "Posting"
     },
@@ -4103,7 +3919,7 @@
       "taskTitle": "Graphic 4",
       "date": "15-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Sanmeet",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -4114,7 +3930,7 @@
       "taskTitle": "Post Graphic 4",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Masoom",
+      "workingOn": "Pujan",
       "status": "Assigned",
       "postType": "Posting"
     },
@@ -4125,7 +3941,7 @@
       "taskTitle": "Reel 2",
       "date": "18-Aug-2026",
       "assignTo": "Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Reel"
     },
@@ -4136,7 +3952,7 @@
       "taskTitle": "Post Reel 2",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Masoom",
+      "workingOn": "Pujan",
       "status": "Assigned",
       "postType": "Posting"
     },
@@ -4147,7 +3963,7 @@
       "taskTitle": "Graphic 5",
       "date": "20-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Sanmeet",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -4158,7 +3974,7 @@
       "taskTitle": "Post Graphic 5",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Masoom",
+      "workingOn": "Pujan",
       "status": "Assigned",
       "postType": "Posting"
     },
@@ -4169,7 +3985,7 @@
       "taskTitle": "Reel 3",
       "date": "22-Aug-2026",
       "assignTo": "Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Reel"
     },
@@ -4180,7 +3996,7 @@
       "taskTitle": "Post Reel 3",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Masoom",
+      "workingOn": "Pujan",
       "status": "Assigned",
       "postType": "Posting"
     },
@@ -4191,7 +4007,7 @@
       "taskTitle": "Weekly Report 1",
       "date": "11-Aug-2026",
       "assignTo": "AI Video Editor",
-      "workingOn": "Masoom",
+      "workingOn": "Pujan",
       "status": "Overdue",
       "postType": "Report"
     },
@@ -4202,7 +4018,7 @@
       "taskTitle": "Weekly Report 2",
       "date": "19-Aug-2026",
       "assignTo": "AI Video Editor",
-      "workingOn": "Masoom",
+      "workingOn": "Pujan",
       "status": "Overdue",
       "postType": "Report"
     },
@@ -4213,7 +4029,7 @@
       "taskTitle": "Weekly Report 3",
       "date": "27-Aug-2026",
       "assignTo": "AI Video Editor",
-      "workingOn": "Masoom",
+      "workingOn": "Pujan",
       "status": "Overdue",
       "postType": "Report"
     },
@@ -4224,7 +4040,7 @@
       "taskTitle": "Weekly Report 4",
       "date": "04-Sept-2026",
       "assignTo": "AI Video Editor",
-      "workingOn": "Masoom",
+      "workingOn": "Pujan",
       "status": "Overdue",
       "postType": "Report"
     },
@@ -4235,7 +4051,7 @@
       "taskTitle": "Post Graphic 1",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Masoom",
+      "workingOn": "Pujan",
       "status": "Not Started",
       "postType": "Posting"
     },
@@ -4246,292 +4062,6 @@
       "taskTitle": "Post AI Video 1",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Masoom",
-      "status": "Not Started",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MSC0HWAO-2358-0",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Client Login / Access Collection",
-      "date": "13-Jul-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Pujan",
-      "status": "Overdue",
-      "postType": "Onboarding"
-    },
-    {
-      "taskId": "AID-T-MSC0HWNZ-5781-1",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Graphic 1",
-      "date": "14-Jul-2026",
-      "assignTo": "Graphic Designer",
-      "workingOn": "Danish Khan",
-      "status": "Completion",
-      "postType": "Graphic"
-    },
-    {
-      "taskId": "AID-T-MSC0HXX6-4211-3",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "AI Video 1",
-      "date": "15-Jul-2026",
-      "assignTo": "Ai Video Editor",
-      "workingOn": "Nouman",
-      "status": "Overdue",
-      "postType": "AI Video"
-    },
-    {
-      "taskId": "AID-T-MSC0HYAH-1214-4",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Ads Run",
-      "date": "15-Jul-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Pujan",
-      "status": "Overdue",
-      "postType": "Ads"
-    },
-    {
-      "taskId": "AID-T-MSC0HYO2-9544-5",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Graphic 2",
-      "date": "16-Jul-2026",
-      "assignTo": "Graphic Designer",
-      "workingOn": "Danish Khan",
-      "status": "Completion",
-      "postType": "Graphic"
-    },
-    {
-      "taskId": "AID-T-MSC0HZ74-5842-6",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Post Graphic 2",
-      "date": "Trigger on Approval",
-      "assignTo": "Content Posting",
-      "workingOn": "Pujan",
-      "status": "Posted",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MSC0HZQF-3333-7",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Reel 1",
-      "date": "18-Jul-2026",
-      "assignTo": "Video Editor",
-      "workingOn": "Nouman",
-      "status": "Completion",
-      "postType": "Reel"
-    },
-    {
-      "taskId": "AID-T-MSC0I03P-7718-8",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Post Reel 1",
-      "date": "Trigger on Approval",
-      "assignTo": "Content Posting",
-      "workingOn": "Pujan",
-      "status": "Assigned",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MSC0I0UL-8664-9",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Graphic 3",
-      "date": "21-Jul-2026",
-      "assignTo": "Graphic Designer",
-      "workingOn": "Danish Khan",
-      "status": "Completion",
-      "postType": "Graphic"
-    },
-    {
-      "taskId": "AID-T-MSC0I17X-4525-10",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Post Graphic 3",
-      "date": "Trigger on Approval",
-      "assignTo": "Content Posting",
-      "workingOn": "Pujan",
-      "status": "Assigned",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MSC0I1YJ-2833-12",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "AI Video 2",
-      "date": "24-Jul-2026",
-      "assignTo": "Ai Video Editor",
-      "workingOn": "Nouman",
-      "status": "Completion",
-      "postType": "AI Video"
-    },
-    {
-      "taskId": "AID-T-MSC0I2BV-8428-13",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Post AI Video 2",
-      "date": "Trigger on Approval",
-      "assignTo": "Content Posting",
-      "workingOn": "Pujan",
-      "status": "Assigned",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MSC0I2P8-3811-14",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Graphic 4",
-      "date": "25-Jul-2026",
-      "assignTo": "Graphic Designer",
-      "workingOn": "Danish Khan",
-      "status": "Completion",
-      "postType": "Graphic"
-    },
-    {
-      "taskId": "AID-T-MSC0I32I-5434-15",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Post Graphic 4",
-      "date": "Trigger on Approval",
-      "assignTo": "Content Posting",
-      "workingOn": "Pujan",
-      "status": "Posted",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MSC0I3FU-9938-16",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Reel 2",
-      "date": "28-Jul-2026",
-      "assignTo": "Video Editor",
-      "workingOn": "Nouman",
-      "status": "Overdue",
-      "postType": "Reel"
-    },
-    {
-      "taskId": "AID-T-MSC0I3T9-2586-17",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Post Reel 2",
-      "date": "Trigger on Approval",
-      "assignTo": "Content Posting",
-      "workingOn": "Pujan",
-      "status": "Assigned",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MSC0I46J-5699-18",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Graphic 5",
-      "date": "30-Jul-2026",
-      "assignTo": "Graphic Designer",
-      "workingOn": "Danish Khan",
-      "status": "Completion",
-      "postType": "Graphic"
-    },
-    {
-      "taskId": "AID-T-MSC0I4JU-6539-19",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Post Graphic 5",
-      "date": "Trigger on Approval",
-      "assignTo": "Content Posting",
-      "workingOn": "Pujan",
-      "status": "Posted",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MSC0I4X8-3466-20",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Reel 3",
-      "date": "01-Aug-2026",
-      "assignTo": "Video Editor",
-      "workingOn": "Nouman",
-      "status": "Overdue",
-      "postType": "Reel"
-    },
-    {
-      "taskId": "AID-T-MSC0I5AI-1028-21",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Post Reel 3",
-      "date": "Trigger on Approval",
-      "assignTo": "Content Posting",
-      "workingOn": "Pujan",
-      "status": "Assigned",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MSC0I5NT-6144-22",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Weekly Report 1",
-      "date": "21-Jul-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Pujan",
-      "status": "Overdue",
-      "postType": "Report"
-    },
-    {
-      "taskId": "AID-T-MSC0I613-7786-23",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Weekly Report 2",
-      "date": "29-Jul-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Pujan",
-      "status": "Overdue",
-      "postType": "Report"
-    },
-    {
-      "taskId": "AID-T-MSC0I6EF-9898-24",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Weekly Report 3",
-      "date": "06-Aug-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Pujan",
-      "status": "Overdue",
-      "postType": "Report"
-    },
-    {
-      "taskId": "AID-T-MSC0I6S8-6654-25",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Weekly Report 4",
-      "date": "14-Aug-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Pujan",
-      "status": "Overdue",
-      "postType": "Report"
-    },
-    {
-      "taskId": "AID-T-MSC0HWNZ-5781-1-POST-MSC0IHB2-6631",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Post Graphic 1",
-      "date": "Trigger on Approval",
-      "assignTo": "Content Posting",
-      "workingOn": "Pujan",
-      "status": "Posted",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MSC0HXX6-4211-3-POST-MSC0IHQN-6323",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Post AI Video 1",
-      "date": "Trigger on Approval",
-      "assignTo": "Content Posting",
       "workingOn": "Pujan",
       "status": "Not Started",
       "postType": "Posting"
@@ -4906,7 +4436,7 @@
       "taskTitle": "Graphic 1",
       "date": "20-Jul-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Danish Khan",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -4939,7 +4469,7 @@
       "taskTitle": "Graphic 2",
       "date": "22-Jul-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Danish Khan",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -4983,7 +4513,7 @@
       "taskTitle": "Graphic 3",
       "date": "05-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Danish Khan",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -5258,8 +4788,8 @@
       "taskTitle": "Graphic 1",
       "date": "03-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
-      "status": "Completion",
+      "workingOn": "Masoom",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -5291,8 +4821,8 @@
       "taskTitle": "Graphic 2",
       "date": "05-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
-      "status": "Completion",
+      "workingOn": "Masoom",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -5335,7 +4865,7 @@
       "taskTitle": "Graphic 3",
       "date": "07-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
+      "workingOn": "Masoom",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -5379,7 +4909,7 @@
       "taskTitle": "Graphic 4",
       "date": "10-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
+      "workingOn": "Masoom",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -5423,7 +4953,7 @@
       "taskTitle": "Graphic 5",
       "date": "12-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
+      "workingOn": "Masoom",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -5445,7 +4975,7 @@
       "taskTitle": "Graphic 6",
       "date": "13-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
+      "workingOn": "Masoom",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -5489,7 +5019,7 @@
       "taskTitle": "Graphic 7",
       "date": "15-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
+      "workingOn": "Masoom",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -9405,7 +8935,7 @@
       "taskTitle": "Client Login / Access Collection",
       "date": "03-Aug-2026",
       "assignTo": "AI Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Onboarding"
     },
@@ -9416,7 +8946,7 @@
       "taskTitle": "Graphic 1",
       "date": "04-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Sanmeet",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -9427,7 +8957,7 @@
       "taskTitle": "AI Video 1",
       "date": "05-Aug-2026",
       "assignTo": "Ai Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "AI Video"
     },
@@ -9438,7 +8968,7 @@
       "taskTitle": "Ads Run",
       "date": "05-Aug-2026",
       "assignTo": "AI Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Ads"
     },
@@ -9449,7 +8979,7 @@
       "taskTitle": "Graphic 2",
       "date": "06-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Sanmeet",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -9460,7 +8990,7 @@
       "taskTitle": "Post Graphic 2",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Assigned",
       "postType": "Posting"
     },
@@ -9471,7 +9001,7 @@
       "taskTitle": "Reel 1",
       "date": "08-Aug-2026",
       "assignTo": "Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Reel"
     },
@@ -9482,7 +9012,7 @@
       "taskTitle": "Post Reel 1",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Assigned",
       "postType": "Posting"
     },
@@ -9493,7 +9023,7 @@
       "taskTitle": "Graphic 3",
       "date": "11-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Sanmeet",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -9504,7 +9034,7 @@
       "taskTitle": "Post Graphic 3",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Assigned",
       "postType": "Posting"
     },
@@ -9515,7 +9045,7 @@
       "taskTitle": "AI Video 2",
       "date": "14-Aug-2026",
       "assignTo": "Ai Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "AI Video"
     },
@@ -9526,7 +9056,7 @@
       "taskTitle": "Post AI Video 2",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Assigned",
       "postType": "Posting"
     },
@@ -9537,7 +9067,7 @@
       "taskTitle": "Graphic 4",
       "date": "15-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Sanmeet",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -9548,7 +9078,7 @@
       "taskTitle": "Post Graphic 4",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Assigned",
       "postType": "Posting"
     },
@@ -9559,7 +9089,7 @@
       "taskTitle": "Reel 2",
       "date": "18-Aug-2026",
       "assignTo": "Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Reel"
     },
@@ -9570,7 +9100,7 @@
       "taskTitle": "Post Reel 2",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Assigned",
       "postType": "Posting"
     },
@@ -9581,7 +9111,7 @@
       "taskTitle": "Graphic 5",
       "date": "20-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Sanmeet",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -9592,7 +9122,7 @@
       "taskTitle": "Post Graphic 5",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Assigned",
       "postType": "Posting"
     },
@@ -9603,7 +9133,7 @@
       "taskTitle": "Reel 3",
       "date": "22-Aug-2026",
       "assignTo": "Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Reel"
     },
@@ -9614,7 +9144,7 @@
       "taskTitle": "Post Reel 3",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Assigned",
       "postType": "Posting"
     },
@@ -9625,7 +9155,7 @@
       "taskTitle": "Weekly Report 1",
       "date": "11-Aug-2026",
       "assignTo": "AI Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Report"
     },
@@ -9636,7 +9166,7 @@
       "taskTitle": "Weekly Report 2",
       "date": "19-Aug-2026",
       "assignTo": "AI Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Report"
     },
@@ -9647,18 +9177,7 @@
       "taskTitle": "Weekly Report 3",
       "date": "27-Aug-2026",
       "assignTo": "AI Video Editor",
-      "workingOn": "Divyansh",
-      "status": "Overdue",
-      "postType": "Report"
-    },
-    {
-      "taskId": "AID-T-MSD8N3XI-1979-25",
-      "clientId": "AID-0051",
-      "businessName": "Sharadam Salads and Soups",
-      "taskTitle": "Weekly Report 4",
-      "date": "04-Sept-2026",
-      "assignTo": "AI Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Report"
     },
@@ -9669,8 +9188,8 @@
       "taskTitle": "Post Graphic 1",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Divyansh",
-      "status": "Not Started",
+      "workingOn": "Nouman",
+      "status": "Assigned",
       "postType": "Posting"
     },
     {
@@ -9680,8 +9199,8 @@
       "taskTitle": "Post AI Video 1",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Divyansh",
-      "status": "Not Started",
+      "workingOn": "Nouman",
+      "status": "Assigned",
       "postType": "Posting"
     },
     {
@@ -10264,7 +9783,7 @@
       "date": "21-Sept-2026",
       "assignTo": "Graphics",
       "workingOn": "Sanmeet",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -10418,7 +9937,7 @@
       "date": "21-Sept-2026",
       "assignTo": "AI Video Editor",
       "workingOn": "Masoom",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -10660,7 +10179,7 @@
       "date": "21-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Preet",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -10681,7 +10200,7 @@
       "taskTitle": "Graphic 1",
       "date": "27-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
+      "workingOn": "Masoom",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -10703,7 +10222,7 @@
       "taskTitle": "Graphic 2",
       "date": "29-Aug-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
+      "workingOn": "Masoom",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -10747,174 +10266,9 @@
       "taskTitle": "Graphic 3",
       "date": "03-Sept-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
+      "workingOn": "Masoom",
       "status": "Overdue",
       "postType": "Graphic"
-    },
-    {
-      "taskId": "AID-T-MTBL8Y5Q-3559-8",
-      "clientId": "AID-0013",
-      "businessName": "Niyathhi Scaffolding",
-      "taskTitle": "Post Graphic 3",
-      "date": "04-Sept-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Preet",
-      "status": "Assigned",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTBL8YUY-6035-9",
-      "clientId": "AID-0013",
-      "businessName": "Niyathhi Scaffolding",
-      "taskTitle": "Graphic 4",
-      "date": "05-Sept-2026",
-      "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
-      "status": "Overdue",
-      "postType": "Graphic"
-    },
-    {
-      "taskId": "AID-T-MTBL8Z84-5235-10",
-      "clientId": "AID-0013",
-      "businessName": "Niyathhi Scaffolding",
-      "taskTitle": "Post Graphic 4",
-      "date": "07-Sept-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Preet",
-      "status": "Assigned",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTBL8ZL8-8149-11",
-      "clientId": "AID-0013",
-      "businessName": "Niyathhi Scaffolding",
-      "taskTitle": "Graphic 5",
-      "date": "08-Sept-2026",
-      "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
-      "status": "Overdue",
-      "postType": "Graphic"
-    },
-    {
-      "taskId": "AID-T-MTBL8ZYC-7667-12",
-      "clientId": "AID-0013",
-      "businessName": "Niyathhi Scaffolding",
-      "taskTitle": "Post Graphic 5",
-      "date": "09-Sept-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Preet",
-      "status": "Assigned",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTBL90BF-9638-13",
-      "clientId": "AID-0013",
-      "businessName": "Niyathhi Scaffolding",
-      "taskTitle": "Graphic 6",
-      "date": "10-Sept-2026",
-      "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
-      "status": "Overdue",
-      "postType": "Graphic"
-    },
-    {
-      "taskId": "AID-T-MTBL90OX-4037-14",
-      "clientId": "AID-0013",
-      "businessName": "Niyathhi Scaffolding",
-      "taskTitle": "Post Graphic 6",
-      "date": "11-Sept-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Preet",
-      "status": "Assigned",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTBL918L-9703-15",
-      "clientId": "AID-0013",
-      "businessName": "Niyathhi Scaffolding",
-      "taskTitle": "Graphic 7",
-      "date": "12-Sept-2026",
-      "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
-      "status": "Overdue",
-      "postType": "Graphic"
-    },
-    {
-      "taskId": "AID-T-MTBL91PY-6232-16",
-      "clientId": "AID-0013",
-      "businessName": "Niyathhi Scaffolding",
-      "taskTitle": "Post Graphic 7",
-      "date": "14-Sept-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Preet",
-      "status": "Assigned",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTBL9238-5507-17",
-      "clientId": "AID-0013",
-      "businessName": "Niyathhi Scaffolding",
-      "taskTitle": "Graphic 8",
-      "date": "15-Sept-2026",
-      "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
-      "status": "Overdue",
-      "postType": "Graphic"
-    },
-    {
-      "taskId": "AID-T-MTBL92HC-7247-18",
-      "clientId": "AID-0013",
-      "businessName": "Niyathhi Scaffolding",
-      "taskTitle": "Post Graphic 8",
-      "date": "16-Sept-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Preet",
-      "status": "Posted",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTBL92UK-1721-19",
-      "clientId": "AID-0013",
-      "businessName": "Niyathhi Scaffolding",
-      "taskTitle": "Weekly Report 1",
-      "date": "04-Sept-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Preet",
-      "status": "Overdue",
-      "postType": "Report"
-    },
-    {
-      "taskId": "AID-T-MTBL937O-4614-20",
-      "clientId": "AID-0013",
-      "businessName": "Niyathhi Scaffolding",
-      "taskTitle": "Weekly Report 2",
-      "date": "12-Sept-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Preet",
-      "status": "Overdue",
-      "postType": "Report"
-    },
-    {
-      "taskId": "AID-T-MTBL93KV-4136-21",
-      "clientId": "AID-0013",
-      "businessName": "Niyathhi Scaffolding",
-      "taskTitle": "Weekly Report 3",
-      "date": "21-Sept-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Preet",
-      "status": "Assigned",
-      "postType": "Report"
-    },
-    {
-      "taskId": "AID-T-MTBL93Y0-5125-22",
-      "clientId": "AID-0013",
-      "businessName": "Niyathhi Scaffolding",
-      "taskTitle": "Weekly Report 4",
-      "date": "29-Sept-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Preet",
-      "status": "Assigned",
-      "postType": "Report"
     },
     {
       "taskId": "AID-T-MTBNT2F2-2840-0",
@@ -10923,7 +10277,7 @@
       "taskTitle": "Client Login / Access Collection",
       "date": "13-Aug-2026",
       "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
+      "workingOn": "Pujan",
       "status": "Overdue",
       "postType": "Onboarding"
     },
@@ -10934,7 +10288,7 @@
       "taskTitle": "Graphic 1",
       "date": "14-Aug-2026",
       "assignTo": "Graphics",
-      "workingOn": "Sanmeet",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -10945,7 +10299,7 @@
       "taskTitle": "AI Video 1",
       "date": "15-Aug-2026",
       "assignTo": "Ai Video Editor",
-      "workingOn": "Divyansh",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "AI Video"
     },
@@ -10956,7 +10310,7 @@
       "taskTitle": "Ads Run",
       "date": "15-Aug-2026",
       "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
+      "workingOn": "Pujan",
       "status": "Overdue",
       "postType": "Ads"
     },
@@ -10967,7 +10321,7 @@
       "taskTitle": "Graphic 2",
       "date": "17-Aug-2026",
       "assignTo": "Graphics",
-      "workingOn": "Sanmeet",
+      "workingOn": "Nouman",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -10978,20 +10332,9 @@
       "taskTitle": "Post Graphic 2",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
+      "workingOn": "Pujan",
       "status": "Assigned",
       "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTBNT5FE-3143-7",
-      "clientId": "AID-0056",
-      "businessName": "Timeer's Badminton Academy",
-      "taskTitle": "Reel 1",
-      "date": "24-Aug-2026",
-      "assignTo": "Ai Video Editor",
-      "workingOn": "Divyansh",
-      "status": "Overdue",
-      "postType": "Reel"
     },
     {
       "taskId": "AID-T-MTBNT5T0-1665-8",
@@ -11000,20 +10343,9 @@
       "taskTitle": "Post Reel 1",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
+      "workingOn": "Pujan",
       "status": "Assigned",
       "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTBNT66H-6854-9",
-      "clientId": "AID-0056",
-      "businessName": "Timeer's Badminton Academy",
-      "taskTitle": "Graphic 3",
-      "date": "31-Aug-2026",
-      "assignTo": "Graphics",
-      "workingOn": "Sanmeet",
-      "status": "Overdue",
-      "postType": "Graphic"
     },
     {
       "taskId": "AID-T-MTBNT6JZ-8979-10",
@@ -11022,53 +10354,9 @@
       "taskTitle": "Post Graphic 3",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
+      "workingOn": "Pujan",
       "status": "Assigned",
       "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTBNT6XG-3185-11",
-      "clientId": "AID-0056",
-      "businessName": "Timeer's Badminton Academy",
-      "taskTitle": "Weekly Report 1",
-      "date": "21-Aug-2026",
-      "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
-      "status": "Overdue",
-      "postType": "Report"
-    },
-    {
-      "taskId": "AID-T-MTBNT7AV-1031-12",
-      "clientId": "AID-0056",
-      "businessName": "Timeer's Badminton Academy",
-      "taskTitle": "Weekly Report 2",
-      "date": "29-Aug-2026",
-      "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
-      "status": "Overdue",
-      "postType": "Report"
-    },
-    {
-      "taskId": "AID-T-MTBNT7OD-2032-13",
-      "clientId": "AID-0056",
-      "businessName": "Timeer's Badminton Academy",
-      "taskTitle": "Weekly Report 3",
-      "date": "07-Sept-2026",
-      "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
-      "status": "Overdue",
-      "postType": "Report"
-    },
-    {
-      "taskId": "AID-T-MTBNT81T-5841-14",
-      "clientId": "AID-0056",
-      "businessName": "Timeer's Badminton Academy",
-      "taskTitle": "Weekly Report 4",
-      "date": "15-Sept-2026",
-      "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
-      "status": "Overdue",
-      "postType": "Report"
     },
     {
       "taskId": "AID-T-MTBNT2SK-7143-1-POST-MTBNTJXA-1720",
@@ -11077,7 +10365,7 @@
       "taskTitle": "Post Graphic 1",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
+      "workingOn": "Pujan",
       "status": "Not Started",
       "postType": "Posting"
     },
@@ -11088,7 +10376,7 @@
       "taskTitle": "Post AI Video 1",
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
+      "workingOn": "Pujan",
       "status": "Not Started",
       "postType": "Posting"
     },
@@ -11445,270 +10733,6 @@
       "postType": "Posting"
     },
     {
-      "taskId": "AID-T-MTFGTU1W-4609-0",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Graphic 1",
-      "date": "31-Aug-2026",
-      "assignTo": "Graphic Designer",
-      "workingOn": "Danish Khan",
-      "status": "Overdue",
-      "postType": "Graphic"
-    },
-    {
-      "taskId": "AID-T-MTFGTUG0-4569-1",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Post Graphic 1",
-      "date": "01-Sept-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Rama",
-      "status": "Assigned",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTFGTUN1-2112-2",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Reel 1",
-      "date": "02-Sept-2026",
-      "assignTo": "Video Editor",
-      "workingOn": "",
-      "status": "Overdue",
-      "postType": "Reel"
-    },
-    {
-      "taskId": "AID-T-MTFGTVBY-6091-3",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Post Reel 1",
-      "date": "03-Sept-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Pujan",
-      "status": "Assigned",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTFGTVQ0-7940-4",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Graphic 2",
-      "date": "04-Sept-2026",
-      "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
-      "status": "Overdue",
-      "postType": "Graphic"
-    },
-    {
-      "taskId": "AID-T-MTFGTW42-1545-5",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Post Graphic 2",
-      "date": "05-Sept-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Preet",
-      "status": "Posted",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTFGTWPB-4063-7",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "AI Video 1",
-      "date": "08-Sept-2026",
-      "assignTo": "Ai Video Editor",
-      "workingOn": "Nouman",
-      "status": "Overdue",
-      "postType": "AI Video"
-    },
-    {
-      "taskId": "AID-T-MTFGTX3H-9286-8",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Post AI Video 1",
-      "date": "09-Sept-2026",
-      "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
-      "status": "Assigned",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTFGTXHM-4133-9",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Graphic 3",
-      "date": "09-Sept-2026",
-      "assignTo": "Graphic Designer",
-      "workingOn": "Sanmeet",
-      "status": "Overdue",
-      "postType": "Graphic"
-    },
-    {
-      "taskId": "AID-T-MTFGTXZM-2608-10",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Post Graphic 3",
-      "date": "10-Sept-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Rama",
-      "status": "Assigned",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTFGTY6O-5166-11",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Reel 2",
-      "date": "11-Sept-2026",
-      "assignTo": "Video Editor",
-      "workingOn": "",
-      "status": "Overdue",
-      "postType": "Reel"
-    },
-    {
-      "taskId": "AID-T-MTFGTYKQ-9839-12",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Post Reel 2",
-      "date": "12-Sept-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Pujan",
-      "status": "Assigned",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTFGTYYS-5060-13",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Graphic 4",
-      "date": "14-Sept-2026",
-      "assignTo": "Graphic Designer",
-      "workingOn": "Danish Khan",
-      "status": "Overdue",
-      "postType": "Graphic"
-    },
-    {
-      "taskId": "AID-T-MTFGTZDW-4597-14",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Post Graphic 4",
-      "date": "15-Sept-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Preet",
-      "status": "Posted",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTFGTZYW-3719-16",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "AI Video 2",
-      "date": "17-Sept-2026",
-      "assignTo": "Ai Video Editor",
-      "workingOn": "Nouman",
-      "status": "Overdue",
-      "postType": "AI Video"
-    },
-    {
-      "taskId": "AID-T-MTFGU0CZ-4873-17",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Post AI Video 2",
-      "date": "18-Sept-2026",
-      "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
-      "status": "Assigned",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTFGU0R0-5824-18",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Graphic 5",
-      "date": "18-Sept-2026",
-      "assignTo": "Graphic Designer",
-      "workingOn": "Swapnil",
-      "status": "Overdue",
-      "postType": "Graphic"
-    },
-    {
-      "taskId": "AID-T-MTFGU152-9798-19",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Post Graphic 5",
-      "date": "19-Sept-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Rama",
-      "status": "Assigned",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTFGU1C2-7314-20",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Reel 3",
-      "date": "21-Sept-2026",
-      "assignTo": "Video Editor",
-      "workingOn": "",
-      "status": "Not Started",
-      "postType": "Reel"
-    },
-    {
-      "taskId": "AID-T-MTFGU1Q4-3573-21",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Post Reel 3",
-      "date": "22-Sept-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Pujan",
-      "status": "Assigned",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTFGU245-5227-22",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Weekly Report 1",
-      "date": "08-Sept-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Preet",
-      "status": "Overdue",
-      "postType": "Report"
-    },
-    {
-      "taskId": "AID-T-MTFGU2I8-7049-23",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Weekly Report 2",
-      "date": "16-Sept-2026",
-      "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
-      "status": "Overdue",
-      "postType": "Report"
-    },
-    {
-      "taskId": "AID-T-MTFGU2WE-7827-24",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Weekly Report 3",
-      "date": "24-Sept-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Rama",
-      "status": "Assigned",
-      "postType": "Report"
-    },
-    {
-      "taskId": "AID-T-MTFGU3AK-3468-25",
-      "clientId": "AID-0023",
-      "businessName": "Ayush Vikas Foundation",
-      "taskTitle": "Weekly Report 4",
-      "date": "02-Oct-2026",
-      "assignTo": "Digital Marketing Executive",
-      "workingOn": "Pujan",
-      "status": "Assigned",
-      "postType": "Report"
-    },
-    {
       "taskId": "AID-T-MTFOCEIE-6967-0",
       "clientId": "AID-0059",
       "businessName": "LIC",
@@ -11859,7 +10883,7 @@
       "date": "22-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Pujan",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -12387,7 +11411,7 @@
       "date": "21-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Preet",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -12761,7 +11785,7 @@
       "date": "21-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Preet",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -13717,7 +12741,7 @@
       "taskTitle": "Graphic 1",
       "date": "02-Sept-2026",
       "assignTo": "Graphic Designer",
-      "workingOn": "Sanmeet",
+      "workingOn": "Masoom",
       "status": "Overdue",
       "postType": "Graphic"
     },
@@ -13728,141 +12752,9 @@
       "taskTitle": "Post Graphic 1",
       "date": "03-Sept-2026",
       "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
+      "workingOn": "Preet",
       "status": "Assigned",
       "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTJYL87H-3058-2",
-      "clientId": "AID-0017",
-      "businessName": "Prashantam Yoga",
-      "taskTitle": "Reel 1",
-      "date": "07-Sept-2026",
-      "assignTo": "Video Editor",
-      "workingOn": "Divyansh",
-      "status": "Overdue",
-      "postType": "Reel"
-    },
-    {
-      "taskId": "AID-T-MTJYL8KM-6914-3",
-      "clientId": "AID-0017",
-      "businessName": "Prashantam Yoga",
-      "taskTitle": "Post Reel 1",
-      "date": "08-Sept-2026",
-      "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
-      "status": "Assigned",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTJYL8XQ-6687-4",
-      "clientId": "AID-0017",
-      "businessName": "Prashantam Yoga",
-      "taskTitle": "Graphic 2",
-      "date": "11-Sept-2026",
-      "assignTo": "Graphic Designer",
-      "workingOn": "Sanmeet",
-      "status": "Overdue",
-      "postType": "Graphic"
-    },
-    {
-      "taskId": "AID-T-MTJYL9AW-1781-5",
-      "clientId": "AID-0017",
-      "businessName": "Prashantam Yoga",
-      "taskTitle": "Post Graphic 2",
-      "date": "12-Sept-2026",
-      "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
-      "status": "Assigned",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTJYL9UK-9581-7",
-      "clientId": "AID-0017",
-      "businessName": "Prashantam Yoga",
-      "taskTitle": "AI Video 1",
-      "date": "17-Sept-2026",
-      "assignTo": "Ai Video Editor",
-      "workingOn": "Divyansh",
-      "status": "Overdue",
-      "postType": "AI Video"
-    },
-    {
-      "taskId": "AID-T-MTJYLA7O-1169-8",
-      "clientId": "AID-0017",
-      "businessName": "Prashantam Yoga",
-      "taskTitle": "Post AI Video 1",
-      "date": "18-Sept-2026",
-      "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
-      "status": "Assigned",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTJYLAKS-6647-9",
-      "clientId": "AID-0017",
-      "businessName": "Prashantam Yoga",
-      "taskTitle": "Graphic 3",
-      "date": "21-Sept-2026",
-      "assignTo": "Graphic Designer",
-      "workingOn": "Sanmeet",
-      "status": "Assigned",
-      "postType": "Graphic"
-    },
-    {
-      "taskId": "AID-T-MTJYLAXW-1081-10",
-      "clientId": "AID-0017",
-      "businessName": "Prashantam Yoga",
-      "taskTitle": "Post Graphic 3",
-      "date": "22-Sept-2026",
-      "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
-      "status": "Assigned",
-      "postType": "Posting"
-    },
-    {
-      "taskId": "AID-T-MTJYLBB0-5364-11",
-      "clientId": "AID-0017",
-      "businessName": "Prashantam Yoga",
-      "taskTitle": "Weekly Report 1",
-      "date": "10-Sept-2026",
-      "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
-      "status": "Overdue",
-      "postType": "Report"
-    },
-    {
-      "taskId": "AID-T-MTJYLBO4-4948-12",
-      "clientId": "AID-0017",
-      "businessName": "Prashantam Yoga",
-      "taskTitle": "Weekly Report 2",
-      "date": "18-Sept-2026",
-      "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
-      "status": "Overdue",
-      "postType": "Report"
-    },
-    {
-      "taskId": "AID-T-MTJYLC1B-3864-13",
-      "clientId": "AID-0017",
-      "businessName": "Prashantam Yoga",
-      "taskTitle": "Weekly Report 3",
-      "date": "26-Sept-2026",
-      "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
-      "status": "Assigned",
-      "postType": "Report"
-    },
-    {
-      "taskId": "AID-T-MTJYLCEF-2438-14",
-      "clientId": "AID-0017",
-      "businessName": "Prashantam Yoga",
-      "taskTitle": "Weekly Report 4",
-      "date": "05-Oct-2026",
-      "assignTo": "AI Video Editor",
-      "workingOn": "Nouman",
-      "status": "Assigned",
-      "postType": "Report"
     },
     {
       "taskId": "AID-0007-SM-AI-VIDEOS-1-POST-MTK1MFCG-3351",
@@ -13993,7 +12885,7 @@
       "date": "21-Sept-2026",
       "assignTo": "Graphic Designer",
       "workingOn": "Masoom",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -14147,7 +13039,7 @@
       "date": "23-Sept-2026",
       "assignTo": "Graphic Designer",
       "workingOn": "Sanmeet",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -14180,7 +13072,7 @@
       "date": "21-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Preet",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -14301,7 +13193,7 @@
       "date": "23-Sept-2026",
       "assignTo": "Graphic Designer",
       "workingOn": "Danish Khan",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -14334,7 +13226,7 @@
       "date": "21-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Pujan",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -14455,7 +13347,7 @@
       "date": "21-Sept-2026",
       "assignTo": "Ai Video Editor",
       "workingOn": "Masoom",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -14534,6 +13426,2316 @@
       "workingOn": "Preet",
       "status": "Not Started",
       "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUAYQASW-2597-0",
+      "clientId": "AID-0018",
+      "businessName": "Rentofurnished",
+      "taskTitle": "Graphic 1",
+      "date": "02-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUAYQB6I-6221-1",
+      "clientId": "AID-0018",
+      "businessName": "Rentofurnished",
+      "taskTitle": "Post Graphic 1",
+      "date": "03-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUAYQBD4-3608-2",
+      "clientId": "AID-0018",
+      "businessName": "Rentofurnished",
+      "taskTitle": "Reel 1",
+      "date": "04-Sept-2026",
+      "assignTo": "Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Reel"
+    },
+    {
+      "taskId": "AID-T-MUAYQBJQ-1284-3",
+      "clientId": "AID-0018",
+      "businessName": "Rentofurnished",
+      "taskTitle": "Post Reel 1",
+      "date": "05-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUAYQBQC-2069-4",
+      "clientId": "AID-0018",
+      "businessName": "Rentofurnished",
+      "taskTitle": "Graphic 2",
+      "date": "07-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUAYQBWY-5198-5",
+      "clientId": "AID-0018",
+      "businessName": "Rentofurnished",
+      "taskTitle": "Post Graphic 2",
+      "date": "08-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUAYQC3J-2014-6",
+      "clientId": "AID-0018",
+      "businessName": "Rentofurnished",
+      "taskTitle": "AI Video 1",
+      "date": "10-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "AI Video"
+    },
+    {
+      "taskId": "AID-T-MUAYQCA6-4234-7",
+      "clientId": "AID-0018",
+      "businessName": "Rentofurnished",
+      "taskTitle": "Post AI Video 1",
+      "date": "11-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUAYQCGS-9894-8",
+      "clientId": "AID-0018",
+      "businessName": "Rentofurnished",
+      "taskTitle": "Graphic 3",
+      "date": "11-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUAYQCNF-8165-9",
+      "clientId": "AID-0018",
+      "businessName": "Rentofurnished",
+      "taskTitle": "Post Graphic 3",
+      "date": "12-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUAYQCU1-9266-10",
+      "clientId": "AID-0018",
+      "businessName": "Rentofurnished",
+      "taskTitle": "Graphic 4",
+      "date": "14-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUAYQD0M-5757-11",
+      "clientId": "AID-0018",
+      "businessName": "Rentofurnished",
+      "taskTitle": "Post Graphic 4",
+      "date": "15-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUAYQD7C-6945-12",
+      "clientId": "AID-0018",
+      "businessName": "Rentofurnished",
+      "taskTitle": "Graphic 5",
+      "date": "16-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUAYQDE7-3141-13",
+      "clientId": "AID-0018",
+      "businessName": "Rentofurnished",
+      "taskTitle": "Post Graphic 5",
+      "date": "17-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUAYQDKV-3627-14",
+      "clientId": "AID-0018",
+      "businessName": "Rentofurnished",
+      "taskTitle": "Graphic 6",
+      "date": "18-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUAYQDRK-8352-15",
+      "clientId": "AID-0018",
+      "businessName": "Rentofurnished",
+      "taskTitle": "Post Graphic 6",
+      "date": "19-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUAYQDY7-2573-16",
+      "clientId": "AID-0018",
+      "businessName": "Rentofurnished",
+      "taskTitle": "Weekly Report 1",
+      "date": "10-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Overdue",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUAYQE4V-6657-17",
+      "clientId": "AID-0018",
+      "businessName": "Rentofurnished",
+      "taskTitle": "Weekly Report 2",
+      "date": "18-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Overdue",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUAYQEBH-6143-18",
+      "clientId": "AID-0018",
+      "businessName": "Rentofurnished",
+      "taskTitle": "Weekly Report 3",
+      "date": "26-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUAYQEI3-1014-19",
+      "clientId": "AID-0018",
+      "businessName": "Rentofurnished",
+      "taskTitle": "Weekly Report 4",
+      "date": "05-Oct-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB4V7S9-6029-0",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Client Login / Access Collection",
+      "date": "12-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Overdue",
+      "postType": "Onboarding"
+    },
+    {
+      "taskId": "AID-T-MUB4V8P0-5246-1",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Graphic 1",
+      "date": "14-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB4VA4F-6805-2",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "AI Video 1",
+      "date": "15-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "AI Video"
+    },
+    {
+      "taskId": "AID-T-MUB4VAHV-3588-3",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Ads Run",
+      "date": "15-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Overdue",
+      "postType": "Ads"
+    },
+    {
+      "taskId": "AID-T-MUB4VAVB-1508-4",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Graphic 2",
+      "date": "16-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB4VB8R-8377-5",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Post Graphic 2",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB4VBMI-2735-6",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Graphic 3",
+      "date": "17-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB4VC55-7638-7",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Post Graphic 3",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB4VCIO-8705-8",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "AI Video 2",
+      "date": "19-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "AI Video"
+    },
+    {
+      "taskId": "AID-T-MUB4VCW3-7708-9",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Post AI Video 2",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB4VD9I-2677-10",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Graphic 4",
+      "date": "19-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB4VDMY-7727-11",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Post Graphic 4",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB4VE0D-1236-12",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Graphic 5",
+      "date": "21-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB4VEDU-8901-13",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Post Graphic 5",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB4VERB-2899-14",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Graphic 6",
+      "date": "22-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB4VF4T-4857-15",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Post Graphic 6",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB4VFI8-4032-16",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Graphic 7",
+      "date": "23-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB4VG1A-1281-17",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Post Graphic 7",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB4VGEQ-2956-18",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Graphic 8",
+      "date": "24-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Assigned",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB4VGS5-4890-19",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Post Graphic 8",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB4VH5P-2248-20",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Graphic 9",
+      "date": "25-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Assigned",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB4VHJ8-7284-21",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Post Graphic 9",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB4VHWN-8902-22",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Graphic 10",
+      "date": "26-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Assigned",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB4VIA2-4394-23",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Post Graphic 10",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB4VINR-3252-24",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Graphic 11",
+      "date": "28-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Assigned",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB4VJ16-6849-25",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Post Graphic 11",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB4VJEM-9426-26",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Graphic 12",
+      "date": "29-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Assigned",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB4VJX0-2972-27",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Post Graphic 12",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB4VKAL-9830-28",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Weekly Report 1",
+      "date": "21-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Overdue",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB4VKO2-1671-29",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Weekly Report 2",
+      "date": "29-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB4VL1J-4906-30",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Weekly Report 3",
+      "date": "07-Oct-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB4VLF1-9925-31",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Weekly Report 4",
+      "date": "15-Oct-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB4V8P0-5246-1-POST-MUB4VP9X-9128",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Post Graphic 1",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Not Started",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB4VA4F-6805-2-POST-MUB4VPGQ-5873",
+      "clientId": "AID-0069",
+      "businessName": "Ayush Vikas Foundation",
+      "taskTitle": "Post AI Video 1",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Not Started",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB530R0-6328-0",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Graphic 1",
+      "date": "19-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Masoom",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB530XL-4753-1",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Post Graphic 1",
+      "date": "21-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB53144-9577-2",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Reel 1",
+      "date": "21-Sept-2026",
+      "assignTo": "Video Editor",
+      "workingOn": "Masoom",
+      "status": "Overdue",
+      "postType": "Reel"
+    },
+    {
+      "taskId": "AID-T-MUB531AV-5416-3",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Post Reel 1",
+      "date": "22-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB531HD-1239-4",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Graphic 2",
+      "date": "22-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Masoom",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB531NY-5357-5",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Post Graphic 2",
+      "date": "23-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB531UK-6966-6",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "AI Video 1",
+      "date": "24-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Masoom",
+      "status": "Assigned",
+      "postType": "AI Video"
+    },
+    {
+      "taskId": "AID-T-MUB53213-6140-7",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Post AI Video 1",
+      "date": "25-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB5327N-9098-8",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Graphic 3",
+      "date": "24-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Masoom",
+      "status": "Assigned",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB532EF-5541-9",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Post Graphic 3",
+      "date": "25-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB532L4-2974-10",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Reel 2",
+      "date": "25-Sept-2026",
+      "assignTo": "Video Editor",
+      "workingOn": "Masoom",
+      "status": "Assigned",
+      "postType": "Reel"
+    },
+    {
+      "taskId": "AID-T-MUB532RN-7282-11",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Post Reel 2",
+      "date": "26-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB532Y6-7580-12",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Graphic 4",
+      "date": "26-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Masoom",
+      "status": "Assigned",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB5334W-2523-13",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Post Graphic 4",
+      "date": "28-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB533L6-6364-14",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "AI Video 2",
+      "date": "29-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Masoom",
+      "status": "Assigned",
+      "postType": "AI Video"
+    },
+    {
+      "taskId": "AID-T-MUB534BL-3550-15",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Post AI Video 2",
+      "date": "30-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB534I3-2154-16",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Graphic 5",
+      "date": "29-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Masoom",
+      "status": "Assigned",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB534OM-7058-17",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Post Graphic 5",
+      "date": "30-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB534V6-1097-18",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Reel 3",
+      "date": "30-Sept-2026",
+      "assignTo": "Video Editor",
+      "workingOn": "Masoom",
+      "status": "Assigned",
+      "postType": "Reel"
+    },
+    {
+      "taskId": "AID-T-MUB5351Q-8683-19",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Post Reel 3",
+      "date": "01-Oct-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB53588-5506-20",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Graphic 6",
+      "date": "01-Oct-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Masoom",
+      "status": "Assigned",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB535ER-4611-21",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Post Graphic 6",
+      "date": "02-Oct-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB535LU-5042-22",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Graphic 7",
+      "date": "02-Oct-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Masoom",
+      "status": "Assigned",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB535SC-5855-23",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Post Graphic 7",
+      "date": "03-Oct-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB535YW-2079-24",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Reel 4",
+      "date": "03-Oct-2026",
+      "assignTo": "Video Editor",
+      "workingOn": "Masoom",
+      "status": "Assigned",
+      "postType": "Reel"
+    },
+    {
+      "taskId": "AID-T-MUB5365F-6602-25",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Post Reel 4",
+      "date": "05-Oct-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB536BY-9710-26",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Reel 5",
+      "date": "05-Oct-2026",
+      "assignTo": "Video Editor",
+      "workingOn": "Masoom",
+      "status": "Assigned",
+      "postType": "Reel"
+    },
+    {
+      "taskId": "AID-T-MUB536IH-3696-27",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Post Reel 5",
+      "date": "06-Oct-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB536P3-5357-28",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Weekly Report 1",
+      "date": "28-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB536W2-7475-29",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Weekly Report 2",
+      "date": "06-Oct-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB5372M-6440-30",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Weekly Report 3",
+      "date": "14-Oct-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB53797-1574-31",
+      "clientId": "AID-0028",
+      "businessName": "Ganesh Auto & Mechanical Works",
+      "taskTitle": "Weekly Report 4",
+      "date": "22-Oct-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB5FALY-6759-0",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Client Login / Access Collection",
+      "date": "02-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Overdue",
+      "postType": "Onboarding"
+    },
+    {
+      "taskId": "AID-T-MUB5FAZA-8433-1",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Graphic 1",
+      "date": "03-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB5FBCK-6409-2",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "AI Video 1",
+      "date": "04-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "AI Video"
+    },
+    {
+      "taskId": "AID-T-MUB5FBPT-9436-3",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Ads Run",
+      "date": "04-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Overdue",
+      "postType": "Ads"
+    },
+    {
+      "taskId": "AID-T-MUB5FC35-9902-4",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Graphic 2",
+      "date": "05-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB5FCGE-6685-5",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Post Graphic 2",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB5FCTO-9236-6",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Reel 1",
+      "date": "08-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Reel"
+    },
+    {
+      "taskId": "AID-T-MUB5FD6X-3602-7",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Post Reel 1",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB5FDYQ-9935-8",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Graphic 3",
+      "date": "10-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB5FEC4-3505-9",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Post Graphic 3",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB5FEPD-4299-10",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "AI Video 2",
+      "date": "14-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "AI Video"
+    },
+    {
+      "taskId": "AID-T-MUB5FF2P-1454-11",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Post AI Video 2",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB5FFFX-7394-12",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Graphic 4",
+      "date": "15-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB5FFT8-8069-13",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Post Graphic 4",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB5FG6L-5382-14",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Reel 2",
+      "date": "17-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Reel"
+    },
+    {
+      "taskId": "AID-T-MUB5FGJT-5248-15",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Post Reel 2",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB5FGX1-2189-16",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Graphic 5",
+      "date": "19-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB5FHA8-4073-17",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Post Graphic 5",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB5FHWE-8682-18",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Reel 3",
+      "date": "22-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Reel"
+    },
+    {
+      "taskId": "AID-T-MUB5FI9P-1251-19",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Post Reel 3",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB5FIMY-9321-20",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Weekly Report 1",
+      "date": "10-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Overdue",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB5FJ06-9987-21",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Weekly Report 2",
+      "date": "18-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Overdue",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB5FJDG-5632-22",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Weekly Report 3",
+      "date": "26-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB5FJQN-5905-23",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Weekly Report 4",
+      "date": "05-Oct-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB5FAZA-8433-1-POST-MUB5FNLN-1093",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Post Graphic 1",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Not Started",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB5FBCK-6409-2-POST-MUB5FNSD-1276",
+      "clientId": "AID-0070",
+      "businessName": "Canal Touch Resort ",
+      "taskTitle": "Post AI Video 1",
+      "date": "Trigger on Approval",
+      "assignTo": "Content Posting",
+      "workingOn": "Pujan",
+      "status": "Not Started",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB6BCIJ-1951-0",
+      "clientId": "AID-0013",
+      "businessName": "Niyathhi Scaffolding",
+      "taskTitle": "Graphic 1",
+      "date": "04-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Masoom",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB6BCP9-9109-1",
+      "clientId": "AID-0013",
+      "businessName": "Niyathhi Scaffolding",
+      "taskTitle": "Post Graphic 1",
+      "date": "05-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB6BCVX-3467-2",
+      "clientId": "AID-0013",
+      "businessName": "Niyathhi Scaffolding",
+      "taskTitle": "Graphic 2",
+      "date": "08-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Masoom",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB6BD2N-4616-3",
+      "clientId": "AID-0013",
+      "businessName": "Niyathhi Scaffolding",
+      "taskTitle": "Post Graphic 2",
+      "date": "09-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB6BD9B-3946-4",
+      "clientId": "AID-0013",
+      "businessName": "Niyathhi Scaffolding",
+      "taskTitle": "AI Video 1",
+      "date": "12-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Masoom",
+      "status": "Overdue",
+      "postType": "AI Video"
+    },
+    {
+      "taskId": "AID-T-MUB6BDFZ-9276-5",
+      "clientId": "AID-0013",
+      "businessName": "Niyathhi Scaffolding",
+      "taskTitle": "Post AI Video 1",
+      "date": "14-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB6BDMO-6283-6",
+      "clientId": "AID-0013",
+      "businessName": "Niyathhi Scaffolding",
+      "taskTitle": "Graphic 3",
+      "date": "15-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Masoom",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB6BDTD-1837-7",
+      "clientId": "AID-0013",
+      "businessName": "Niyathhi Scaffolding",
+      "taskTitle": "Post Graphic 3",
+      "date": "16-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB6BE02-9720-8",
+      "clientId": "AID-0013",
+      "businessName": "Niyathhi Scaffolding",
+      "taskTitle": "Graphic 4",
+      "date": "18-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Masoom",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB6BE71-7753-9",
+      "clientId": "AID-0013",
+      "businessName": "Niyathhi Scaffolding",
+      "taskTitle": "Post Graphic 4",
+      "date": "19-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB6BEDP-1264-10",
+      "clientId": "AID-0013",
+      "businessName": "Niyathhi Scaffolding",
+      "taskTitle": "Graphic 5",
+      "date": "22-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Masoom",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB6BEKE-7096-11",
+      "clientId": "AID-0013",
+      "businessName": "Niyathhi Scaffolding",
+      "taskTitle": "Post Graphic 5",
+      "date": "23-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB6BER4-3003-12",
+      "clientId": "AID-0013",
+      "businessName": "Niyathhi Scaffolding",
+      "taskTitle": "Graphic 6",
+      "date": "25-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Masoom",
+      "status": "Assigned",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB6BEXU-8148-13",
+      "clientId": "AID-0013",
+      "businessName": "Niyathhi Scaffolding",
+      "taskTitle": "Post Graphic 6",
+      "date": "26-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB6BF4J-2754-14",
+      "clientId": "AID-0013",
+      "businessName": "Niyathhi Scaffolding",
+      "taskTitle": "Weekly Report 1",
+      "date": "12-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Overdue",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB6BFB7-1350-15",
+      "clientId": "AID-0013",
+      "businessName": "Niyathhi Scaffolding",
+      "taskTitle": "Weekly Report 2",
+      "date": "21-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Overdue",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB6BFHV-8508-16",
+      "clientId": "AID-0013",
+      "businessName": "Niyathhi Scaffolding",
+      "taskTitle": "Weekly Report 3",
+      "date": "29-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB6BFOK-2677-17",
+      "clientId": "AID-0013",
+      "businessName": "Niyathhi Scaffolding",
+      "taskTitle": "Weekly Report 4",
+      "date": "07-Oct-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB6S3CI-3531-0",
+      "clientId": "AID-0026",
+      "businessName": "PAATH",
+      "taskTitle": "Graphic 1",
+      "date": "01-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB6S429-6312-1",
+      "clientId": "AID-0026",
+      "businessName": "PAATH",
+      "taskTitle": "Post Graphic 1",
+      "date": "02-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB6S4JU-9295-2",
+      "clientId": "AID-0026",
+      "businessName": "PAATH",
+      "taskTitle": "Reel 1",
+      "date": "05-Sept-2026",
+      "assignTo": "Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Reel"
+    },
+    {
+      "taskId": "AID-T-MUB6S4QG-7466-3",
+      "clientId": "AID-0026",
+      "businessName": "PAATH",
+      "taskTitle": "Post Reel 1",
+      "date": "07-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB6S4X4-9303-4",
+      "clientId": "AID-0026",
+      "businessName": "PAATH",
+      "taskTitle": "Graphic 2",
+      "date": "10-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB6S53R-2156-5",
+      "clientId": "AID-0026",
+      "businessName": "PAATH",
+      "taskTitle": "Post Graphic 2",
+      "date": "11-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB6S5AE-4517-6",
+      "clientId": "AID-0026",
+      "businessName": "PAATH",
+      "taskTitle": "AI Video 1",
+      "date": "16-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "AI Video"
+    },
+    {
+      "taskId": "AID-T-MUB6S5H0-6985-7",
+      "clientId": "AID-0026",
+      "businessName": "PAATH",
+      "taskTitle": "Post AI Video 1",
+      "date": "17-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB6S5NM-2834-8",
+      "clientId": "AID-0026",
+      "businessName": "PAATH",
+      "taskTitle": "Graphic 3",
+      "date": "19-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB6S5U8-6724-9",
+      "clientId": "AID-0026",
+      "businessName": "PAATH",
+      "taskTitle": "Post Graphic 3",
+      "date": "21-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB6S60U-3226-10",
+      "clientId": "AID-0026",
+      "businessName": "PAATH",
+      "taskTitle": "Weekly Report 1",
+      "date": "09-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Overdue",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB6S67F-8227-11",
+      "clientId": "AID-0026",
+      "businessName": "PAATH",
+      "taskTitle": "Weekly Report 2",
+      "date": "17-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Overdue",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB6S6E2-4644-12",
+      "clientId": "AID-0026",
+      "businessName": "PAATH",
+      "taskTitle": "Weekly Report 3",
+      "date": "25-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB6S6KO-5564-13",
+      "clientId": "AID-0026",
+      "businessName": "PAATH",
+      "taskTitle": "Weekly Report 4",
+      "date": "03-Oct-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB77Y20-6817-0",
+      "clientId": "AID-0017",
+      "businessName": "Prashantam Yoga",
+      "taskTitle": "Graphic 1",
+      "date": "05-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB77Y8P-7132-1",
+      "clientId": "AID-0017",
+      "businessName": "Prashantam Yoga",
+      "taskTitle": "Post Graphic 1",
+      "date": "07-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB77YFE-5377-2",
+      "clientId": "AID-0017",
+      "businessName": "Prashantam Yoga",
+      "taskTitle": "Reel 1",
+      "date": "10-Sept-2026",
+      "assignTo": "Video Editor",
+      "workingOn": "Masoom",
+      "status": "Overdue",
+      "postType": "Reel"
+    },
+    {
+      "taskId": "AID-T-MUB77YM4-3408-3",
+      "clientId": "AID-0017",
+      "businessName": "Prashantam Yoga",
+      "taskTitle": "Post Reel 1",
+      "date": "11-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB77YSS-8967-4",
+      "clientId": "AID-0017",
+      "businessName": "Prashantam Yoga",
+      "taskTitle": "Graphic 2",
+      "date": "15-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB77YZH-5624-5",
+      "clientId": "AID-0017",
+      "businessName": "Prashantam Yoga",
+      "taskTitle": "Post Graphic 2",
+      "date": "16-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB77Z66-5020-6",
+      "clientId": "AID-0017",
+      "businessName": "Prashantam Yoga",
+      "taskTitle": "AI Video 1",
+      "date": "21-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Masoom",
+      "status": "Overdue",
+      "postType": "AI Video"
+    },
+    {
+      "taskId": "AID-T-MUB77ZCU-3807-7",
+      "clientId": "AID-0017",
+      "businessName": "Prashantam Yoga",
+      "taskTitle": "Post AI Video 1",
+      "date": "22-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB77ZJI-4602-8",
+      "clientId": "AID-0017",
+      "businessName": "Prashantam Yoga",
+      "taskTitle": "Graphic 3",
+      "date": "24-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Nouman",
+      "status": "Assigned",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB77ZQ7-3345-9",
+      "clientId": "AID-0017",
+      "businessName": "Prashantam Yoga",
+      "taskTitle": "Post Graphic 3",
+      "date": "25-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB77ZWV-3559-10",
+      "clientId": "AID-0017",
+      "businessName": "Prashantam Yoga",
+      "taskTitle": "Weekly Report 1",
+      "date": "14-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Overdue",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB78044-7297-11",
+      "clientId": "AID-0017",
+      "businessName": "Prashantam Yoga",
+      "taskTitle": "Weekly Report 2",
+      "date": "22-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Overdue",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB780AU-9935-12",
+      "clientId": "AID-0017",
+      "businessName": "Prashantam Yoga",
+      "taskTitle": "Weekly Report 3",
+      "date": "30-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB780HJ-7822-13",
+      "clientId": "AID-0017",
+      "businessName": "Prashantam Yoga",
+      "taskTitle": "Weekly Report 4",
+      "date": "08-Oct-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB7SI3C-6806-0",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "Graphic 1",
+      "date": "01-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB7SIA0-3300-1",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "Post Graphic 1",
+      "date": "02-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB7SIGO-9908-2",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "Reel 1",
+      "date": "03-Sept-2026",
+      "assignTo": "Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Reel"
+    },
+    {
+      "taskId": "AID-T-MUB7SINC-4827-3",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "Post Reel 1",
+      "date": "04-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB7SIU3-9899-4",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "Graphic 2",
+      "date": "05-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB7SJ0S-2881-5",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "Post Graphic 2",
+      "date": "07-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB7SJ7H-1671-6",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "AI Video 1",
+      "date": "09-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "AI Video"
+    },
+    {
+      "taskId": "AID-T-MUB7SJE6-9480-7",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "Post AI Video 1",
+      "date": "10-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB7SJKU-8532-8",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "Graphic 3",
+      "date": "10-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB7SJRI-7403-9",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "Post Graphic 3",
+      "date": "11-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB7SJY6-7497-10",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "Reel 2",
+      "date": "12-Sept-2026",
+      "assignTo": "Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Reel"
+    },
+    {
+      "taskId": "AID-T-MUB7SK4X-8011-11",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "Post Reel 2",
+      "date": "14-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB7SKDK-1560-12",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "Graphic 4",
+      "date": "15-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB7SKNC-1979-13",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "Post Graphic 4",
+      "date": "16-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB7SLA7-2540-14",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "AI Video 2",
+      "date": "18-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "AI Video"
+    },
+    {
+      "taskId": "AID-T-MUB7SLGV-6568-15",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "Post AI Video 2",
+      "date": "19-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB7SLNJ-6908-16",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "Graphic 5",
+      "date": "19-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB7SLU7-9302-17",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "Post Graphic 5",
+      "date": "21-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB7SM0V-1413-18",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "Reel 3",
+      "date": "22-Sept-2026",
+      "assignTo": "Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Reel"
+    },
+    {
+      "taskId": "AID-T-MUB7SM7J-3909-19",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "Post Reel 3",
+      "date": "23-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB7SME7-4297-20",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "Weekly Report 1",
+      "date": "09-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Overdue",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB7SMKW-6379-21",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "Weekly Report 2",
+      "date": "17-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Overdue",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB7SMRN-1421-22",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "Weekly Report 3",
+      "date": "25-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB7SMYB-9852-23",
+      "clientId": "AID-0051",
+      "businessName": "Sharadam Salads and Soups",
+      "taskTitle": "Weekly Report 4",
+      "date": "03-Oct-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB8C7D5-9739-0",
+      "clientId": "AID-0056",
+      "businessName": "Timeer's Badminton Academy",
+      "taskTitle": "Graphic 1",
+      "date": "19-Aug-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB8C7JS-4537-1",
+      "clientId": "AID-0056",
+      "businessName": "Timeer's Badminton Academy",
+      "taskTitle": "Post Graphic 1",
+      "date": "20-Aug-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB8C7QH-6570-2",
+      "clientId": "AID-0056",
+      "businessName": "Timeer's Badminton Academy",
+      "taskTitle": "Reel 1",
+      "date": "24-Aug-2026",
+      "assignTo": "Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Reel"
+    },
+    {
+      "taskId": "AID-T-MUB8C7X2-5623-3",
+      "clientId": "AID-0056",
+      "businessName": "Timeer's Badminton Academy",
+      "taskTitle": "Post Reel 1",
+      "date": "25-Aug-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB8C83O-2331-4",
+      "clientId": "AID-0056",
+      "businessName": "Timeer's Badminton Academy",
+      "taskTitle": "Graphic 2",
+      "date": "28-Aug-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB8C8AC-4206-5",
+      "clientId": "AID-0056",
+      "businessName": "Timeer's Badminton Academy",
+      "taskTitle": "Post Graphic 2",
+      "date": "29-Aug-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB8C8GY-4930-6",
+      "clientId": "AID-0056",
+      "businessName": "Timeer's Badminton Academy",
+      "taskTitle": "AI Video 1",
+      "date": "03-Sept-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "AI Video"
+    },
+    {
+      "taskId": "AID-T-MUB8C8NM-7607-7",
+      "clientId": "AID-0056",
+      "businessName": "Timeer's Badminton Academy",
+      "taskTitle": "Post AI Video 1",
+      "date": "04-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB8C8U8-7664-8",
+      "clientId": "AID-0056",
+      "businessName": "Timeer's Badminton Academy",
+      "taskTitle": "Graphic 3",
+      "date": "07-Sept-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Nouman",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB8C90U-1218-9",
+      "clientId": "AID-0056",
+      "businessName": "Timeer's Badminton Academy",
+      "taskTitle": "Post Graphic 3",
+      "date": "08-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB8C97F-1736-10",
+      "clientId": "AID-0056",
+      "businessName": "Timeer's Badminton Academy",
+      "taskTitle": "Weekly Report 1",
+      "date": "27-Aug-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Overdue",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB8C9E0-9424-11",
+      "clientId": "AID-0056",
+      "businessName": "Timeer's Badminton Academy",
+      "taskTitle": "Weekly Report 2",
+      "date": "04-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Overdue",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB8C9KM-2453-12",
+      "clientId": "AID-0056",
+      "businessName": "Timeer's Badminton Academy",
+      "taskTitle": "Weekly Report 3",
+      "date": "12-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Overdue",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB8C9R8-9822-13",
+      "clientId": "AID-0056",
+      "businessName": "Timeer's Badminton Academy",
+      "taskTitle": "Weekly Report 4",
+      "date": "21-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Pujan",
+      "status": "Overdue",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB8OAYE-2554-0",
+      "clientId": "AID-0054",
+      "businessName": "Very Essential",
+      "taskTitle": "Graphic 1",
+      "date": "11-Aug-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Masoom",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB8OB6T-7057-1",
+      "clientId": "AID-0054",
+      "businessName": "Very Essential",
+      "taskTitle": "Post Graphic 1",
+      "date": "12-Aug-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB8OBDH-1334-2",
+      "clientId": "AID-0054",
+      "businessName": "Very Essential",
+      "taskTitle": "Reel 1",
+      "date": "15-Aug-2026",
+      "assignTo": "Video Editor",
+      "workingOn": "Masoom",
+      "status": "Overdue",
+      "postType": "Reel"
+    },
+    {
+      "taskId": "AID-T-MUB8OBK5-2695-3",
+      "clientId": "AID-0054",
+      "businessName": "Very Essential",
+      "taskTitle": "Post Reel 1",
+      "date": "17-Aug-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB8OBQT-3871-4",
+      "clientId": "AID-0054",
+      "businessName": "Very Essential",
+      "taskTitle": "Graphic 2",
+      "date": "20-Aug-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Masoom",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB8OBXH-7812-5",
+      "clientId": "AID-0054",
+      "businessName": "Very Essential",
+      "taskTitle": "Post Graphic 2",
+      "date": "21-Aug-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB8OC47-7306-6",
+      "clientId": "AID-0054",
+      "businessName": "Very Essential",
+      "taskTitle": "AI Video 1",
+      "date": "26-Aug-2026",
+      "assignTo": "Ai Video Editor",
+      "workingOn": "Masoom",
+      "status": "Overdue",
+      "postType": "AI Video"
+    },
+    {
+      "taskId": "AID-T-MUB8OCAV-9588-7",
+      "clientId": "AID-0054",
+      "businessName": "Very Essential",
+      "taskTitle": "Post AI Video 1",
+      "date": "27-Aug-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB8OCHN-1721-8",
+      "clientId": "AID-0054",
+      "businessName": "Very Essential",
+      "taskTitle": "Graphic 3",
+      "date": "29-Aug-2026",
+      "assignTo": "Graphic Designer",
+      "workingOn": "Masoom",
+      "status": "Overdue",
+      "postType": "Graphic"
+    },
+    {
+      "taskId": "AID-T-MUB8OCOD-7187-9",
+      "clientId": "AID-0054",
+      "businessName": "Very Essential",
+      "taskTitle": "Post Graphic 3",
+      "date": "31-Aug-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Assigned",
+      "postType": "Posting"
+    },
+    {
+      "taskId": "AID-T-MUB8OCV2-9443-10",
+      "clientId": "AID-0054",
+      "businessName": "Very Essential",
+      "taskTitle": "Weekly Report 1",
+      "date": "19-Aug-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Overdue",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB8OD1P-5780-11",
+      "clientId": "AID-0054",
+      "businessName": "Very Essential",
+      "taskTitle": "Weekly Report 2",
+      "date": "27-Aug-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Overdue",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB8OD8D-6711-12",
+      "clientId": "AID-0054",
+      "businessName": "Very Essential",
+      "taskTitle": "Weekly Report 3",
+      "date": "04-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Overdue",
+      "postType": "Report"
+    },
+    {
+      "taskId": "AID-T-MUB8ODF2-2462-13",
+      "clientId": "AID-0054",
+      "businessName": "Very Essential",
+      "taskTitle": "Weekly Report 4",
+      "date": "12-Sept-2026",
+      "assignTo": "Digital Marketing Executive",
+      "workingOn": "Preet",
+      "status": "Overdue",
+      "postType": "Report"
     }
   ]
 }

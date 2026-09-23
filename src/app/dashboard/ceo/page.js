@@ -32,6 +32,8 @@ import {
   FileSpreadsheet
 } from 'lucide-react';
 import ExcelImportModal from '@/components/ExcelImportModal';
+import CollectionReportModal from '@/components/CollectionReportModal';
+
 import {
   parseDbDate as parsePlanDbDate,
   formatDateToDb,
@@ -49,6 +51,7 @@ import {
 
 export default function CeoDashboard() {
   const router = useRouter();
+  const [showCollectionReportModal, setShowCollectionReportModal] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState('overview'); // overview, users, audits, payroll
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -64,6 +67,8 @@ export default function CeoDashboard() {
   const [auditLogs, setAuditLogs] = useState([]);
   const [tasksList, setTasksList] = useState([]);
   const [clientsList, setClientsList] = useState([]);
+  const [futureCollectionData, setFutureCollectionData] = useState(0);
+
   const [allClientTasks, setAllClientTasks] = useState([]);
   const [allClientDeliveries, setAllClientDeliveries] = useState([]);
   const [metrics, setMetrics] = useState({
@@ -1127,6 +1132,13 @@ export default function CeoDashboard() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <button
+              onClick={() => setShowCollectionReportModal(true)}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-1.5 cursor-pointer"
+            >
+              <TrendingUp className="w-4 h-4" />
+              <span className="hidden sm:inline">Collection Report</span>
+            </button>
             {/* Dark Mode toggle */}
             <button
               onClick={toggleDarkMode}
@@ -1219,53 +1231,23 @@ export default function CeoDashboard() {
                   </div>
                 </div>
 
-                {/* Expected Revenue Card */}
-                <div 
-                  onClick={() => {
-                    setActiveTab('clients');
-                    setClientFilterScope('all_clients');
-                    setClientMonthFilter('all');
-                    setClientStartDate('');
-                    setClientEndDate('');
-                    setClientPaymentFilter('all');
-                    setClientLifecycleFilter('all');
-                    setClientRevenueStreamFilter('all');
-                  }}
-                  className="relative bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] hover:shadow-md hover:border-indigo-300 transition duration-200 group cursor-pointer"
-                  title="Click to view all 58 target billing accounts in Client CRM"
-                >
-                  <div className="absolute -right-6 -top-6 w-24 h-24 bg-indigo-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
-                  <div className="space-y-1 relative z-10 min-w-0 flex-1 pr-2">
-                    <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-extrabold uppercase tracking-wider truncate">Expected Revenue</div>
-                    <h3 className="text-xl sm:text-2xl font-black text-indigo-600 dark:text-indigo-400 truncate">₹{(metrics.expectedRevenue || 0).toLocaleString()}</h3>
-                    <span className="text-[9px] text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-full border border-indigo-100 dark:border-indigo-900 block w-fit truncate max-w-full">
-                      All {metrics.totalClients || clientsList.length} Clients Target
-                    </span>
-                  </div>
-                  <div className="shrink-0 relative z-10 w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-100 dark:border-indigo-900">
-                    <BarChart2 className="w-5 h-5" />
-                  </div>
-                </div>
 
-                {/* Pending Revenue Card */}
+                {/* Future Collection Report */}
                 <div 
-                  onClick={() => {
-                    setActiveTab('clients');
-                    setClientPaymentFilter('Pending');
-                  }}
-                  className="relative bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] hover:shadow-md hover:border-orange-300 transition duration-200 group cursor-pointer"
-                  title="Click to view Pending Balance accounts in Client CRM"
+                  onClick={() => setShowCollectionReportModal(true)}
+                  className="relative bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-between hover:translate-y-[-2px] hover:shadow-md hover:border-emerald-300 transition duration-200 group cursor-pointer"
+                  title="Click to generate Future Collection Report"
                 >
-                  <div className="absolute -right-6 -top-6 w-24 h-24 bg-orange-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
+                  <div className="absolute -right-6 -top-6 w-24 h-24 bg-emerald-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
                   <div className="space-y-1 relative z-10 min-w-0 flex-1 pr-2">
-                    <div className="text-[10px] text-orange-600 dark:text-orange-400 font-extrabold uppercase tracking-wider truncate">Pending Revenue</div>
-                    <h3 className="text-xl sm:text-2xl font-black text-orange-500 truncate">₹{(metrics.pendingRevenue || 0).toLocaleString()}</h3>
-                    <span className="text-[9px] text-orange-600 dark:text-orange-400 font-bold bg-orange-50 dark:bg-orange-950/40 px-2 py-0.5 rounded-full border border-orange-100 dark:border-orange-900 block w-fit truncate max-w-full">
-                      Outstanding Due
+                    <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-extrabold uppercase tracking-wider truncate">Future Collection (This Month)</div>
+                    <h3 className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 truncate">₹{futureCollectionData.toLocaleString()}</h3>
+                    <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-900 block w-fit truncate max-w-full">
+                      Sales & Renewals
                     </span>
                   </div>
-                  <div className="shrink-0 relative z-10 w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-950/50 text-orange-600 dark:text-orange-400 flex items-center justify-center border border-orange-100 dark:border-orange-900">
-                    <AlertCircle className="w-5 h-5" />
+                  <div className="shrink-0 relative z-10 w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-100 dark:border-emerald-900">
+                    <TrendingUp className="w-5 h-5" />
                   </div>
                 </div>
 
@@ -2250,62 +2232,6 @@ export default function CeoDashboard() {
                     </div>
                   </div>
 
-                  {/* Expected Revenue (Total Billing) */}
-                  <div 
-                    onClick={() => {
-                      setClientPaymentFilter('all');
-                      setClientLifecycleFilter('all');
-                      setClientRevenueStreamFilter('all');
-                      setClientFilterScope('all_clients');
-                      setClientMonthFilter('all');
-                      setClientStartDate('');
-                      setClientEndDate('');
-                    }}
-                    className={`bg-white dark:bg-slate-900 border p-5 rounded-2xl shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all ${
-                      clientFilterScope === 'all_clients' && clientPaymentFilter === 'all' && clientLifecycleFilter === 'all' && clientRevenueStreamFilter === 'all'
-                        ? 'border-indigo-500 ring-2 ring-indigo-400/20 bg-indigo-50/20 dark:bg-indigo-950/20'
-                        : 'border-slate-200 dark:border-slate-800 hover:border-indigo-300'
-                    }`}
-                    title="Click to view all 58 clients amount (Reset filters to All Clients)"
-                  >
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-extrabold uppercase tracking-wider">Expected Revenue</span>
-                      <BarChart2 className="w-4 h-4 text-indigo-500" />
-                    </div>
-                    <div className="my-2">
-                      <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
-                        ₹{totalAll58ClientsBilling.toLocaleString()}
-                      </div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">
-                        All {clientsList.length} CRM Clients Target Billing
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-1 mt-1 text-[9px] font-medium text-slate-500 dark:text-slate-400">
-                      <span 
-                        onClick={(e) => { e.stopPropagation(); setClientRevenueStreamFilter(clientRevenueStreamFilter === 'NewPurchase' ? 'all' : 'NewPurchase'); }}
-                        className="cursor-pointer hover:underline"
-                        title="Click to filter Sales clients"
-                      >
-                        Target Sale: <b className="text-indigo-600 font-bold">₹{all58SalesExpected.toLocaleString()}</b>
-                      </span>
-                      <span>•</span>
-                      <span 
-                        onClick={(e) => { e.stopPropagation(); setClientRevenueStreamFilter(clientRevenueStreamFilter === 'Renewal' ? 'all' : 'Renewal'); }}
-                        className="cursor-pointer hover:underline"
-                        title="Click to filter Renewal clients"
-                      >
-                        Target Renewal: <b className="text-purple-600 font-bold">₹{all58RenewalsExpected.toLocaleString()}</b>
-                      </span>
-                      <span>•</span>
-                      <span 
-                        onClick={(e) => { e.stopPropagation(); setClientRevenueStreamFilter(clientRevenueStreamFilter === 'ActiveRetainer' ? 'all' : 'ActiveRetainer'); }}
-                        className="cursor-pointer hover:underline"
-                        title="Click to filter Retainer clients"
-                      >
-                        Ret: <b className="text-blue-600 font-bold">₹{all58RetainersExpected.toLocaleString()}</b>
-                      </span>
-                    </div>
-                  </div>
 
                   {/* Pending Revenue (Outstanding) */}
                   <div 
@@ -3816,6 +3742,11 @@ export default function CeoDashboard() {
         }}
       />
 
+      {/* Collection Report Modal */}
+      <CollectionReportModal 
+        isOpen={showCollectionReportModal} 
+        onClose={() => setShowCollectionReportModal(false)} 
+      />
     </div>
   );
 }

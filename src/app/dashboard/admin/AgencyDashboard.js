@@ -22,7 +22,7 @@ import {
 import { calculateEmployeePerformance } from '@/lib/performanceUtils';
 import EmployeeTasksModal from './EmployeeTasksModal';
 
-export default function AgencyDashboard({ deliveries = [], clients = [], tasks = [], employees = [], attendance = [], feedbacks = [], calls = [], onSelectTab, refreshData }) {
+export default function AgencyDashboard({ deliveries = [], clients = [], tasks = [], employees = [], attendance = [], feedbacks = [], calls = [], onSelectTab, onOpenCollectionReport, refreshData }) {
   const [selectedEmployeeForTasks, setSelectedEmployeeForTasks] = useState(null);
   const [internalCalls, setInternalCalls] = useState(calls || []);
 
@@ -650,30 +650,6 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
           </div>
         </div>
 
-        {/* Expected Revenue (Total Target) */}
-        <div 
-          onClick={() => onSelectTab && onSelectTab('clients', { 
-            filterScope: 'all_clients', 
-            monthFilter: 'all', 
-            paymentFilter: 'all', 
-            lifecycleFilter: 'all', 
-            revenueStreamFilter: 'all' 
-          })}
-          className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
-          title="Click to view all 58 Client Accounts in CRM"
-        >
-          <div className="absolute -right-6 -top-6 w-24 h-24 bg-indigo-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
-          <div className="space-y-1.5 relative z-10 min-w-0 flex-1 pr-2">
-            <span className="text-[10px] text-indigo-600 dark:text-indigo-400 uppercase tracking-widest font-extrabold font-sans block truncate">Expected Revenue</span>
-            <h3 className="text-xl sm:text-2xl font-extrabold text-indigo-600 dark:text-indigo-400 truncate">₹{totalAllClientsBilling.toLocaleString()}</h3>
-            <span className="text-[9px] text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-full border border-indigo-100 dark:border-indigo-800/40 block w-fit truncate max-w-full">
-              All {clients.length} Clients Billing (100%)
-            </span>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center relative z-10 shadow-inner border border-indigo-100 dark:border-indigo-900 shrink-0">
-            <BarChart2 className="w-5 h-5" />
-          </div>
-        </div>
 
         {/* Achieved Renewal (Depends on Renewal Data) */}
         <div 
@@ -732,22 +708,22 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
           </div>
         </div>
 
-        {/* Pending Revenue (Outstanding) */}
+        {/* Future Collection Report */}
         <div 
-          onClick={() => onSelectTab && onSelectTab('pending-payments', { paymentTabFilter: 'All' })}
-          className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-orange-300 dark:hover:border-orange-700 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
-          title="Click to open Pending Payments Hub"
+          onClick={() => onOpenCollectionReport && onOpenCollectionReport()}
+          className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-emerald-300 dark:hover:border-emerald-700 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
+          title="Click to open Future Collection Report"
         >
-          <div className="absolute -right-6 -top-6 w-24 h-24 bg-orange-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
+          <div className="absolute -right-6 -top-6 w-24 h-24 bg-emerald-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
           <div className="space-y-1.5 relative z-10 min-w-0 flex-1 pr-2">
-            <span className="text-[10px] text-orange-600 dark:text-orange-400 uppercase tracking-widest font-extrabold font-sans block truncate">Pending Revenue</span>
-            <h3 className="text-xl sm:text-2xl font-extrabold text-orange-500 truncate">₹{pendingRevenue.toLocaleString()}</h3>
-            <span className="text-[9px] text-orange-600 dark:text-orange-400 font-bold bg-orange-50 dark:bg-orange-950/40 px-2 py-0.5 rounded-full border border-orange-100 dark:border-orange-800/40 block w-fit truncate max-w-full">
-              Outstanding ({revPendingPercent}%)
+            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase tracking-widest font-extrabold font-sans block truncate">Future Collection</span>
+            <h3 className="text-xl sm:text-2xl font-extrabold text-emerald-500 truncate">Report</h3>
+            <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-800/40 block w-fit truncate max-w-full">
+              Sales & Renewals
             </span>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-950/50 text-orange-600 dark:text-orange-400 flex items-center justify-center relative z-10 shadow-inner border border-orange-100 dark:border-orange-900 shrink-0">
-            <AlertCircle className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center relative z-10 shadow-inner border border-emerald-100 dark:border-emerald-900 shrink-0">
+            <TrendingUp className="w-5 h-5" />
           </div>
         </div>
 
@@ -979,33 +955,6 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
               </div>
             </div>
 
-            {/* 2. Expected Revenue */}
-            <div 
-              onClick={() => onSelectTab && onSelectTab('clients', { lifecycleFilter: 'all' })}
-              className="space-y-1.5 p-2 -mx-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-all duration-200 group"
-              title="Click to view all billing contracts in CRM"
-            >
-              <div className="flex justify-between items-end">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block group-hover:scale-125 transition-transform"></span>
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">Expected Revenue (Total Target)</span>
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-lg font-black text-indigo-600 dark:text-indigo-400">₹{dynamicEstimatedRevenue.toLocaleString()}</span>
-                  <span className="text-xs font-bold text-slate-400">(100%)</span>
-                </div>
-              </div>
-              <div className="w-full bg-slate-100 dark:bg-slate-800 h-4 rounded-full overflow-hidden shadow-inner relative">
-                <div 
-                  className="bg-gradient-to-r from-indigo-400 to-indigo-600 h-full rounded-full transition-all duration-1000 ease-out" 
-                  style={{ width: `100%` }}
-                />
-              </div>
-              <div className="text-[10px] text-slate-400 text-right flex justify-between items-center">
-                <span className="text-indigo-600 text-[9px] font-semibold opacity-0 group-hover:opacity-100 transition">View CRM Clients →</span>
-                <span>{filteredRevenueClients.length} active contracts</span>
-              </div>
-            </div>
 
             {/* 3. Pending Revenue */}
             <div 
