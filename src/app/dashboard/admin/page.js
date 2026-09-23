@@ -10540,7 +10540,12 @@ export default function AdminDashboard() {
       {/* Collection Report Modal */}
       <CollectionReportModal 
         isOpen={showCollectionReportModal} 
-        onClose={() => setShowCollectionReportModal(false)} 
+        onClose={() => setShowCollectionReportModal(false)}
+        onClientClick={(client) => {
+          setShowCollectionReportModal(false);
+          setSelectedClient(client);
+          setShowClientDetailModal(true);
+        }}
       />
     </div>
   );

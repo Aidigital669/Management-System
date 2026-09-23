@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { X, Calendar, DollarSign, TrendingUp, RefreshCw, Download, FileText } from 'lucide-react';
 import { getClientPlanInfo, parseDbDate } from '@/lib/planUtils';
 
-export default function CollectionReportModal({ isOpen, onClose }) {
+export default function CollectionReportModal({ isOpen, onClose, onClientClick }) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [loading, setLoading] = useState(false);
@@ -62,10 +62,7 @@ export default function CollectionReportModal({ isOpen, onClose }) {
 
     // 1. Calculate Expected Sales
     const validSales = calls.filter(call => {
-      // Only include hot leads with an expected closing date and value
-      if (call.status !== 'HOT' && call.status !== 'WARM' && call.status !== 'PENDING') return false; 
-      // Included pending just in case, but let's filter purely on expectedClosingDate existence for this report logic
-      // Actually, prompt says "HOT LEADS HOW MUCH LEAD WILL BE CONVERTED". So let's include if expectedValue > 0 and date falls in range.
+      if (call.status !== 'INTERESTED') return false; 
       if (!call.expectedClosingDate || !call.expectedValue) return false;
       
       const closingDate = new Date(call.expectedClosingDate);
@@ -89,7 +86,9 @@ export default function CollectionReportModal({ isOpen, onClose }) {
           validRenewals.push({
             ...client,
             computedExpiryDateStr: planInfo.renewalDueStr,
-            expectedAmount: Number(client.packageAmount) || 0
+            expectedAmount: Number(client.packageAmount) || 0,
+            isRenewed: planInfo.isRenewed,
+            joiningDateStr: planInfo.cycleStartStr
           });
           totalRenewals += Number(client.packageAmount) || 0;
         }
@@ -181,7 +180,7 @@ export default function CollectionReportModal({ isOpen, onClose }) {
                 <div className="bg-emerald-50 dark:bg-emerald-900/20 p-5 rounded-2xl border border-emerald-100 dark:border-emerald-800">
                   <div className="text-emerald-600 dark:text-emerald-400 text-xs font-black uppercase tracking-wider mb-2">Expected Sales</div>
                   <div className="text-3xl font-black text-emerald-700 dark:text-emerald-300">₹{expectedSales.toLocaleString()}</div>
-                  <div className="text-sm font-medium text-emerald-600/70 dark:text-emerald-400/70 mt-1">{salesList.length} Leads</div>
+                  <div className="text-sm font-medium text-emerald-600/70 dark:text-emerald-400/70 mt-1">{salesList.length} Hot Leads</div>
                 </div>
                 
                 <div className="bg-blue-50 dark:bg-blue-900/20 p-5 rounded-2xl border border-blue-100 dark:border-blue-800">
@@ -194,7 +193,9 @@ export default function CollectionReportModal({ isOpen, onClose }) {
                   <div className="absolute -right-4 -top-4 w-20 h-20 bg-indigo-500/10 rounded-full"></div>
                   <div className="text-indigo-600 dark:text-indigo-400 text-xs font-black uppercase tracking-wider mb-2 relative z-10">Total Future Collection</div>
                   <div className="text-4xl font-black text-indigo-700 dark:text-indigo-300 relative z-10">₹{totalCollection.toLocaleString()}</div>
-                  <div className="text-sm font-medium text-indigo-600/70 dark:text-indigo-400/70 mt-1 relative z-10">Target during period</div>
+                  <div className="text-sm font-medium text-indigo-600/70 dark:text-indigo-400/70 mt-1 relative z-10">
+                    Period: {new Date(startDate).toLocaleDateString()} - {new Date(endDate).toLocaleDateString()}
+                  </div>
                 </div>
               </div>
 
@@ -265,9 +266,20 @@ export default function CollectionReportModal({ isOpen, onClose }) {
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                         {renewalsList.map(client => (
-                          <tr key={client.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                          <tr 
+                            key={client.id} 
+                            onClick={() => onClientClick && onClientClick(client)}
+                            className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${onClientClick ? 'cursor-pointer' : ''}`}
+                          >
                             <td className="p-3">
-                              <div className="font-bold text-slate-800 dark:text-white">{client.businessName}</div>
+                              <div className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                {client.businessName}
+                                {client.isRenewed && (
+                                  <span className="text-[10px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 px-1.5 py-0.5 rounded font-bold border border-emerald-200 dark:border-emerald-800">
+                                    Renewed
+                                  </span>
+                                )}
+                              </div>
                               <div className="text-xs text-slate-500">{client.clientId}</div>
                             </td>
                             <td className="p-3 text-slate-600 dark:text-slate-300 truncate max-w-[150px]">

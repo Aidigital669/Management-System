@@ -43,8 +43,38 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
   const totalClients = clients.length;
   
   // Calculate delivery stats from real data
+  // Calculate delivery stats from real data
   const deliveryCompleted = deliveries.filter(d => d.status === 'Delivered' || d.status === 'Completed').length;
   const deliveryPending = deliveries.filter(d => d.status !== 'Delivered' && d.status !== 'Completed').length;
+
+  // Future Collection Calculation (Current Month)
+  const fcNow = new Date();
+  const fcStart = new Date(fcNow.getFullYear(), fcNow.getMonth(), 1);
+  const fcEnd = new Date(fcNow.getFullYear(), fcNow.getMonth() + 1, 0, 23, 59, 59, 999);
+  
+  let fcSales = 0;
+  internalCalls.forEach(call => {
+    if (call.status !== 'INTERESTED') return;
+    if (!call.expectedClosingDate || !call.expectedValue) return;
+    const closingDate = new Date(call.expectedClosingDate);
+    if (closingDate >= fcStart && closingDate <= fcEnd) {
+      fcSales += (Number(call.expectedValue) || 0);
+    }
+  });
+
+  let fcRenewals = 0;
+  clients.forEach(client => {
+    if (!client.active) return;
+    const planInfo = getClientPlanInfo(client, new Date());
+    if (planInfo.renewalDueDate) {
+      const dueDate = new Date(planInfo.renewalDueDate);
+      if (dueDate >= fcStart && dueDate <= fcEnd) {
+        fcRenewals += (Number(client.packageAmount) || 0);
+      }
+    }
+  });
+
+  const futureCollectionTotal = fcSales + fcRenewals;
 
   // Current month string (YYYY-MM) for month-based filtering
   const currentMonthStr = new Date().toISOString().slice(0, 7);
@@ -716,8 +746,8 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
         >
           <div className="absolute -right-6 -top-6 w-24 h-24 bg-emerald-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
           <div className="space-y-1.5 relative z-10 min-w-0 flex-1 pr-2">
-            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase tracking-widest font-extrabold font-sans block truncate">Future Collection</span>
-            <h3 className="text-xl sm:text-2xl font-extrabold text-emerald-500 truncate">Report</h3>
+            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase tracking-widest font-extrabold font-sans block truncate">Future Collection (This Month)</span>
+            <h3 className="text-xl sm:text-2xl font-extrabold text-emerald-500 truncate">₹{futureCollectionTotal.toLocaleString()}</h3>
             <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-800/40 block w-fit truncate max-w-full">
               Sales & Renewals
             </span>

@@ -96,6 +96,44 @@ export default function CeoDashboard() {
   const [excelModalType, setExcelModalType] = useState('clients');
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    // Calculate Future Collection (Sales + Renewals) for the current month
+    const currentDate = new Date();
+    const fcStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const fcEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    fetch('/api/calls')
+      .then(res => res.json())
+      .then(callsRes => {
+        let fcSales = 0;
+        const callsArr = callsRes.calls || [];
+        callsArr.forEach(call => {
+          if (call.status !== 'INTERESTED') return;
+          if (!call.expectedClosingDate || !call.expectedValue) return;
+          const closingDate = new Date(call.expectedClosingDate);
+          if (closingDate >= fcStart && closingDate <= fcEnd) {
+            fcSales += (Number(call.expectedValue) || 0);
+          }
+        });
+
+        let fcRenewals = 0;
+        clientsList.forEach(client => {
+          if (!client.active) return;
+          const planInfo = getClientPlanInfo(client, new Date());
+          if (planInfo.renewalDueDate) {
+            const dueDate = new Date(planInfo.renewalDueDate);
+            if (dueDate >= fcStart && dueDate <= fcEnd) {
+              fcRenewals += (Number(client.packageAmount) || 0);
+            }
+          }
+        });
+
+        setFutureCollectionData(fcSales + fcRenewals);
+      })
+      .catch(() => {});
+  }, [clientsList]);
+
   const now = new Date();
   const curLiveYear = now.getFullYear();
   const curLiveMonth = now.getMonth() + 1;
@@ -3745,7 +3783,12 @@ export default function CeoDashboard() {
       {/* Collection Report Modal */}
       <CollectionReportModal 
         isOpen={showCollectionReportModal} 
-        onClose={() => setShowCollectionReportModal(false)} 
+        onClose={() => setShowCollectionReportModal(false)}
+        onClientClick={(client) => {
+          setShowCollectionReportModal(false);
+          setSelectedClient(client);
+          setShowClientDetailModal(true);
+        }}
       />
     </div>
   );
