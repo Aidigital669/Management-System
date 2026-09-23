@@ -61,3 +61,5 @@ credentials.md
 /skills-lock.json
 
 
+.prisma-composer/
+.alchemy/
