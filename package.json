@@ -13,8 +13,12 @@
     "@prisma/adapter-better-sqlite3": "^7.10.0",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
+    "@prisma/composer": "0.20.0",
+    "@prisma/composer-prisma-cloud": "0.20.0",
+    "alchemy": "2.0.0-beta.74",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.11.1",
+    "effect": "4.0.0-rc.112",
     "lucide-react": "^1.23.0",
     "next": "16.2.10",
     "pg": "^8.22.0",
@@ -27,7 +31,7 @@
     "@tailwindcss/postcss": "^4",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
-    "prisma": "8.0.0-rc.12",
+    "prisma": "8.0.0-rc.15",
     "tailwindcss": "^4"
   }
 }
