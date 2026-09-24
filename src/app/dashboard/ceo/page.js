@@ -29,7 +29,8 @@ import {
   RefreshCw,
   Menu,
   X,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Download
 } from 'lucide-react';
 import ExcelImportModal from '@/components/ExcelImportModal';
 import CollectionReportModal from '@/components/CollectionReportModal';
@@ -49,6 +50,7 @@ import {
   getClientMonthKey
 } from '@/lib/planUtils';
 import { isDoneStatus, isInProgressStatus, isNotStartedStatus, isOverdueStatus, getDistinctDeliveries } from '@/lib/taskStatusUtils';
+import { exportMonthlyReport } from '@/lib/monthlyReportExport';
 
 export default function CeoDashboard() {
   const router = useRouter();
@@ -2594,6 +2596,31 @@ export default function CeoDashboard() {
                       </button>
                     )}
                   </div>
+
+                  <button
+                    onClick={() => {
+                      const selectedMonthObj = availableClientMonths.find(m => m.key === clientMonthFilter);
+                      const label = clientMonthFilter === 'all'
+                        ? 'All Months (All-Time)'
+                        : (selectedMonthObj ? selectedMonthObj.label : clientMonthFilter);
+
+                      exportMonthlyReport({
+                        monthKey: clientMonthFilter,
+                        startDate: clientStartDate,
+                        endDate: clientEndDate,
+                        periodLabel: label,
+                        clients: clientsList,
+                        tasks: allClientTasks,
+                        deliveries: allClientDeliveries,
+                        employeeData: usersList || []
+                      });
+                    }}
+                    className="bg-purple-600 hover:bg-purple-700 text-white py-2.5 px-4 rounded-xl font-bold flex items-center justify-center gap-1.5 transition text-xs shadow-md shadow-purple-500/10 shrink-0 cursor-pointer"
+                    title="Download complete Monthly Report with all tabs as Excel (.xlsx)"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export Monthly Report
+                  </button>
 
                   <button
                     onClick={() => { setExcelModalType('clients'); setExcelModalOpen(true); }}

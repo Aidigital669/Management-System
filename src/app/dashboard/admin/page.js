@@ -109,12 +109,14 @@ import {
   Tag,
   Eye,
   Loader2,
-  History
+  History,
+  Download
 } from 'lucide-react';
 const ExcelImportModal = dynamic(() => import('@/components/ExcelImportModal'), {
   ssr: false
 });
 import { uploadFileAction } from '@/app/actions/uploadAction';
+import { exportMonthlyReport } from '@/lib/monthlyReportExport';
 import {
   parseDbDate as parsePlanDbDate,
   formatDateToDb,
@@ -7214,6 +7216,31 @@ export default function AdminDashboard() {
                     )}
                   </div>
                   
+                  <button
+                    onClick={() => {
+                      const selectedMonthObj = availableClientMonths.find(m => m.key === clientMonthFilter);
+                      const label = clientMonthFilter === 'all'
+                        ? 'All Months (All-Time)'
+                        : (selectedMonthObj ? selectedMonthObj.label : clientMonthFilter);
+
+                      exportMonthlyReport({
+                        monthKey: clientMonthFilter,
+                        startDate: clientStartDate,
+                        endDate: clientEndDate,
+                        periodLabel: label,
+                        clients: clientsList,
+                        tasks: allClientTasks,
+                        deliveries: allClientDeliveries,
+                        employeeData: employeesList || []
+                      });
+                    }}
+                    className="bg-purple-600 hover:bg-purple-700 text-white py-2.5 px-4 rounded-xl font-bold flex items-center justify-center gap-1.5 transition text-xs shadow-md shadow-purple-500/10 shrink-0 cursor-pointer"
+                    title="Download complete Monthly Report with all tabs as Excel (.xlsx)"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export Monthly Report
+                  </button>
+
                   <button
                     onClick={() => { setExcelModalType('clients'); setExcelModalOpen(true); }}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-4 rounded-xl font-bold flex items-center justify-center gap-1.5 transition text-xs shadow-md shadow-emerald-500/10 shrink-0 cursor-pointer"

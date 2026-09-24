@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, DollarSign, FileText, CheckCircle, Clock, Truck, FileCheck, Target,
   ChevronDown, ChevronUp, BarChart2, AlertCircle, Layers, RefreshCw, AlertTriangle, TrendingUp, Tag,
-  Award, Trophy, Star, Sparkles, ChevronRight
+  Award, Trophy, Star, Sparkles, ChevronRight, Download
 } from 'lucide-react';
 import {
   parseDbDate,
@@ -21,6 +21,7 @@ import {
 } from '@/lib/planUtils';
 import { calculateEmployeePerformance } from '@/lib/performanceUtils';
 import { isDoneStatus, getDistinctDeliveries } from '@/lib/taskStatusUtils';
+import { exportMonthlyReport } from '@/lib/monthlyReportExport';
 import EmployeeTasksModal from './EmployeeTasksModal';
 
 export default function AgencyDashboard({ deliveries = [], clients = [], tasks = [], employees = [], attendance = [], feedbacks = [], calls = [], onSelectTab, onOpenCollectionReport, refreshData }) {
@@ -704,31 +705,33 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
           </div>
         </div>
 
-        {/* Achieved Sale (Depends on Sales Data) */}
+        {/* Achieved Sale (New Client Purchases) */}
         <div 
-          onClick={() => onSelectTab && onSelectTab('seller-dashboard', { activeStatusFilter: 'ANSWERED' })}
+          onClick={() => onSelectTab && onSelectTab('clients', { revenueStreamFilter: 'NewPurchase' })}
           className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-cyan-200/60 dark:border-cyan-900/40 shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:shadow-md hover:border-cyan-400 dark:hover:border-cyan-600 hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200"
-          title="Click to view Sales & Converted Leads in Seller Dashboard"
+          title="Click to view New Client Sales in CRM"
         >
           <div className="absolute -right-6 -top-6 w-24 h-24 bg-cyan-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
           <div className="space-y-1.5 relative z-10 min-w-0 flex-1 pr-2">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[10px] text-cyan-600 dark:text-cyan-400 uppercase tracking-widest font-extrabold font-sans">Achieved Sale</span>
-              <span className="text-[8px] font-bold text-cyan-700 dark:text-cyan-300 bg-cyan-100 dark:bg-cyan-900/60 px-1.5 py-0.2 rounded-full whitespace-nowrap">Sales Data</span>
+              <span className="text-[8px] font-bold text-cyan-700 dark:text-cyan-300 bg-cyan-100 dark:bg-cyan-900/60 px-1.5 py-0.2 rounded-full whitespace-nowrap">New Sales</span>
             </div>
             <div className="flex flex-wrap items-baseline gap-1 sm:gap-2">
-              <h3 className="text-xl sm:text-2xl font-extrabold text-cyan-600 dark:text-cyan-400">₹{achievedSaleProjection.toLocaleString()}</h3>
-              <span className="text-xs text-cyan-400 font-semibold whitespace-nowrap" title={`Pipeline Potential: Converted (₹${achievedSaleProjection.toLocaleString()}) + Hot Leads (₹${hotLeadsPipeline.toLocaleString()})`}>/ ₹{expectedSaleProjection.toLocaleString()}</span>
+              <h3 className="text-xl sm:text-2xl font-extrabold text-cyan-600 dark:text-cyan-400">₹{newPurchasesActual.toLocaleString()}</h3>
+              <span className="text-xs text-cyan-400 font-semibold whitespace-nowrap" title={`New Client Sales Target: ₹${newPurchasesExpected.toLocaleString()}`}>/ ₹{newPurchasesExpected.toLocaleString()}</span>
             </div>
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[9px] text-cyan-700 dark:text-cyan-300 font-bold bg-cyan-50 dark:bg-cyan-950/40 px-2 py-0.5 rounded-full border border-cyan-100 dark:border-cyan-800/40 block w-fit truncate max-w-full">
-                {convertedLeadsCount} / {totalHotPoolCount} Done ({saleRealizedPercent}%) • {hotLeadsCount} Hot
+                {newPurchasesCount} New Sales ({newPurchasesExpected > 0 ? Math.round((newPurchasesActual / newPurchasesExpected) * 100) : 100}%)
               </span>
-              {convertedWithPackage.length > 0 && (
-                <span className="text-[9px] text-emerald-700 dark:text-emerald-300 font-black bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/40 whitespace-nowrap">
-                  {convertedWithPackage.length} Packages
-                </span>
-              )}
+              <span 
+                onClick={(e) => { e.stopPropagation(); onSelectTab && onSelectTab('seller-dashboard', { activeStatusFilter: 'ANSWERED' }); }}
+                className="text-[9px] text-slate-600 dark:text-slate-300 font-semibold bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-full border border-slate-200 dark:border-slate-700 whitespace-nowrap hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                title="Click to view Telemarketing Pipeline in Seller Dashboard"
+              >
+                Calls: {convertedLeadsCount} Leads (₹{achievedSaleProjection.toLocaleString()})
+              </span>
             </div>
           </div>
           <div className="w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-950/50 text-cyan-600 dark:text-cyan-400 flex items-center justify-center relative z-10 shadow-inner border border-cyan-100 dark:border-cyan-900 shrink-0">
@@ -806,8 +809,8 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
                 </div>
               </div>
 
-              {/* Month Dropdown Quick Selector */}
-              <div className="w-full sm:w-auto lg:w-full 2xl:w-auto shrink-0">
+              {/* Month Dropdown Quick Selector & Export Report */}
+              <div className="w-full sm:w-auto lg:w-full 2xl:w-auto shrink-0 flex items-center gap-2">
                 <select
                   value={selectedRevenueMonth}
                   onChange={(e) => {
@@ -842,6 +845,34 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
                   ))}
                   <option value="custom">📅 Custom Date Range...</option>
                 </select>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const selectedMonthObj = availableRevenueMonths.find(m => m.key === selectedRevenueMonth);
+                    const label = selectedRevenueMonth === 'all'
+                      ? 'All Months (All-Time)'
+                      : (selectedMonthObj ? selectedMonthObj.label : selectedRevenueMonth);
+
+                    exportMonthlyReport({
+                      monthKey: selectedRevenueMonth,
+                      startDate: revenueStartDate,
+                      endDate: revenueEndDate,
+                      periodLabel: label,
+                      clients,
+                      tasks,
+                      deliveries: distinctDeliveries,
+                      employeeData,
+                      calls: internalCalls
+                    });
+                  }}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition shadow-xs hover:shadow cursor-pointer shrink-0"
+                  title="Download complete Monthly Executive Report as Excel (.xlsx)"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Export Report</span>
+                  <span className="sm:hidden">Export</span>
+                </button>
               </div>
             </div>
 
@@ -1088,13 +1119,13 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
               <span className="text-[8px] text-purple-600/70 dark:text-purple-400/70 block truncate">Proj: ₹{totalRenewalExpected.toLocaleString()}</span>
             </div>
             <div 
-              onClick={() => onSelectTab && onSelectTab('seller-dashboard', { activeStatusFilter: 'ANSWERED' })}
+              onClick={() => onSelectTab && onSelectTab('clients', { revenueStreamFilter: 'NewPurchase' })}
               className="bg-cyan-50 dark:bg-cyan-950/30 p-2 rounded-xl border border-cyan-100 dark:border-cyan-800/30 min-w-0 cursor-pointer hover:shadow-xs hover:scale-[1.02] transition-all"
-              title="Click to view Sales Data in Seller Dashboard"
+              title="Click to view New Client Sales in CRM"
             >
               <span className="text-[10px] text-cyan-700 dark:text-cyan-400 font-bold block truncate">Achieved Sale</span>
-              <span className="text-[11px] sm:text-xs font-extrabold text-cyan-800 dark:text-cyan-300 block truncate">₹{achievedSaleProjection.toLocaleString()}</span>
-              <span className="text-[8px] text-cyan-600/70 dark:text-cyan-400/70 block truncate">{convertedWithPackage.length > 0 ? `${convertedWithPackage.length} Pkg • ` : ''}Proj: ₹{expectedSaleProjection.toLocaleString()}</span>
+              <span className="text-[11px] sm:text-xs font-extrabold text-cyan-800 dark:text-cyan-300 block truncate">₹{newPurchasesActual.toLocaleString()}</span>
+              <span className="text-[8px] text-cyan-600/70 dark:text-cyan-400/70 block truncate">{newPurchasesCount} Sales • Proj: ₹{newPurchasesExpected.toLocaleString()}</span>
             </div>
             <div 
               onClick={() => onSelectTab && onSelectTab('pending-payments', { paymentTabFilter: 'All' })}
