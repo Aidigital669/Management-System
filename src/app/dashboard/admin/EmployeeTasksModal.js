@@ -22,6 +22,7 @@ import {
   Building,
   RotateCcw
 } from 'lucide-react';
+import { isDoneStatus, isOverdueStatus } from '@/lib/taskStatusUtils';
 
 export default function EmployeeTasksModal({ employee, employees = [], onClose, onTaskTransferred }) {
   const [activeTab, setActiveTab] = useState('ALL'); // 'ALL' | 'OVERDUE' | 'IN_PROGRESS' | 'COMPLETED'
@@ -142,19 +143,19 @@ export default function EmployeeTasksModal({ employee, employees = [], onClose, 
     if (!employee) return [];
     return allTasks.filter(task => {
       // Status Filter Tab (Metric Cards)
-      if (activeTab === 'OVERDUE' && task.status !== 'Overdue') return false;
-      if (activeTab === 'COMPLETED' && task.status !== 'Completed' && task.status !== 'Delivered') return false;
-      if (activeTab === 'IN_PROGRESS' && (task.status === 'Completed' || task.status === 'Delivered' || task.status === 'Overdue')) return false;
+      if (activeTab === 'OVERDUE' && !isOverdueStatus(task.status)) return false;
+      if (activeTab === 'COMPLETED' && !isDoneStatus(task.status)) return false;
+      if (activeTab === 'IN_PROGRESS' && (isDoneStatus(task.status) || isOverdueStatus(task.status))) return false;
 
       // Status Dropdown Filter
       if (statusFilter !== 'ALL') {
         const s = (task.status || '').toLowerCase();
         if (statusFilter === 'OVERDUE') {
-          if (task.status !== 'Overdue') return false;
+          if (!isOverdueStatus(task.status)) return false;
         } else if (statusFilter === 'COMPLETED') {
-          if (task.status !== 'Completed' && task.status !== 'Delivered') return false;
+          if (!isDoneStatus(task.status)) return false;
         } else if (statusFilter === 'IN_PROGRESS') {
-          if (task.status === 'Completed' || task.status === 'Delivered' || task.status === 'Overdue') return false;
+          if (isDoneStatus(task.status) || isOverdueStatus(task.status)) return false;
         } else {
           if (s !== statusFilter.toLowerCase()) return false;
         }
@@ -207,7 +208,7 @@ export default function EmployeeTasksModal({ employee, employees = [], onClose, 
           const nextWeekStr = nextWeek.toISOString().split('T')[0];
           if (taskDate < todayStr || taskDate > nextWeekStr) return false;
         } else if (dueDateFilter === 'OVERDUE') {
-          const isDone = task.status === 'Completed' || task.status === 'Delivered';
+          const isDone = isDoneStatus(task.status);
           if (isDone) return false;
           if (task.status === 'Overdue') return true;
           if (!taskDate || taskDate >= todayStr) return false;
@@ -249,9 +250,9 @@ export default function EmployeeTasksModal({ employee, employees = [], onClose, 
     );
   }, [staffList, staffSearchQuery, employee]);
 
-  const overdueCount = allTasks.filter(t => t.status === 'Overdue').length;
-  const completedCount = allTasks.filter(t => t.status === 'Completed' || t.status === 'Delivered').length;
-  const inProgressCount = allTasks.length - overdueCount - completedCount;
+  const overdueCount = allTasks.filter(t => isOverdueStatus(t.status)).length;
+  const completedCount = allTasks.filter(t => isDoneStatus(t.status)).length;
+  const inProgressCount = Math.max(0, allTasks.length - overdueCount - completedCount);
 
   // Handler to open transfer popup
   const handleOpenTransferModal = (task) => {

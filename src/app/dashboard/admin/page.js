@@ -131,6 +131,7 @@ import {
   getClientSmExecutive,
   isClientPlanActive
 } from '@/lib/planUtils';
+import { isDoneStatus, isInProgressStatus, isNotStartedStatus, isOverdueStatus } from '@/lib/taskStatusUtils';
 
 const SERVICES_PRICING = {
   "Meta Ads Plans": [
@@ -934,7 +935,7 @@ export default function AdminDashboard() {
 
         // Calculate Overview Metrics immediately so the UI is ready to paint!
         const totalStaff = fetchedUsers.filter(u => u.role === 'EMPLOYEE' || u.role === 'SALES').length;
-        const activeTasks = fetchedTasks.filter(t => t.status !== 'DONE').length;
+        const activeTasks = fetchedTasks.filter(t => !isDoneStatus(t.status)).length;
         const pendingLeaves = fetchedLeaves.filter(l => l.status === 'PENDING').length;
         const todayStr = new Date().toISOString().split('T')[0];
         const presentToday = fetchedAttendance.filter(a => a.date === todayStr).length;
@@ -1054,7 +1055,7 @@ export default function AdminDashboard() {
 
       // Calculate Metrics
       const totalStaff = fetchedUsers.filter(u => u.role === 'EMPLOYEE' || u.role === 'SALES').length;
-      const activeTasks = fetchedTasks.filter(t => t.status !== 'DONE').length;
+      const activeTasks = fetchedTasks.filter(t => !isDoneStatus(t.status)).length;
       const pendingLeaves = fetchedLeaves.filter(l => l.status === 'PENDING').length;
       
       const todayStr = new Date().toISOString().split('T')[0];
@@ -4203,13 +4204,16 @@ export default function AdminDashboard() {
               return true;
             });
 
-            const completedCount = baseDeliverables.filter(t => t.status === 'Complete Task').length;
-            const inProgressCount = baseDeliverables.filter(t => t.status === 'Working On It').length;
-            const notStartedCount = baseDeliverables.filter(t => t.status === 'Not Started').length;
+            const completedCount = baseDeliverables.filter(t => isDoneStatus(t.status)).length;
+            const inProgressCount = baseDeliverables.filter(t => isInProgressStatus(t.status)).length;
+            const notStartedCount = baseDeliverables.filter(t => isNotStartedStatus(t.status)).length;
 
             const filteredDeliverables = baseDeliverables.filter(t => {
-              if (deliverableStatusFilter !== 'all' && t.status !== deliverableStatusFilter) return false;
-              return true;
+              if (deliverableStatusFilter === 'all') return true;
+              if (deliverableStatusFilter === 'Complete Task') return isDoneStatus(t.status);
+              if (deliverableStatusFilter === 'Working On It') return isInProgressStatus(t.status);
+              if (deliverableStatusFilter === 'Not Started') return isNotStartedStatus(t.status);
+              return t.status === deliverableStatusFilter;
             });
 
             return (
@@ -4432,10 +4436,12 @@ export default function AdminDashboard() {
                             <td className="p-4 font-semibold text-slate-900 dark:text-white">{task.workingOn || 'Unassigned'}</td>
                             <td className="p-4">
                               <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-bold uppercase
-                                ${task.status === 'Complete Task' 
+                                ${isDoneStatus(task.status) 
                                   ? 'bg-emerald-500 text-white' 
-                                  : task.status === 'Working On It' 
+                                  : isInProgressStatus(task.status) 
                                   ? 'bg-orange-500 text-white' 
+                                  : isOverdueStatus(task.status)
+                                  ? 'bg-rose-500 text-white'
                                   : 'bg-slate-200 dark:bg-slate-800 text-slate-650 dark:text-slate-400'}`}
                               >
                                 {task.status}
@@ -9424,10 +9430,12 @@ export default function AdminDashboard() {
                               </td>
                               <td className="p-2.5">
                                 <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase mb-1
-                                  ${task.status === 'Complete Task' 
+                                  ${isDoneStatus(task.status) 
                                     ? 'bg-emerald-500 text-white' 
-                                    : task.status === 'Working On It' 
+                                    : isInProgressStatus(task.status) 
                                     ? 'bg-orange-500 text-white' 
+                                    : isOverdueStatus(task.status)
+                                    ? 'bg-rose-500 text-white'
                                     : 'bg-slate-200 dark:bg-slate-800 text-slate-650 dark:text-slate-400'}`}
                                 >
                                   {task.status}

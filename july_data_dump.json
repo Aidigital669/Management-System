@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-09-23T12:51:31.928Z",
+  "timestamp": "2026-09-24T06:59:24.486Z",
   "summary": {
     "totalClients": 58,
     "totalClientTasks": 1386,
@@ -10520,7 +10520,7 @@
       "date": "24-Sept-2026",
       "assignTo": "AI Video Editor",
       "workingOn": "Divyansh",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -11246,7 +11246,7 @@
       "date": "24-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Pujan",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -13853,7 +13853,7 @@
       "date": "24-Sept-2026",
       "assignTo": "Ai Video Editor",
       "workingOn": "Nouman",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -13875,7 +13875,7 @@
       "date": "25-Sept-2026",
       "assignTo": "Ai Video Editor",
       "workingOn": "Nouman",
-      "status": "Assigned",
+      "status": "Completion",
       "postType": "Graphic"
     },
     {
@@ -14095,7 +14095,7 @@
       "date": "24-Sept-2026",
       "assignTo": "Ai Video Editor",
       "workingOn": "Masoom",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "AI Video"
     },
     {
@@ -14117,7 +14117,7 @@
       "date": "24-Sept-2026",
       "assignTo": "Graphic Designer",
       "workingOn": "Masoom",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -15107,7 +15107,7 @@
       "date": "24-Sept-2026",
       "assignTo": "Graphic Designer",
       "workingOn": "Nouman",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {

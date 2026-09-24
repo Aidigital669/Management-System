@@ -48,6 +48,7 @@ import {
   getClientRevenueStream,
   getClientMonthKey
 } from '@/lib/planUtils';
+import { isDoneStatus, isInProgressStatus, isNotStartedStatus, isOverdueStatus, getDistinctDeliveries } from '@/lib/taskStatusUtils';
 
 export default function CeoDashboard() {
   const router = useRouter();
@@ -530,13 +531,17 @@ export default function CeoDashboard() {
 
       // Tasks Pipeline Calculation
       const ctArray = ctData.tasks || [];
-      const completedTasksCount = ctArray.filter(t => t.status === 'Completed' || t.status === 'Done').length;
+      const cdArray = cdData.deliveries || [];
+
+      // Deduplicate deliveries mirroring client tasks
+      const distinctCdArray = getDistinctDeliveries(cdArray, ctArray);
+
+      const completedTasksCount = ctArray.filter(t => isDoneStatus(t.status)).length;
       const pendingTasksCount = ctArray.length - completedTasksCount;
 
       // Deliveries Calculation
-      const cdArray = cdData.deliveries || [];
-      const completedDeliveries = cdArray.filter(d => d.status === 'Completed' || d.status === 'Done' || d.status === 'Sent').length;
-      const pendingDeliveries = cdArray.length - completedDeliveries;
+      const completedDeliveries = distinctCdArray.filter(d => isDoneStatus(d.status)).length;
+      const pendingDeliveries = distinctCdArray.length - completedDeliveries;
 
       setMetrics({
         totalEmployees: totalEmp,
@@ -1643,7 +1648,7 @@ export default function CeoDashboard() {
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
                   <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Completed Tasks</span>
                   <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
-                    {allClientTasks.filter(t => t.status === 'Complete Task').length}
+                    {allClientTasks.filter(t => isDoneStatus(t.status)).length}
                   </div>
                   <span className="text-[9px] text-slate-400 font-medium">Successfully completed</span>
                 </div>
@@ -1651,7 +1656,7 @@ export default function CeoDashboard() {
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
                   <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">In Progress</span>
                   <div className="text-xl font-bold text-orange-500 mt-1">
-                    {allClientTasks.filter(t => t.status === 'Working On It').length}
+                    {allClientTasks.filter(t => isInProgressStatus(t.status)).length}
                   </div>
                   <span className="text-[9px] text-slate-400 font-medium">Under active production</span>
                 </div>
@@ -1659,7 +1664,7 @@ export default function CeoDashboard() {
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm flex flex-col gap-1">
                   <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Pending Release</span>
                   <div className="text-xl font-bold text-slate-500 mt-1">
-                    {allClientTasks.filter(t => t.status === 'Not Started').length}
+                    {allClientTasks.filter(t => isNotStartedStatus(t.status)).length}
                   </div>
                   <span className="text-[9px] text-slate-400 font-medium">Queued or not started</span>
                 </div>
@@ -1730,10 +1735,12 @@ export default function CeoDashboard() {
                             <td className="p-4 font-semibold text-slate-900 dark:text-white">{task.workingOn || 'Unassigned'}</td>
                             <td className="p-4">
                               <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-bold uppercase
-                                ${task.status === 'Complete Task'
+                                ${isDoneStatus(task.status)
                                   ? 'bg-emerald-500 text-white'
-                                  : task.status === 'Working On It'
+                                  : isInProgressStatus(task.status)
                                     ? 'bg-orange-500 text-white'
+                                    : isOverdueStatus(task.status)
+                                    ? 'bg-rose-500 text-white'
                                     : 'bg-slate-200 dark:bg-slate-800 text-slate-650 dark:text-slate-400'}`}
                               >
                                 {task.status}
@@ -3714,10 +3721,12 @@ export default function CeoDashboard() {
                               </td>
                               <td className="p-2.5">
                                 <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase
-                                  ${task.status === 'Complete Task'
+                                  ${isDoneStatus(task.status)
                                     ? 'bg-emerald-500 text-white'
-                                    : task.status === 'Working On It'
+                                    : isInProgressStatus(task.status)
                                       ? 'bg-orange-500 text-white'
+                                      : isOverdueStatus(task.status)
+                                      ? 'bg-rose-500 text-white'
                                       : 'bg-slate-200 dark:bg-slate-800 text-slate-650 dark:text-slate-400'}`}
                                 >
                                   {task.status}

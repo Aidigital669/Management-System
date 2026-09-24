@@ -20,6 +20,7 @@ import {
   isClientPlanActive
 } from '@/lib/planUtils';
 import { calculateEmployeePerformance } from '@/lib/performanceUtils';
+import { isDoneStatus, getDistinctDeliveries } from '@/lib/taskStatusUtils';
 import EmployeeTasksModal from './EmployeeTasksModal';
 
 export default function AgencyDashboard({ deliveries = [], clients = [], tasks = [], employees = [], attendance = [], feedbacks = [], calls = [], onSelectTab, onOpenCollectionReport, refreshData }) {
@@ -42,10 +43,12 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
   const activeClients = clients.filter(c => isClientPlanActive(c)).length;
   const totalClients = clients.length;
   
+  // Deduplicate deliveries that mirror client tasks
+  const distinctDeliveries = getDistinctDeliveries(deliveries, tasks);
+
   // Calculate delivery stats from real data
-  // Calculate delivery stats from real data
-  const deliveryCompleted = deliveries.filter(d => d.status === 'Delivered' || d.status === 'Completed').length;
-  const deliveryPending = deliveries.filter(d => d.status !== 'Delivered' && d.status !== 'Completed').length;
+  const deliveryCompleted = distinctDeliveries.filter(d => isDoneStatus(d.status)).length;
+  const deliveryPending = distinctDeliveries.filter(d => !isDoneStatus(d.status)).length;
 
   // Future Collection Calculation (Current Month)
   const fcNow = new Date();
@@ -118,12 +121,12 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
   };
 
   // Calculate task stats (all-time, used for yearly donut)
-  const taskCompleted = tasks.filter(t => t.status === 'DONE' || t.status === 'Completed' || t.status === 'Complete Task').length;
-  const taskPending = tasks.filter(t => t.status !== 'DONE' && t.status !== 'Completed' && t.status !== 'Complete Task').length;
+  const taskCompleted = tasks.filter(t => isDoneStatus(t.status)).length;
+  const taskPending = tasks.filter(t => !isDoneStatus(t.status)).length;
 
   // --- DATASET 1: OVERALL/ALL-TIME ITEMS (Includes ALL employee tasks & deliverables) ---
   const overallTasks = tasks;
-  const overallDeliveries = deliveries;
+  const overallDeliveries = distinctDeliveries;
 
   const normalizedOverallTasks = overallTasks.map(t => ({
     ...t,
@@ -136,7 +139,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
     taskTitle: d.postType ? `${d.postType} Post` : 'Deliverable',
     businessName: d.clientName || d.clientId,
     postType: d.postType,
-    status: d.status === 'Delivered' ? 'Completed' : (d.status || 'Pending'),
+    status: isDoneStatus(d.status) ? 'Completed' : (d.status || 'Pending'),
     priority: 'Normal',
     assignTo: (d.workingOn || 'Unassigned Staff').trim(),
     notes: d.notes,
@@ -146,8 +149,8 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
 
   const allOverallItems = [...normalizedOverallTasks, ...normalizedOverallDeliveries];
 
-  const overallCompleted = allOverallItems.filter(t => t.status === 'DONE' || t.status === 'Completed' || t.status === 'Complete Task').length;
-  const overallPending = allOverallItems.filter(t => t.status !== 'DONE' && t.status !== 'Completed' && t.status !== 'Complete Task').length;
+  const overallCompleted = allOverallItems.filter(t => isDoneStatus(t.status)).length;
+  const overallPending = allOverallItems.filter(t => !isDoneStatus(t.status)).length;
   const overallTotal = allOverallItems.length;
 
   // --- DATASET 2: TODAY'S & CARRY-FORWARD OVERDUE ITEMS (LIVE CALENDAR CONNECTED) ---
@@ -195,11 +198,6 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
     }
   }, [currentLiveMonthKey, currentLiveMonthStart, currentLiveMonthEnd, isLiveCalendarMode]);
 
-  const isDoneStatus = (status) => {
-    const s = (status || '').toLowerCase();
-    return s === 'done' || s === 'completed' || s === 'complete task' || s === 'delivered' || s === 'posted';
-  };
-
   // Cutoff date for overdue carry-forwards: do not carry forward any tasks before 3 September 2026
   const OVERDUE_CUTOFF_DATE = '2026-09-03';
 
@@ -212,7 +210,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
     return false;
   });
 
-  const todayDeliveries = deliveries.filter(d => {
+  const todayDeliveries = distinctDeliveries.filter(d => {
     const iso = parseToISO(d.postDate);
     if (!iso) return false;
     if (iso === todayStr) return true;
@@ -549,15 +547,15 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
     }
     
     empMap[name].total += 1;
-    if (t.status === 'DONE' || t.status === 'Completed' || t.status === 'Complete Task') {
+    if (isDoneStatus(t.status)) {
       empMap[name].done += 1;
     } else {
       empMap[name].pending += 1;
     }
   });
 
-  // Process deliveries
-  deliveries.forEach(d => {
+  // Process distinct deliveries (avoiding double-counting mirrored tasks)
+  distinctDeliveries.forEach(d => {
     if (!d.workingOn) return;
     const name = d.workingOn.trim();
     if (!name || NON_EMPLOYEE_NAMES.includes(name.toLowerCase())) return;
@@ -567,7 +565,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
     }
     
     empMap[name].total += 1;
-    if (d.status === 'Delivered' || d.status === 'Completed') {
+    if (isDoneStatus(d.status)) {
       empMap[name].done += 1;
     } else {
       empMap[name].pending += 1;
@@ -586,7 +584,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
   const performanceOverview = calculateEmployeePerformance({
     employees: employeesToEvaluate,
     clientTasks: tasks,
-    clientDeliveries: deliveries,
+    clientDeliveries: distinctDeliveries,
     attendanceLogs: attendance,
     feedbacks,
     timeRange: 'this_month'

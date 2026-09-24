@@ -1,3 +1,5 @@
+import { isDoneStatus } from '@/lib/taskStatusUtils';
+
 // Helper utilities for calculating and analyzing Employee Performance
 
 export const ROLE_CATEGORIES = {
@@ -172,7 +174,7 @@ export function calculateEmployeePerformance({
     assignedClientTasks.forEach(t => {
       totalAssigned += 1;
       if (t.clientId) clientIdsWorkedOn.add(t.clientId);
-      const isCompleted = t.status === 'DONE' || t.status === 'Completed' || t.status === 'Complete Task';
+      const isCompleted = isDoneStatus(t.status);
       const isOverdue = t.status === 'Overdue' || (!isCompleted && t.date && t.date < todayStr);
       const normalizedStatus = isCompleted ? 'Completed' : isOverdue ? 'Overdue' : (t.status || 'Working On It');
 
@@ -230,11 +232,23 @@ export function calculateEmployeePerformance({
       }
     });
 
-    // Process Deliveries (Reels, Posts, Banners)
-    assignedDeliveries.forEach(d => {
+    // Deduplicate deliveries that mirror client tasks to prevent double counting
+    const existingTaskKeys = new Set(
+      assignedClientTasks.map(t => (t.taskId || t.id ? String(t.taskId || t.id).toLowerCase().trim() : '')).filter(Boolean)
+    );
+    const uniqueAssignedDeliveries = assignedDeliveries.filter(d => {
+      const linked = d.linkedTaskId ? String(d.linkedTaskId).toLowerCase().trim() : null;
+      const delivId = d.deliveryId ? String(d.deliveryId).toLowerCase().trim() : null;
+      if (linked && existingTaskKeys.has(linked)) return false;
+      if (delivId && existingTaskKeys.has(delivId)) return false;
+      return true;
+    });
+
+    // Process Unique Deliveries (Reels, Posts, Banners)
+    uniqueAssignedDeliveries.forEach(d => {
       totalAssigned += 1;
       if (d.clientId) clientIdsWorkedOn.add(d.clientId);
-      const isDelivered = d.status === 'Delivered' || d.status === 'Completed';
+      const isDelivered = isDoneStatus(d.status);
       const isOverdue = !isDelivered && d.postDate && d.postDate < todayStr;
       const normalizedStatus = isDelivered ? 'Completed' : isOverdue ? 'Overdue' : (d.status || 'Pending');
 
@@ -282,7 +296,7 @@ export function calculateEmployeePerformance({
     // Process Internal Tasks
     assignedInternalTasks.forEach(t => {
       totalAssigned += 1;
-      const isCompleted = t.status === 'DONE' || t.status === 'COMPLETED';
+      const isCompleted = isDoneStatus(t.status);
       const isOverdue = !isCompleted && t.dueDate && t.dueDate < todayStr;
       const normalizedStatus = isCompleted ? 'Completed' : isOverdue ? 'Overdue' : (t.status || 'In Progress');
 
