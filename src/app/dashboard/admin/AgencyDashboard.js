@@ -614,7 +614,202 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
   const revPendingPercent = dynamicEstimatedRevenue > 0 ? Math.round((pendingRevenue / dynamicEstimatedRevenue) * 100) : 0;
 
   return (
-    <div className="space-y-8 animate-fade-in text-slate-800 dark:text-slate-200">
+    <div className="space-y-6 sm:space-y-8 animate-fade-in text-slate-800 dark:text-slate-200">
+      
+      {/* 0. Top Executive Toolbar: Month Selector & Export Report */}
+      <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-100 dark:border-emerald-900 shadow-inner shrink-0">
+            <DollarSign className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <h4 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
+              <span>Performance Dashboard</span>
+              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/40">
+                {selectedRevenueMonth === 'all' && !revenueStartDate
+                  ? 'All Months (All-Time)'
+                  : revenueStartDate && revenueEndDate
+                    ? `${availableRevenueMonths.find(m => m.key === selectedRevenueMonth)?.label || selectedRevenueMonth} (${new Date(revenueStartDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${new Date(revenueEndDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })})`
+                    : (availableRevenueMonths.find(m => m.key === selectedRevenueMonth)?.label || selectedRevenueMonth)}
+              </span>
+            </h4>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Live operational & financial metrics across clients, sales, renewals, and staff deliverables
+            </p>
+          </div>
+        </div>
+
+        {/* Quick Month Pills, Dropdown & Export Button */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Quick Month Filter Pills */}
+          <div 
+            className="flex items-center gap-1 overflow-x-auto pb-1 max-w-full [&::-webkit-scrollbar]:hidden"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            <button
+              type="button"
+              onClick={() => { setSelectedRevenueMonth('all'); setIsLiveCalendarMode(false); setRevenueStartDate(''); setRevenueEndDate(''); setShowCustomDate(false); }}
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 whitespace-nowrap ${
+                selectedRevenueMonth === 'all' && !revenueStartDate && !revenueEndDate
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              All Months
+            </button>
+            {availableRevenueMonths.slice(0, 4).map(m => {
+              const isSelected = selectedRevenueMonth === m.key && !showCustomDate;
+              const isLiveCurrent = m.key === currentLiveMonthKey;
+              return (
+                <button
+                  key={m.key}
+                  type="button"
+                  onClick={() => {
+                    setSelectedRevenueMonth(m.key);
+                    setIsLiveCalendarMode(isLiveCurrent);
+                    const [yyyy, mm] = m.key.split('-');
+                    const y = parseInt(yyyy, 10);
+                    const mInt = parseInt(mm, 10);
+                    setRevenueStartDate(`${y}-${String(mInt).padStart(2, '0')}-01`);
+                    const lastDate = new Date(y, mInt, 0).getDate();
+                    setRevenueEndDate(`${y}-${String(mInt).padStart(2, '0')}-${String(lastDate).padStart(2, '0')}`);
+                    setShowCustomDate(false);
+                  }}
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap ${
+                    isSelected
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {isLiveCurrent && (
+                    <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-emerald-500'} animate-pulse shrink-0`}></span>
+                  )}
+                  <span>{m.label.split(' ')[0]}</span>
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => setShowCustomDate(!showCustomDate)}
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap ${
+                showCustomDate || (revenueStartDate && selectedRevenueMonth === 'custom')
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              <span>📅 Custom Range</span>
+              {(revenueStartDate || revenueEndDate) && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
+              )}
+            </button>
+          </div>
+
+          {/* Month Dropdown */}
+          <select
+            value={selectedRevenueMonth}
+            onChange={(e) => {
+              const val = e.target.value;
+              setSelectedRevenueMonth(val);
+              if (val === 'all') {
+                setIsLiveCalendarMode(false);
+                setRevenueStartDate('');
+                setRevenueEndDate('');
+                setShowCustomDate(false);
+              } else if (val === 'custom') {
+                setIsLiveCalendarMode(false);
+                setShowCustomDate(true);
+              } else {
+                setIsLiveCalendarMode(val === currentLiveMonthKey);
+                const [yyyy, mm] = val.split('-');
+                const y = parseInt(yyyy, 10);
+                const m = parseInt(mm, 10);
+                setRevenueStartDate(`${y}-${String(m).padStart(2, '0')}-01`);
+                const lastDate = new Date(y, m, 0).getDate();
+                setRevenueEndDate(`${y}-${String(m).padStart(2, '0')}-${String(lastDate).padStart(2, '0')}`);
+                setShowCustomDate(false);
+              }
+            }}
+            className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500 transition cursor-pointer shadow-xs max-w-[170px] truncate"
+          >
+            <option value="all">🌐 All Months</option>
+            {availableRevenueMonths.map(m => (
+              <option key={m.key} value={m.key}>
+                {m.key === currentLiveMonthKey ? `🟢 ${m.label}` : `📅 ${m.label}`}
+              </option>
+            ))}
+            <option value="custom">📅 Custom Date Range...</option>
+          </select>
+
+          {/* Export Report Button */}
+          <button
+            type="button"
+            onClick={() => {
+              const selectedMonthObj = availableRevenueMonths.find(m => m.key === selectedRevenueMonth);
+              const label = selectedRevenueMonth === 'all'
+                ? 'All Months (All-Time)'
+                : (selectedMonthObj ? selectedMonthObj.label : selectedRevenueMonth);
+
+              exportMonthlyReport({
+                monthKey: selectedRevenueMonth,
+                startDate: revenueStartDate,
+                endDate: revenueEndDate,
+                periodLabel: label,
+                clients,
+                tasks,
+                deliveries: distinctDeliveries,
+                employeeData,
+                calls: internalCalls
+              });
+            }}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition shadow-xs hover:shadow cursor-pointer shrink-0"
+            title="Download complete Monthly Executive Report as Excel (.xlsx)"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export Report</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Expandable Custom Date Range Box */}
+      {(showCustomDate || selectedRevenueMonth === 'custom' || (revenueStartDate && selectedRevenueMonth !== 'all' && !availableRevenueMonths.some(m => selectedRevenueMonth === m.key))) && (
+        <div className="bg-slate-50 dark:bg-slate-850 p-3 rounded-xl border border-slate-200 dark:border-slate-700 -mt-4 mb-2 space-y-2.5 animate-fade-in">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Custom Date Range
+            </span>
+            {(revenueStartDate || revenueEndDate) && (
+              <button
+                type="button"
+                onClick={() => { setRevenueStartDate(''); setRevenueEndDate(''); setSelectedRevenueMonth('all'); setShowCustomDate(false); }}
+                className="text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 transition cursor-pointer flex items-center gap-1"
+              >
+                <span>Clear Range</span>
+                <span className="font-black">✕</span>
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 shadow-xs min-w-0">
+              <span className="text-[10px] font-bold text-slate-400 uppercase shrink-0 w-8">From</span>
+              <input
+                type="date"
+                value={revenueStartDate}
+                onChange={(e) => { setRevenueStartDate(e.target.value); setSelectedRevenueMonth('custom'); }}
+                className="w-full bg-transparent text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer min-w-0"
+              />
+            </div>
+            <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 shadow-xs min-w-0">
+              <span className="text-[10px] font-bold text-slate-400 uppercase shrink-0 w-8">To</span>
+              <input
+                type="date"
+                value={revenueEndDate}
+                onChange={(e) => { setRevenueEndDate(e.target.value); setSelectedRevenueMonth('custom'); }}
+                className="w-full bg-transparent text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer min-w-0"
+              />
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* 1. KPIs Section */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-3 sm:gap-4">
@@ -781,362 +976,8 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
         </div>
       </div>
 
-      {/* 2. Charts Row (Custom CSS Based) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
-        {/* Revenue Progress Chart */}
-        <div className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between overflow-hidden">
-          <div>
-            {/* Header: Title, Subtitle, & Month Selector Dropdown */}
-            <div className="flex flex-col sm:flex-row lg:flex-col 2xl:flex-row sm:items-center lg:items-start 2xl:items-center justify-between gap-3 mb-3">
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-100 dark:border-emerald-900 shadow-inner shrink-0">
-                  <DollarSign className="w-5 h-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h4 className="text-base font-extrabold text-slate-900 dark:text-white truncate">
-                    Revenue Breakdown
-                  </h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
-                    Actual vs Expected vs Pending • <span className="font-bold text-slate-700 dark:text-slate-300">
-                      {selectedRevenueMonth === 'all' && !revenueStartDate
-                        ? 'All Months (All-Time)'
-                        : revenueStartDate && revenueEndDate
-                          ? `${availableRevenueMonths.find(m => m.key === selectedRevenueMonth)?.label || selectedRevenueMonth} (${new Date(revenueStartDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${new Date(revenueEndDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })})`
-                          : (availableRevenueMonths.find(m => m.key === selectedRevenueMonth)?.label || selectedRevenueMonth)}
-                    </span>
-                  </p>
-                </div>
-              </div>
-
-              {/* Month Dropdown Quick Selector & Export Report */}
-              <div className="w-full sm:w-auto lg:w-full 2xl:w-auto shrink-0 flex items-center gap-2">
-                <select
-                  value={selectedRevenueMonth}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setSelectedRevenueMonth(val);
-                    if (val === 'all') {
-                      setIsLiveCalendarMode(false);
-                      setRevenueStartDate('');
-                      setRevenueEndDate('');
-                      setShowCustomDate(false);
-                    } else if (val === 'custom') {
-                      setIsLiveCalendarMode(false);
-                      setShowCustomDate(true);
-                    } else {
-                      setIsLiveCalendarMode(val === currentLiveMonthKey);
-                      const [yyyy, mm] = val.split('-');
-                      const y = parseInt(yyyy, 10);
-                      const m = parseInt(mm, 10);
-                      setRevenueStartDate(`${y}-${String(m).padStart(2, '0')}-01`);
-                      const lastDate = new Date(y, m, 0).getDate();
-                      setRevenueEndDate(`${y}-${String(m).padStart(2, '0')}-${String(lastDate).padStart(2, '0')}`);
-                      setShowCustomDate(false);
-                    }
-                  }}
-                  className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl px-3 py-1.5 focus:outline-none focus:border-emerald-500 transition cursor-pointer shadow-xs w-full sm:w-auto lg:w-full 2xl:w-auto max-w-full truncate"
-                >
-                  <option value="all">🌐 All Months (Combined)</option>
-                  {availableRevenueMonths.map(m => (
-                    <option key={m.key} value={m.key}>
-                      {m.key === currentLiveMonthKey ? `🟢 Live Current Month: ${m.label}` : `📅 ${m.label}`} ({m.count} clients)
-                    </option>
-                  ))}
-                  <option value="custom">📅 Custom Date Range...</option>
-                </select>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    const selectedMonthObj = availableRevenueMonths.find(m => m.key === selectedRevenueMonth);
-                    const label = selectedRevenueMonth === 'all'
-                      ? 'All Months (All-Time)'
-                      : (selectedMonthObj ? selectedMonthObj.label : selectedRevenueMonth);
-
-                    exportMonthlyReport({
-                      monthKey: selectedRevenueMonth,
-                      startDate: revenueStartDate,
-                      endDate: revenueEndDate,
-                      periodLabel: label,
-                      clients,
-                      tasks,
-                      deliveries: distinctDeliveries,
-                      employeeData,
-                      calls: internalCalls
-                    });
-                  }}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition shadow-xs hover:shadow cursor-pointer shrink-0"
-                  title="Download complete Monthly Executive Report as Excel (.xlsx)"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Export Report</span>
-                  <span className="sm:hidden">Export</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Quick Month Filter Pills (Single horizontal scrollable row with NO visible scrollbar) */}
-            <div 
-              className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-3 flex-nowrap border-b border-slate-100 dark:border-slate-800 [&::-webkit-scrollbar]:hidden"
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-            >
-              <button
-                type="button"
-                onClick={() => { setSelectedRevenueMonth('all'); setIsLiveCalendarMode(false); setRevenueStartDate(''); setRevenueEndDate(''); setShowCustomDate(false); }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 whitespace-nowrap ${
-                  selectedRevenueMonth === 'all' && !revenueStartDate && !revenueEndDate
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-                }`}
-              >
-                All Months
-              </button>
-              {availableRevenueMonths.map(m => {
-                const isSelected = selectedRevenueMonth === m.key && !showCustomDate;
-                const isLiveCurrent = m.key === currentLiveMonthKey;
-                return (
-                  <button
-                    key={m.key}
-                    type="button"
-                    onClick={() => {
-                      setSelectedRevenueMonth(m.key);
-                      setIsLiveCalendarMode(isLiveCurrent);
-                      const [yyyy, mm] = m.key.split('-');
-                      const y = parseInt(yyyy, 10);
-                      const mInt = parseInt(mm, 10);
-                      setRevenueStartDate(`${y}-${String(mInt).padStart(2, '0')}-01`);
-                      const lastDate = new Date(y, mInt, 0).getDate();
-                      setRevenueEndDate(`${y}-${String(mInt).padStart(2, '0')}-${String(lastDate).padStart(2, '0')}`);
-                      setShowCustomDate(false);
-                    }}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap ${
-                      isSelected
-                        ? 'bg-emerald-600 text-white shadow-xs'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    {isLiveCurrent && (
-                      <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-emerald-500'} animate-pulse shrink-0`}></span>
-                    )}
-                    <span>{m.label.split(' ')[0]}</span>
-                    {isLiveCurrent && <span className="text-[9px] font-extrabold uppercase opacity-90">(Live)</span>}
-                    <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-200/70 dark:bg-slate-700 text-slate-500'}`}>
-                      {m.count}
-                    </span>
-                  </button>
-                );
-              })}
-              <button
-                type="button"
-                onClick={() => setShowCustomDate(!showCustomDate)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap ${
-                  showCustomDate || (revenueStartDate && selectedRevenueMonth === 'custom')
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-                }`}
-              >
-                <span>📅 Custom Range</span>
-                {(revenueStartDate || revenueEndDate) && (
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
-                )}
-              </button>
-            </div>
-
-            {/* Expandable Custom Date Range Box (Structured Grid, 100% responsive, NEVER overflows out of box) */}
-            {(showCustomDate || selectedRevenueMonth === 'custom' || (revenueStartDate && selectedRevenueMonth !== 'all' && !availableRevenueMonths.some(m => selectedRevenueMonth === m.key))) && (
-              <div className="bg-slate-50 dark:bg-slate-850 p-3 rounded-xl border border-slate-200 dark:border-slate-700 mb-4 space-y-2.5 animate-fade-in">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Custom Date Range
-                  </span>
-                  {(revenueStartDate || revenueEndDate) && (
-                    <button
-                      type="button"
-                      onClick={() => { setRevenueStartDate(''); setRevenueEndDate(''); setSelectedRevenueMonth('all'); setShowCustomDate(false); }}
-                      className="text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 transition cursor-pointer flex items-center gap-1"
-                    >
-                      <span>Clear Range</span>
-                      <span className="font-black">✕</span>
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 shadow-xs min-w-0">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase shrink-0 w-8">From</span>
-                    <input
-                      type="date"
-                      value={revenueStartDate}
-                      onChange={(e) => { setRevenueStartDate(e.target.value); setSelectedRevenueMonth('custom'); }}
-                      className="w-full bg-transparent text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer min-w-0"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 shadow-xs min-w-0">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase shrink-0 w-8">To</span>
-                    <input
-                      type="date"
-                      value={revenueEndDate}
-                      onChange={(e) => { setRevenueEndDate(e.target.value); setSelectedRevenueMonth('custom'); }}
-                      className="w-full bg-transparent text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer min-w-0"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-          
-          <div className="space-y-5 my-auto">
-            {/* 1. Actual Revenue */}
-            <div 
-              onClick={() => onSelectTab && onSelectTab('clients', { paymentFilter: 'full' })}
-              className="space-y-1.5 p-2 -mx-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-all duration-200 group"
-              title="Click to view fully paid accounts in CRM"
-            >
-              <div className="flex justify-between items-end">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block group-hover:scale-125 transition-transform"></span>
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition">Actual Revenue (Collected)</span>
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-lg font-black text-emerald-600 dark:text-emerald-400">₹{dynamicTotalRevenue.toLocaleString()}</span>
-                  <span className="text-xs font-bold text-slate-400">({revReceivedPercent}%)</span>
-                </div>
-              </div>
-              <div className="w-full bg-slate-100 dark:bg-slate-800 h-4 rounded-full overflow-hidden shadow-inner relative">
-                <div 
-                  className="bg-gradient-to-r from-emerald-400 to-emerald-600 h-full rounded-full transition-all duration-1000 ease-out" 
-                  style={{ width: `${revReceivedPercent}%` }}
-                />
-              </div>
-              <div className="text-[10px] text-slate-400 text-right flex justify-between items-center">
-                <span className="text-emerald-600 text-[9px] font-semibold opacity-0 group-hover:opacity-100 transition">View Paid Accounts →</span>
-                <span>{paymentReceivedCount} accounts paid</span>
-              </div>
-            </div>
-
-
-            {/* 3. Pending Revenue */}
-            <div 
-              onClick={() => onSelectTab && onSelectTab('pending-payments', { paymentTabFilter: 'All' })}
-              className="space-y-1.5 p-2 -mx-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-all duration-200 group"
-              title="Click to view Pending Balance accounts"
-            >
-              <div className="flex justify-between items-end">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block group-hover:scale-125 transition-transform"></span>
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-orange-500 transition">Pending Revenue (Outstanding)</span>
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-lg font-black text-orange-500">₹{pendingRevenue.toLocaleString()}</span>
-                  <span className="text-xs font-bold text-slate-400">({revPendingPercent}%)</span>
-                </div>
-              </div>
-              <div className="w-full bg-slate-100 dark:bg-slate-800 h-4 rounded-full overflow-hidden shadow-inner relative">
-                <div 
-                  className="bg-gradient-to-r from-orange-400 to-orange-500 h-full rounded-full transition-all duration-1000 ease-out delay-300" 
-                  style={{ width: `${revPendingPercent}%` }}
-                />
-              </div>
-              <div className="text-[10px] text-slate-400 text-right flex justify-between items-center">
-                <span className="text-orange-600 text-[9px] font-semibold opacity-0 group-hover:opacity-100 transition">View Pending Payments →</span>
-                <span>{paymentPendingCount} accounts pending</span>
-              </div>
-            </div>
-          </div>
-          
-          {/* Interlinked Revenue Streams Breakdown */}
-          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-            <div 
-              onClick={() => onSelectTab && onSelectTab('clients', { revenueStreamFilter: 'NewPurchase' })}
-              className="bg-emerald-50/70 dark:bg-emerald-950/20 p-2.5 rounded-xl border border-emerald-100 dark:border-emerald-800/30 flex flex-col justify-between cursor-pointer hover:shadow-sm hover:scale-[1.02] active:scale-[0.99] transition-all"
-              title="Click to view Sales Data in CRM"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-extrabold uppercase">🛒 Sales Data (New Purchases)</span>
-                <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 dark:bg-emerald-900/50 px-1.5 py-0.2 rounded">{newPurchasesCount} Sales</span>
-              </div>
-              <div className="mt-1.5">
-                <div className="text-[9px] text-slate-400">Target: <span className="font-bold text-slate-700 dark:text-slate-300">₹{newPurchasesExpected.toLocaleString()}</span></div>
-                <div className="text-[10px] font-extrabold text-emerald-600">Achieved: ₹{newPurchasesActual.toLocaleString()}</div>
-              </div>
-            </div>
-
-            <div 
-              onClick={() => onSelectTab && onSelectTab('renewals', { renewalFilter: 'All' })}
-              className="bg-purple-50/70 dark:bg-purple-950/20 p-2.5 rounded-xl border border-purple-100 dark:border-purple-800/30 flex flex-col justify-between cursor-pointer hover:shadow-sm hover:scale-[1.02] active:scale-[0.99] transition-all"
-              title="Click to open Renewals & Retention Hub"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-purple-700 dark:text-purple-400 font-extrabold uppercase">🔄 Renewal Data (Plan Renewals)</span>
-                <span className="text-[9px] font-bold text-purple-700 bg-purple-100 dark:bg-purple-900/50 px-1.5 py-0.2 rounded">{renewalsCount} Renewals</span>
-              </div>
-              <div className="mt-1.5">
-                <div className="text-[9px] text-slate-400">Target: <span className="font-bold text-slate-700 dark:text-slate-300">₹{renewalsExpected.toLocaleString()}</span></div>
-                <div className="text-[10px] font-extrabold text-purple-600">Achieved: ₹{renewalsActual.toLocaleString()}</div>
-              </div>
-            </div>
-
-            <div 
-              onClick={() => onSelectTab && onSelectTab('clients', { revenueStreamFilter: 'ActiveRetainer' })}
-              className="bg-blue-50/70 dark:bg-blue-950/20 p-2.5 rounded-xl border border-blue-100 dark:border-blue-800/30 flex flex-col justify-between cursor-pointer hover:shadow-sm hover:scale-[1.02] active:scale-[0.99] transition-all"
-              title="Click to view Active Retainers in CRM"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-blue-700 dark:text-blue-400 font-extrabold uppercase">💼 Retainers</span>
-                <span className="text-[9px] font-bold text-blue-700 bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.2 rounded">{retainersCount} Retainers</span>
-              </div>
-              <div className="mt-1.5">
-                <div className="text-[9px] text-slate-400">Target: <span className="font-bold text-slate-700 dark:text-slate-300">₹{retainersExpected.toLocaleString()}</span></div>
-                <div className="text-[10px] font-extrabold text-blue-600">Achieved: ₹{retainersActual.toLocaleString()}</div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-5 gap-1.5 sm:gap-2 text-center text-xs">
-            <div 
-              onClick={() => onSelectTab && onSelectTab('clients', { paymentFilter: 'full' })}
-              className="bg-emerald-50 dark:bg-emerald-950/30 p-2 rounded-xl border border-emerald-100 dark:border-emerald-800/30 min-w-0 cursor-pointer hover:shadow-xs hover:scale-[1.02] transition-all"
-              title="Click to view fully paid accounts in CRM"
-            >
-              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold block truncate">Actual Revenue</span>
-              <span className="text-[11px] sm:text-xs font-extrabold text-emerald-800 dark:text-emerald-300 block truncate">₹{dynamicTotalRevenue.toLocaleString()}</span>
-            </div>
-            <div 
-              onClick={() => onSelectTab && onSelectTab('clients', { filterScope: 'all_clients', monthFilter: 'all', paymentFilter: 'all', lifecycleFilter: 'all', revenueStreamFilter: 'all' })}
-              className="bg-indigo-50 dark:bg-indigo-950/30 p-2 rounded-xl border border-indigo-100 dark:border-indigo-800/30 min-w-0 cursor-pointer hover:shadow-xs hover:scale-[1.02] transition-all"
-              title="Click to view all 58 accounts in CRM"
-            >
-              <span className="text-[10px] text-indigo-700 dark:text-indigo-400 font-bold block truncate">Expected Target</span>
-              <span className="text-[11px] sm:text-xs font-extrabold text-indigo-800 dark:text-indigo-300 block truncate">₹{totalAllClientsBilling.toLocaleString()}</span>
-            </div>
-            <div 
-              onClick={() => onSelectTab && onSelectTab('renewals', { renewalFilter: 'All' })}
-              className="bg-purple-50 dark:bg-purple-950/30 p-2 rounded-xl border border-purple-100 dark:border-purple-800/30 min-w-0 cursor-pointer hover:shadow-xs hover:scale-[1.02] transition-all"
-              title="Click to view Renewal Data in Renewals Hub"
-            >
-              <span className="text-[10px] text-purple-700 dark:text-purple-400 font-bold block truncate">Achieved Renewal</span>
-              <span className="text-[11px] sm:text-xs font-extrabold text-purple-800 dark:text-purple-300 block truncate">₹{achievedRenewalActual.toLocaleString()}</span>
-              <span className="text-[8px] text-purple-600/70 dark:text-purple-400/70 block truncate">Proj: ₹{totalRenewalExpected.toLocaleString()}</span>
-            </div>
-            <div 
-              onClick={() => onSelectTab && onSelectTab('clients', { revenueStreamFilter: 'NewPurchase' })}
-              className="bg-cyan-50 dark:bg-cyan-950/30 p-2 rounded-xl border border-cyan-100 dark:border-cyan-800/30 min-w-0 cursor-pointer hover:shadow-xs hover:scale-[1.02] transition-all"
-              title="Click to view New Client Sales in CRM"
-            >
-              <span className="text-[10px] text-cyan-700 dark:text-cyan-400 font-bold block truncate">Achieved Sale</span>
-              <span className="text-[11px] sm:text-xs font-extrabold text-cyan-800 dark:text-cyan-300 block truncate">₹{newPurchasesActual.toLocaleString()}</span>
-              <span className="text-[8px] text-cyan-600/70 dark:text-cyan-400/70 block truncate">{newPurchasesCount} Sales • Proj: ₹{newPurchasesExpected.toLocaleString()}</span>
-            </div>
-            <div 
-              onClick={() => onSelectTab && onSelectTab('pending-payments', { paymentTabFilter: 'All' })}
-              className="bg-orange-50 dark:bg-orange-950/30 p-2 rounded-xl border border-orange-100 dark:border-orange-800/30 min-w-0 col-span-2 sm:col-span-1 cursor-pointer hover:shadow-xs hover:scale-[1.02] transition-all"
-              title="Click to view Pending Payments"
-            >
-              <span className="text-[10px] text-orange-700 dark:text-orange-400 font-bold block truncate">Pending Balance</span>
-              <span className="text-[11px] sm:text-xs font-extrabold text-orange-800 dark:text-orange-300 block truncate">₹{pendingRevenue.toLocaleString()}</span>
-            </div>
-          </div>
-        </div>
+      {/* 2. Overall Task Status Overview */}
+      <div className="w-full">
 
         {/* Task Status Bar Chart — Overall */}
         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
