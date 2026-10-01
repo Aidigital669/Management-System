@@ -42,7 +42,7 @@ async function run() {
         if (parsed.paymentStatus === 'Pending' || parsed.paymentStatus === 'Unpaid') paid = 0;
         else if (parsed.paidAmount !== undefined) paid = parseFloat(parsed.paidAmount) || 0;
       }
-    } catch (e) {}
+    } catch (e) { }
     septContractActual += paid;
     const stream = getClientRevenueStream(c, '2026-09');
     console.log(`[Sept] ${c.clientId} - ${c.businessName} | pkg: ${pkg} | paid: ${paid} | stream: ${stream.type} | active: ${c.active} | planActive: ${isClientPlanActive(c)}`);
@@ -59,7 +59,7 @@ async function run() {
         if (parsed.paymentStatus === 'Pending' || parsed.paymentStatus === 'Unpaid') paid = 0;
         else if (parsed.paidAmount !== undefined) paid = parseFloat(parsed.paidAmount) || 0;
       }
-    } catch (e) {}
+    } catch (e) { }
     const info = getClientPlanInfo(c);
     const stream = getClientRevenueStream(c, '2026-09');
     console.log(`${c.clientId} | ${c.businessName} | pkg: ${pkg} | paid: ${paid} | status: ${info.status} | end: ${info.planEndDate} | stream: ${stream.type}`);

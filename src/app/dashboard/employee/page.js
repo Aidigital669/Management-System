@@ -155,11 +155,36 @@ export default function EmployeeDashboard() {
     setTimeout(() => setToast({ message: '', type: '' }), 4000);
   };
 
-  // Clock ticks
+  // Clock ticks and 6:30 PM evening auto-logout check
   useEffect(() => {
-    const clock = setInterval(() => {
+    let hasAutoLoggedOut = false;
+    const clock = setInterval(async () => {
       const now = new Date();
       setTimeStr(now.toLocaleTimeString());
+
+      // Evening 6:30 PM Shift End Auto-Logout (18:30 IST)
+      try {
+        const istTimeStr = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'Asia/Kolkata',
+          hour12: false,
+          hour: '2-digit',
+          minute: '2-digit'
+        }).format(now);
+        const [hr, mn] = istTimeStr.split(':').map(Number);
+        if ((hr > 18 || (hr === 18 && mn >= 30)) && !hasAutoLoggedOut) {
+          hasAutoLoggedOut = true;
+          await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+          window.location.href = '/?autoLogout=true';
+        }
+      } catch (err) {
+        const hr = now.getHours();
+        const mn = now.getMinutes();
+        if ((hr > 18 || (hr === 18 && mn >= 30)) && !hasAutoLoggedOut) {
+          hasAutoLoggedOut = true;
+          await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+          window.location.href = '/?autoLogout=true';
+        }
+      }
     }, 1000);
     return () => clearInterval(clock);
   }, []);
@@ -500,6 +525,44 @@ export default function EmployeeDashboard() {
       setFormError('Connection error.');
     } finally {
       setFormLoading(false);
+    }
+  };
+
+  // Toggle subtask/additional task completion status
+  const handleToggleSubtask = async (taskId, subtaskId, currentStatus) => {
+    const nextStatus = currentStatus === 'DONE' ? 'TODO' : 'DONE';
+    
+    // Optimistic UI update
+    setTasksList(prev => prev.map(t => {
+      if (t.id === taskId && Array.isArray(t.subtasks)) {
+        const updatedSubs = t.subtasks.map(st => 
+          st.id === subtaskId ? { 
+            ...st, 
+            status: nextStatus, 
+            completedAt: nextStatus === 'DONE' ? new Date().toISOString() : null 
+          } : st
+        );
+        return { ...t, subtasks: updatedSubs };
+      }
+      return t;
+    }));
+
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/subtasks`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subtaskId, status: nextStatus })
+      });
+      if (res.ok) {
+        showToast(`Additional task marked as ${nextStatus === 'DONE' ? 'Completed' : 'Pending'}!`, 'success');
+      } else {
+        showToast('Failed to update additional task status', 'error');
+        await refreshData();
+      }
+    } catch (err) {
+      console.error('Error toggling subtask:', err);
+      showToast('Network error updating additional task', 'error');
+      await refreshData();
     }
   };
 
@@ -1013,7 +1076,21 @@ export default function EmployeeDashboard() {
                                 );
                               })()}
                               <span>•</span>
-                              <span className="truncate">{item.type === 'internal' ? `Assigned by: ${item.createdBy.name}` : `Client: ${item.businessName}`}</span>
+                              <span className="truncate">{item.type === 'internal' ? `Assigned by: ${item.createdBy?.name || 'Admin'}` : `Client: ${item.businessName}`}</span>
+                              {item.type === 'internal' && item.department && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-indigo-600 dark:text-indigo-400 font-bold">💻 {item.department}</span>
+                                </>
+                              )}
+                              {item.type === 'internal' && Array.isArray(item.subtasks) && item.subtasks.length > 0 && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-blue-600 dark:text-blue-400 font-bold">
+                                    {item.subtasks.filter(s => s.status === 'DONE').length}/{item.subtasks.length} subtasks done
+                                  </span>
+                                </>
+                              )}
                               {item.priority && (
                                 <>
                                   <span>•</span>
@@ -1355,74 +1432,215 @@ export default function EmployeeDashboard() {
                 {filteredTasksList.length === 0 ? (
                   <p className="text-xs text-slate-400 text-center py-6">No tasks assigned yet for this date.</p>
                 ) : (
-                  filteredTasksList.map((task) => (
-                    <div 
-                      key={task.id} 
-                      className={`p-4 border rounded-xl flex items-center justify-between transition duration-300
-                        ${task.status === 'DONE' 
-                          ? 'border-slate-100 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/40 opacity-75' 
-                          : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800 hover:-translate-y-1 cursor-default'}`}
-                    >
-                      <div className="space-y-1 pr-6 overflow-hidden">
-                        <p className={`text-xs font-bold leading-tight flex items-center gap-2 ${task.status === 'DONE' ? 'line-through text-slate-400' : 'text-slate-900 dark:text-white'}`}>
-                          {task.title}
-                          <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase w-max no-underline
-                            ${task.priority === 'Urgent' ? 'bg-red-500 text-white' 
-                              : task.priority === 'High' ? 'bg-orange-400 text-white' 
-                              : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>
-                            {task.priority || 'Normal'}
-                          </span>
-                        </p>
-                        {task.description && (task.description.startsWith('http') || task.description.startsWith('/uploads/')) ? (
-                          <div className="flex flex-wrap items-center gap-2 mt-1">
-                            <a 
-                              href={task.description} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded-md"
-                            >
-                              <FileDown className="w-3.5 h-3.5" /> View Script PDF
-                            </a>
-                            <label className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded-md cursor-pointer transition border border-indigo-200/60 dark:border-indigo-800/40">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                              Re-Upload Content
-                              <input 
-                                type="file" 
-                                className="hidden"
-                                onChange={(e) => {
-                                  if (e.target.files && e.target.files[0]) {
-                                    handleReuploadContent(task.id, e.target.files[0], false);
-                                  }
-                                }}
-                              />
-                            </label>
-                          </div>
-                        ) : (
-                          <p className="text-[10px] text-slate-450 truncate mt-1">{task.description}</p>
-                        )}
-                        <p className="text-[9px] text-slate-400 font-medium mt-1.5">Assigned by: {task.createdBy.name} ({task.createdBy.role}) | Due: {task.dueDate || 'No Limit'}</p>
-                        {task.reason && (
-                           <p className="text-[10px] text-red-500 font-medium italic mt-1.5 bg-red-50 dark:bg-red-950/20 p-1.5 rounded-md border border-red-100 dark:border-red-900/30">Reason: {task.reason}</p>
-                        )}
-                      </div>
+                  filteredTasksList.map((task) => {
+                    const subtasks = Array.isArray(task.subtasks) ? task.subtasks : [];
+                    const doneSubtasks = subtasks.filter(st => st.status === 'DONE').length;
+                    const subtaskProgress = subtasks.length > 0 ? Math.round((doneSubtasks / subtasks.length) * 100) : 0;
 
-                      <div className="shrink-0 flex items-center gap-2">
-                        {task.status !== 'DONE' && (
-                          <button 
-                            onClick={() => openStatusModal(task, 'INTERNAL')}
-                            className="py-1 px-3 border border-blue-200 text-blue-600 dark:border-blue-800 dark:text-blue-400 rounded-lg text-[9px] font-bold hover:bg-blue-50 dark:hover:bg-blue-950/20 transition flex items-center gap-1"
-                          >
-                            <Play className="w-2.5 h-2.5" /> Update Status
-                          </button>
-                        )}
-                        {task.status === 'DONE' && (
-                          <span className="px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 text-[9px] font-bold rounded-lg uppercase tracking-wider">
-                            Completed
-                          </span>
+                    return (
+                      <div 
+                        key={task.id} 
+                        className={`p-4 border rounded-xl flex flex-col gap-3 transition duration-300
+                          ${task.status === 'DONE' 
+                            ? 'border-slate-100 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/40 opacity-85' 
+                            : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800 cursor-default'}`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="space-y-1 pr-2 overflow-hidden flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className={`text-xs font-bold leading-tight ${task.status === 'DONE' ? 'line-through text-slate-400' : 'text-slate-900 dark:text-white'}`}>
+                                {task.title}
+                              </p>
+                              <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase w-max no-underline
+                                ${task.priority === 'Urgent' ? 'bg-red-500 text-white' 
+                                  : task.priority === 'High' ? 'bg-orange-400 text-white' 
+                                  : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>
+                                {task.priority || 'Normal'}
+                              </span>
+                              {task.department && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60">
+                                  💻 {task.department}
+                                </span>
+                              )}
+                            </div>
+
+                            {task.description && (task.description.startsWith('http') || task.description.startsWith('/uploads/')) ? (
+                              <div className="flex flex-wrap items-center gap-2 mt-1">
+                                <a 
+                                  href={task.description} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded-md"
+                                >
+                                  <FileDown className="w-3.5 h-3.5" /> View Script PDF
+                                </a>
+                                <label className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded-md cursor-pointer transition border border-indigo-200/60 dark:border-indigo-800/40">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                  Re-Upload Content
+                                  <input 
+                                    type="file" 
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      if (e.target.files && e.target.files[0]) {
+                                        handleReuploadContent(task.id, e.target.files[0], false);
+                                      }
+                                    }}
+                                  />
+                                </label>
+                              </div>
+                            ) : (
+                              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">{task.description}</p>
+                            )}
+
+                            {task.module && (
+                              <p className="text-[10px] text-indigo-600 dark:text-indigo-400 mt-1.5 font-semibold">Module: {task.module}</p>
+                            )}
+                            {task.dependency && (
+                              <p className="text-[10px] text-orange-500 dark:text-orange-400 mt-0.5 font-semibold">Dependency: {task.dependency}</p>
+                            )}
+                            {task.expectedOutput && (
+                              <div className="mt-1.5 bg-slate-50 dark:bg-slate-800/50 p-2 rounded border border-slate-200 dark:border-slate-700">
+                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Expected Output</p>
+                                <p className="text-[10px] text-slate-700 dark:text-slate-300 leading-relaxed">{task.expectedOutput}</p>
+                              </div>
+                            )}
+
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[9px] text-slate-400 font-medium mt-1.5">
+                              <span>Assigned by: <strong className="text-slate-600 dark:text-slate-300">{task.createdBy?.name || 'Admin'}</strong></span>
+                              <span>•</span>
+                              <span>Due: {task.dueDate || 'No Limit'}</span>
+                              {subtasks.length > 0 && (
+                                <>
+                                  <span>•</span>
+                                  <span className="font-bold text-blue-600 dark:text-blue-400">
+                                    {doneSubtasks}/{subtasks.length} Additional Deliverables Done
+                                  </span>
+                                </>
+                              )}
+                            </div>
+
+                            {task.reason && (
+                              <p className="text-[10px] text-red-500 font-medium italic mt-1.5 bg-red-50 dark:bg-red-950/20 p-1.5 rounded-md border border-red-100 dark:border-red-900/30">Reason: {task.reason}</p>
+                            )}
+                          </div>
+
+                          <div className="shrink-0 flex items-center gap-2">
+                            {task.status !== 'DONE' && (
+                              <button 
+                                onClick={() => openStatusModal(task, 'INTERNAL')}
+                                className="py-1 px-3 border border-blue-200 text-blue-600 dark:border-blue-800 dark:text-blue-400 rounded-lg text-[9px] font-bold hover:bg-blue-50 dark:hover:bg-blue-950/20 transition flex items-center gap-1"
+                              >
+                                <Play className="w-2.5 h-2.5" /> Update Status
+                              </button>
+                            )}
+                            {task.status === 'DONE' && (
+                              <span className="px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 text-[9px] font-bold rounded-lg uppercase tracking-wider">
+                                Completed
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Additional Tasks / Deliverables Given Through This Task */}
+                        {subtasks.length > 0 && (
+                          <div className="mt-1 pt-3 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/70 dark:bg-slate-950/40 p-3 rounded-xl space-y-2.5">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                <CheckSquare className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                                <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
+                                  Additional Tasks Given Through This Task ({doneSubtasks}/{subtasks.length})
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="w-24 bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                                  <div 
+                                    className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                                    style={{ width: `${subtaskProgress}%` }}
+                                  />
+                                </div>
+                                <span className="text-[10px] font-bold text-slate-500">
+                                  {subtaskProgress}%
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              {subtasks.map((st) => {
+                                const isDone = st.status === 'DONE';
+                                return (
+                                  <div 
+                                    key={st.id}
+                                    className={`flex items-start justify-between gap-3 p-2.5 rounded-lg border transition text-xs ${
+                                      isDone 
+                                        ? 'bg-emerald-50/40 border-emerald-200/50 dark:bg-emerald-950/20 dark:border-emerald-900/30' 
+                                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700'
+                                    }`}
+                                  >
+                                    <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleSubtask(task.id, st.id, st.status)}
+                                        className={`mt-0.5 w-4 h-4 rounded flex items-center justify-center border transition shrink-0 ${
+                                          isDone 
+                                            ? 'bg-emerald-500 border-emerald-600 text-white' 
+                                            : 'border-slate-300 dark:border-slate-600 hover:border-emerald-500 bg-white dark:bg-slate-800'
+                                        }`}
+                                        title={isDone ? 'Mark as Incomplete' : 'Mark as Completed'}
+                                      >
+                                        {isDone && <Check className="w-3 h-3 stroke-[3]" />}
+                                      </button>
+                                      <div className="flex-1 min-w-0">
+                                        <p className={`text-[11px] font-bold leading-tight ${isDone ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-900 dark:text-white'}`}>
+                                          {st.title}
+                                        </p>
+                                        {st.description && (
+                                          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 whitespace-pre-wrap">
+                                            {st.description}
+                                          </p>
+                                        )}
+                                        <div className="flex flex-wrap items-center gap-2 mt-1 text-[9px] text-slate-400">
+                                          {st.priority && (
+                                            <span className={`px-1 rounded text-[8px] font-semibold ${
+                                              st.priority === 'Urgent' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' :
+                                              st.priority === 'High' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' :
+                                              'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                                            }`}>
+                                              {st.priority}
+                                            </span>
+                                          )}
+                                          {st.dueDate && <span>Due: {st.dueDate}</span>}
+                                          {st.createdByName && <span>Added by Admin: {st.createdByName}</span>}
+                                          {isDone && st.completedAt && (
+                                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                                              ✓ Completed {new Date(st.completedAt).toLocaleDateString()}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="shrink-0 flex items-center">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleSubtask(task.id, st.id, st.status)}
+                                        className={`text-[9px] font-bold px-2 py-0.5 rounded transition ${
+                                          isDone 
+                                            ? 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300' 
+                                            : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                                        }`}
+                                      >
+                                        {isDone ? 'Undo' : 'Mark Done'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
                         )}
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
 
                 {/* Client Tasks Section */}

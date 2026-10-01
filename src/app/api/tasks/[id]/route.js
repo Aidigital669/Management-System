@@ -9,6 +9,56 @@ async function getRequester(cookieStore) {
   return await prisma.user.findUnique({ where: { id: parseInt(userIdStr) } });
 }
 
+export async function GET(request, { params }) {
+  try {
+    const { id: idParam } = await params;
+    const id = parseInt(idParam);
+    const cookieStore = await cookies();
+    const requester = await getRequester(cookieStore);
+
+    if (!requester) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
+    const task = await prisma.task.findUnique({
+      where: { id },
+      include: {
+        assignedTo: { select: { id: true, name: true, avatar: true, department: true } },
+        createdBy: { select: { id: true, name: true, role: true } }
+      }
+    });
+
+    if (!task) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+
+    if (requester.role === 'EMPLOYEE' && task.assignedToId !== requester.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
+    let parsedSubtasks = [];
+    if (typeof task.subtasks === 'string') {
+      try {
+        parsedSubtasks = JSON.parse(task.subtasks);
+      } catch {
+        parsedSubtasks = [];
+      }
+    } else if (Array.isArray(task.subtasks)) {
+      parsedSubtasks = task.subtasks;
+    }
+
+    return NextResponse.json({
+      task: {
+        ...task,
+        subtasks: parsedSubtasks
+      }
+    });
+  } catch (error) {
+    console.error('Task GET error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
 export async function PATCH(request, context) {
   return PUT(request, context);
 }
@@ -24,7 +74,7 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const { title, description, status, assignedToId, dueDate, reason, workSampleUrl, priority } = await request.json();
+    const { title, description, status, assignedToId, dueDate, reason, workSampleUrl, priority, department, subtasks, module, dependency, expectedOutput } = await request.json();
 
     const task = await prisma.task.findUnique({ where: { id } });
     if (!task) {
@@ -36,13 +86,17 @@ export async function PUT(request, { params }) {
     const checkTitle = title || task.title;
     const checkPosted = isPostedStatus(checkStatus, '', checkTitle);
 
+    const serializedSubtasks = subtasks !== undefined
+      ? (typeof subtasks === 'string' ? subtasks : JSON.stringify(subtasks))
+      : undefined;
+
     if (!isPowerUser) {
       if (task.assignedToId !== requester.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
       }
 
-      if (!status && !workSampleUrl && !description) {
-        return NextResponse.json({ error: 'Status or sample payload required' }, { status: 400 });
+      if (!status && !workSampleUrl && !description && subtasks === undefined) {
+        return NextResponse.json({ error: 'Status, sample, description or subtasks required' }, { status: 400 });
       }
 
       const updateData = {};
@@ -50,6 +104,10 @@ export async function PUT(request, { params }) {
       if (reason !== undefined) updateData.reason = reason;
       if (workSampleUrl !== undefined) updateData.workSampleUrl = workSampleUrl;
       if (description !== undefined) updateData.description = description;
+      if (serializedSubtasks !== undefined) updateData.subtasks = serializedSubtasks;
+      if (module !== undefined) updateData.module = module;
+      if (dependency !== undefined) updateData.dependency = dependency;
+      if (expectedOutput !== undefined) updateData.expectedOutput = expectedOutput;
 
       if (checkPosted) {
         updateData.workSampleUrl = null;
@@ -59,10 +117,19 @@ export async function PUT(request, { params }) {
 
       const updatedTask = await prisma.task.update({
         where: { id },
-        data: updateData
+        data: updateData,
+        include: {
+          assignedTo: { select: { id: true, name: true, avatar: true, department: true } },
+          createdBy: { select: { id: true, name: true, role: true } }
+        }
       });
 
-      return NextResponse.json({ task: updatedTask });
+      return NextResponse.json({
+        task: {
+          ...updatedTask,
+          subtasks: typeof updatedTask.subtasks === 'string' ? JSON.parse(updatedTask.subtasks || '[]') : (updatedTask.subtasks || [])
+        }
+      });
     }
 
     const data = {};
@@ -74,6 +141,11 @@ export async function PUT(request, { params }) {
     if (reason !== undefined) data.reason = reason;
     if (workSampleUrl !== undefined) data.workSampleUrl = workSampleUrl;
     if (priority !== undefined) data.priority = priority;
+    if (department !== undefined) data.department = department;
+    if (serializedSubtasks !== undefined) data.subtasks = serializedSubtasks;
+    if (module !== undefined) data.module = module;
+    if (dependency !== undefined) data.dependency = dependency;
+    if (expectedOutput !== undefined) data.expectedOutput = expectedOutput;
 
     if (checkPosted) {
       data.workSampleUrl = null;
@@ -103,7 +175,11 @@ export async function PUT(request, { params }) {
 
     const updatedTask = await prisma.task.update({
       where: { id },
-      data
+      data,
+      include: {
+        assignedTo: { select: { id: true, name: true, avatar: true, department: true } },
+        createdBy: { select: { id: true, name: true, role: true } }
+      }
     });
 
     await prisma.auditLog.create({
@@ -114,7 +190,12 @@ export async function PUT(request, { params }) {
       }
     });
 
-    return NextResponse.json({ task: updatedTask });
+    return NextResponse.json({
+      task: {
+        ...updatedTask,
+        subtasks: typeof updatedTask.subtasks === 'string' ? JSON.parse(updatedTask.subtasks || '[]') : (updatedTask.subtasks || [])
+      }
+    });
   } catch (error) {
     console.error('Task PUT error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

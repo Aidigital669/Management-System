@@ -44,6 +44,17 @@ export async function GET() {
         overdueIds.push(t.id);
         t.status = 'OVERDUE';
       }
+
+      // Parse subtasks safely so client always gets an array
+      if (typeof t.subtasks === 'string') {
+        try {
+          t.subtasks = JSON.parse(t.subtasks);
+        } catch {
+          t.subtasks = [];
+        }
+      } else if (!t.subtasks) {
+        t.subtasks = [];
+      }
     });
 
     if (overdueIds.length > 0) {
@@ -69,7 +80,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const { title, description, assignedToId, dueDate, priority } = await request.json();
+    const { title, description, assignedToId, dueDate, priority, department, subtasks, module, dependency, expectedOutput } = await request.json();
 
     if (!title || !assignedToId) {
       return NextResponse.json({ error: 'Title and Assignee are required' }, { status: 400 });
@@ -80,6 +91,11 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Assignee not found' }, { status: 404 });
     }
 
+    const resolvedDept = department || assignee.department || 'Software Development';
+    const resolvedSubtasks = Array.isArray(subtasks)
+      ? JSON.stringify(subtasks)
+      : (typeof subtasks === 'string' ? subtasks : '[]');
+
     const task = await prisma.task.create({
       data: {
         title,
@@ -88,19 +104,34 @@ export async function POST(request) {
         createdById: requester.id,
         dueDate,
         status: 'TODO',
-        priority: priority || 'Normal'
+        priority: priority || 'Normal',
+        department: resolvedDept,
+        subtasks: resolvedSubtasks,
+        module,
+        dependency,
+        expectedOutput
+      },
+      include: {
+        assignedTo: { select: { name: true, avatar: true, department: true } },
+        createdBy: { select: { name: true, role: true } }
       }
     });
 
     await prisma.auditLog.create({
       data: {
-        action: `Created task "${title}" for ${assignee.name}`,
+        action: `Created task "${title}" for ${assignee.name} (${resolvedDept})`,
         performedByName: requester.name,
         performedByRole: requester.role
       }
     });
 
-    return NextResponse.json({ task }, { status: 201 });
+    // Parse subtasks for client return
+    const clientTask = {
+      ...task,
+      subtasks: typeof task.subtasks === 'string' ? JSON.parse(task.subtasks) : (task.subtasks || [])
+    };
+
+    return NextResponse.json({ task: clientTask }, { status: 201 });
   } catch (error) {
     console.error('Tasks POST error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

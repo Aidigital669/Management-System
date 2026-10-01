@@ -151,11 +151,36 @@ export default function TLDashboard() {
     setTimeout(() => setToast({ message: '', type: '' }), 4000);
   };
 
-  // Clock ticks
+  // Clock ticks and 6:30 PM evening auto-logout check
   useEffect(() => {
-    const clock = setInterval(() => {
+    let hasAutoLoggedOut = false;
+    const clock = setInterval(async () => {
       const now = new Date();
       setTimeStr(now.toLocaleTimeString());
+
+      // Evening 6:30 PM Shift End Auto-Logout (18:30 IST)
+      try {
+        const istTimeStr = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'Asia/Kolkata',
+          hour12: false,
+          hour: '2-digit',
+          minute: '2-digit'
+        }).format(now);
+        const [hr, mn] = istTimeStr.split(':').map(Number);
+        if ((hr > 18 || (hr === 18 && mn >= 30)) && !hasAutoLoggedOut) {
+          hasAutoLoggedOut = true;
+          await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+          window.location.href = '/?autoLogout=true';
+        }
+      } catch (err) {
+        const hr = now.getHours();
+        const mn = now.getMinutes();
+        if ((hr > 18 || (hr === 18 && mn >= 30)) && !hasAutoLoggedOut) {
+          hasAutoLoggedOut = true;
+          await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+          window.location.href = '/?autoLogout=true';
+        }
+      }
     }, 1000);
     return () => clearInterval(clock);
   }, []);

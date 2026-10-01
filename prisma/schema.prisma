@@ -74,6 +74,11 @@ model Task {
   priority      String   @default("Normal")
   reason        String?
   workSampleUrl String?
+  department    String?
+  subtasks      String?
+  module         String?
+  dependency     String?
+  expectedOutput String?
   assignedTo    User     @relation("AssignedTasks", fields: [assignedToId], references: [id], onDelete: Cascade)
   createdBy     User     @relation("CreatedTasks", fields: [createdById], references: [id], onDelete: Cascade)
 }

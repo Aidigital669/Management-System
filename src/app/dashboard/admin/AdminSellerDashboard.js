@@ -1993,7 +1993,7 @@ export default function AdminSellerDashboard({ usersList = [], refreshData, onNa
                     required
                     value={leadForm.clientName}
                     onChange={(e) => setLeadForm({ ...leadForm, clientName: e.target.value })}
-                    placeholder="e.g. Rahul Sharma"
+                    placeholder="e.g. Prem Sharma"
                     className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:outline-none focus:border-blue-500 dark:text-white"
                   />
                 </div>

@@ -7,6 +7,7 @@ export const ROLE_CATEGORIES = {
   AI_VIDEO: 'ai_video',
   GRAPHICS: 'graphics',
   SOCIAL_MEDIA: 'social_media',
+  SOFTWARE_DEV: 'software_dev',
   SALES: 'sales',
   OTHER: 'other'
 };
@@ -16,6 +17,7 @@ export const ROLE_LABELS = {
   [ROLE_CATEGORIES.AI_VIDEO]: 'AI Video Editors',
   [ROLE_CATEGORIES.GRAPHICS]: 'Graphic Designers',
   [ROLE_CATEGORIES.SOCIAL_MEDIA]: 'Social Media Executives',
+  [ROLE_CATEGORIES.SOFTWARE_DEV]: 'Software Developers',
   [ROLE_CATEGORIES.SALES]: 'Sales Team',
   [ROLE_CATEGORIES.OTHER]: 'Other Staff'
 };
@@ -76,6 +78,22 @@ export function getEmployeeRoleCategory(employee) {
     desig.includes('design')
   ) {
     return ROLE_CATEGORIES.GRAPHICS;
+  }
+
+  // Software Development
+  if (
+    dept.includes('software') || 
+    dept.includes('developer') || 
+    dept.includes('development') ||
+    dept.includes('engineering') ||
+    desig.includes('software') || 
+    desig.includes('developer') ||
+    desig.includes('engineer') ||
+    desig.includes('full stack') ||
+    desig.includes('frontend') ||
+    desig.includes('backend')
+  ) {
+    return ROLE_CATEGORIES.SOFTWARE_DEV;
   }
 
   return ROLE_CATEGORIES.OTHER;

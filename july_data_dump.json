@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-09-24T09:57:42.654Z",
+  "timestamp": "2026-10-01T07:54:09.150Z",
   "summary": {
     "totalClients": 58,
     "totalClientTasks": 1386,
@@ -3117,7 +3117,7 @@
       "date": "Trigger on Approval",
       "assignTo": "AI Video Editor",
       "workingOn": "Nouman",
-      "status": "Completion",
+      "status": "Posted",
       "postType": "Posting"
     },
     {
@@ -9805,7 +9805,7 @@
       "date": "25-Sept-2026",
       "assignTo": "Ai Video Editor",
       "workingOn": "Divyansh",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Reel"
     },
     {
@@ -9827,7 +9827,7 @@
       "date": "30-Sept-2026",
       "assignTo": "Graphics",
       "workingOn": "Sanmeet",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -9948,7 +9948,7 @@
       "date": "29-Sept-2026",
       "assignTo": "AI Video Editor",
       "workingOn": "Masoom",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -10190,7 +10190,7 @@
       "date": "29-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Preet",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -10894,7 +10894,7 @@
       "date": "30-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Pujan",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -11422,7 +11422,7 @@
       "date": "29-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Preet",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -11972,7 +11972,7 @@
       "date": "25-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Preet",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -12137,7 +12137,7 @@
       "date": "25-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Preet",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -12929,7 +12929,7 @@
       "date": "26-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Preet",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -13083,7 +13083,7 @@
       "date": "29-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Harshit Gajbhiye",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -13237,7 +13237,7 @@
       "date": "29-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Pujan",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -13391,7 +13391,7 @@
       "date": "28-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Preet",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -13633,7 +13633,7 @@
       "date": "26-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Pujan",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -13897,7 +13897,7 @@
       "date": "26-Sept-2026",
       "assignTo": "Ai Video Editor",
       "workingOn": "Nouman",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -13919,7 +13919,7 @@
       "date": "28-Sept-2026",
       "assignTo": "Ai Video Editor",
       "workingOn": "Nouman",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -13941,7 +13941,7 @@
       "date": "29-Sept-2026",
       "assignTo": "Ai Video Editor",
       "workingOn": "Nouman",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -13974,7 +13974,7 @@
       "date": "29-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Pujan",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -14161,7 +14161,7 @@
       "date": "26-Sept-2026",
       "assignTo": "Graphic Designer",
       "workingOn": "Masoom",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -14183,7 +14183,7 @@
       "date": "29-Sept-2026",
       "assignTo": "Ai Video Editor",
       "workingOn": "Masoom",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "AI Video"
     },
     {
@@ -14205,7 +14205,7 @@
       "date": "29-Sept-2026",
       "assignTo": "Graphic Designer",
       "workingOn": "Masoom",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Graphic"
     },
     {
@@ -14227,7 +14227,7 @@
       "date": "30-Sept-2026",
       "assignTo": "Video Editor",
       "workingOn": "Masoom",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Reel"
     },
     {
@@ -14337,7 +14337,7 @@
       "date": "28-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Preet",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -14623,7 +14623,7 @@
       "date": "26-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Pujan",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -14843,7 +14843,7 @@
       "date": "29-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Preet",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -14997,7 +14997,7 @@
       "date": "25-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Pujan",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -15151,7 +15151,7 @@
       "date": "30-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Preet",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {
@@ -15415,7 +15415,7 @@
       "date": "25-Sept-2026",
       "assignTo": "Digital Marketing Executive",
       "workingOn": "Pujan",
-      "status": "Assigned",
+      "status": "Overdue",
       "postType": "Report"
     },
     {

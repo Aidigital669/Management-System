@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { sendLeadFollowUpReminder } from '@/lib/whatsapp';
+import { autoCloseExpiredAttendance } from '@/lib/attendanceService';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +21,9 @@ export async function GET(req) {
     if (expectedSecret && secret && secret !== expectedSecret && authHeader !== `Bearer ${expectedSecret}`) {
       return NextResponse.json({ error: 'Unauthorized cron trigger' }, { status: 401 });
     }
+
+    // Auto-close any expired attendance sessions at 6:30 PM shift end
+    await autoCloseExpiredAttendance().catch(err => console.error('Cron attendance auto-close notice:', err));
 
     const now = new Date();
     // Look ahead 35 minutes into the future and 15 minutes in the past

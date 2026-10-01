@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { cookies } from 'next/headers';
+import { autoCloseExpiredAttendance, getISTDateTime } from '@/lib/attendanceService';
 
 async function getRequester(cookieStore) {
   const userIdStr = cookieStore.get('userId')?.value;
@@ -17,7 +18,10 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    // Auto-close any expired sessions from past dates or today after 6:30 PM shift end
+    await autoCloseExpiredAttendance();
+
+    const { dateStr: todayStr } = getISTDateTime();
 
     const todayLog = await prisma.attendance.findFirst({
       where: {
@@ -63,8 +67,11 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
+    // Auto-close expired sessions first
+    await autoCloseExpiredAttendance();
+
+    const { dateStr: todayStr, hour: curHour, minute: curMinute } = getISTDateTime();
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
 
     const activeLog = await prisma.attendance.findFirst({
       where: {
@@ -90,6 +97,12 @@ export async function POST(request) {
 
       return NextResponse.json({ message: 'Clocked out successfully', log: updated });
     } else {
+      // Check if trying to clock in after 6:30 PM (18:30)
+      const isPastShiftEnd = curHour > 18 || (curHour === 18 && curMinute >= 30);
+      if (isPastShiftEnd) {
+        return NextResponse.json({ error: 'Office shift ended at 6:30 PM. Clock-in is closed for today.' }, { status: 400 });
+      }
+
       const alreadyLogged = await prisma.attendance.findFirst({
         where: {
           userId: requester.id,
@@ -102,9 +115,7 @@ export async function POST(request) {
       }
 
       let status = 'PRESENT';
-      const hours = now.getHours();
-      const minutes = now.getMinutes();
-      if (hours > 9 || (hours === 9 && minutes > 15)) {
+      if (curHour > 9 || (curHour === 9 && curMinute > 15)) {
         status = 'LATE';
       }
 

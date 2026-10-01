@@ -2416,44 +2416,6 @@ export default function CeoDashboard() {
                         );
                       })}
                     </div>
-
-                    {/* Scope Selector: All Clients (Global) vs Selected Month */}
-                    <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px] font-bold">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setClientFilterScope('all_clients');
-                          setClientMonthFilter('all');
-                          setClientStartDate('');
-                          setClientEndDate('');
-                        }}
-                        className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${clientFilterScope === 'all_clients'
-                          ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs font-black'
-                          : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                          }`}
-                        title="Search and filter across entire client base (all months)"
-                      >
-                        🌐 All Clients (Global)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setClientFilterScope('month');
-                          if (clientMonthFilter === 'all') {
-                            setClientMonthFilter(currentLiveMonthKey);
-                            setClientStartDate(currentLiveMonthStart);
-                            setClientEndDate(currentLiveMonthEnd);
-                          }
-                        }}
-                        className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${clientFilterScope === 'month'
-                          ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs font-black'
-                          : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                          }`}
-                        title="Filter within the selected calendar month"
-                      >
-                        📅 Month Specific
-                      </button>
-                    </div>
                   </div>
 
                   {/* Active filter informational breadcrumb */}

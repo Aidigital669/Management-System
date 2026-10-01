@@ -24,6 +24,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [checkingSession, setCheckingSession] = useState(true);
+  const [autoLogoutNotice, setAutoLogoutNotice] = useState(false);
 
   // Sign Up states
   const [isSignUp, setIsSignUp] = useState(false);
@@ -37,6 +38,12 @@ export default function LoginPage() {
   const isSpecialRole = email === 'nikhil@aidigital.com' || email === 'praveen@aidigital.com' || email === 'admin@workforce.com';
 
   const [hasWelcomedNikhil, setHasWelcomedNikhil] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('autoLogout')) {
+      setAutoLogoutNotice(true);
+    }
+  }, []);
 
   useEffect(() => {
     const trimmedEmail = email.toLowerCase().trim();
@@ -59,6 +66,11 @@ export default function LoginPage() {
   useEffect(() => {
     async function checkSession() {
       try {
+        if (typeof window !== 'undefined' && window.location.search.includes('autoLogout')) {
+          setCheckingSession(false);
+          return;
+        }
+
         const res = await fetch('/api/auth/me');
         if (res.ok) {
           const data = await res.json();
@@ -286,6 +298,16 @@ export default function LoginPage() {
               {isClient ? 'Enter your registered email address to track your plan deliverables.' : isSignUp ? 'Self-register as a new employee to get started.' : 'Enter your credentials to access your dashboard.'}
             </p>
           </div>
+
+          {autoLogoutNotice && (
+            <div className="p-4 bg-amber-50 border border-amber-200/90 rounded-2xl flex items-center gap-3 text-amber-900 text-xs font-semibold animate-fade-in shadow-xs">
+              <span className="text-2xl shrink-0">⏰</span>
+              <div>
+                <p className="font-extrabold text-amber-950 text-sm">Shift Ended at 6:30 PM</p>
+                <p className="text-amber-800">You have been automatically clocked out and logged out for the day.</p>
+              </div>
+            </div>
+          )}
 
           {error && (
             <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 text-red-700 text-sm animate-shake">

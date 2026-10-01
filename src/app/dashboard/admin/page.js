@@ -68,6 +68,16 @@ const AdminRemarksHistoryHub = dynamic(() => import('./AdminRemarksHistoryHub'),
   ),
   ssr: false
 });
+
+const DevDashboard = dynamic(() => import('./DevDashboard'), {
+  loading: () => (
+    <div className="flex items-center justify-center p-16 text-slate-400 gap-2">
+      <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      <span className="text-sm font-medium">Loading Dev Dashboard...</span>
+    </div>
+  ),
+  ssr: false
+});
 import {
   Award,
   Users,
@@ -110,7 +120,11 @@ import {
   Eye,
   Loader2,
   History,
-  Download
+  Download,
+  ListPlus,
+  Code,
+  Layers,
+  ListTodo
 } from 'lucide-react';
 const ExcelImportModal = dynamic(() => import('@/components/ExcelImportModal'), {
   ssr: false
@@ -278,6 +292,19 @@ export default function AdminDashboard() {
   const [taskAssignee, setTaskAssignee] = useState('');
   const [taskDueDate, setTaskDueDate] = useState('');
   const [taskPriority, setTaskPriority] = useState('Normal');
+  const [taskDepartment, setTaskDepartment] = useState('Software Development');
+
+  // Additional Tasks (Subtasks) & Department Filter State
+  const [taskDeptFilter, setTaskDeptFilter] = useState('ALL');
+  const [selectedTaskForSubtasks, setSelectedTaskForSubtasks] = useState(null);
+  const [showSubtasksModal, setShowSubtasksModal] = useState(false);
+  const [subtaskTitle, setSubtaskTitle] = useState('');
+  const [subtaskDesc, setSubtaskDesc] = useState('');
+  const [subtaskPriority, setSubtaskPriority] = useState('Normal');
+  const [subtaskDueDate, setSubtaskDueDate] = useState('');
+  const [subtaskAssignee, setSubtaskAssignee] = useState('');
+  const [subtaskLoading, setSubtaskLoading] = useState(false);
+  const [employeeDeptFilter, setEmployeeDeptFilter] = useState('ALL');
 
   // Form Fields - Client
   const [showAddClientModal, setShowAddClientModal] = useState(false);
@@ -2628,6 +2655,7 @@ export default function AdminDashboard() {
     setFormLoading(true);
 
     try {
+      const assigneeObj = employeesList.find(emp => emp.id.toString() === taskAssignee.toString());
       const res = await fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2636,7 +2664,8 @@ export default function AdminDashboard() {
           description: taskDesc,
           assignedToId: parseInt(taskAssignee),
           dueDate: taskDueDate || undefined,
-          priority: taskPriority
+          priority: taskPriority,
+          department: taskDepartment || (assigneeObj ? assigneeObj.department : 'Software Development')
         })
       });
 
@@ -2647,16 +2676,114 @@ export default function AdminDashboard() {
         return;
       }
 
-      showToast(`Task successfully assigned!`);
+      showToast(`Task successfully assigned to ${assigneeObj?.name || 'staff'} (${taskDepartment || 'Software Development'})!`);
       setShowAddTaskModal(false);
       setTaskTitle('');
       setTaskDesc('');
       setTaskDueDate('');
+      setTaskDepartment('Software Development');
       await refreshData();
     } catch (err) {
       setFormError('Internal server error.');
     } finally {
       setFormLoading(false);
+    }
+  };
+
+  const handleOpenSubtasksModal = (task) => {
+    setSelectedTaskForSubtasks(task);
+    setSubtaskTitle('');
+    setSubtaskDesc('');
+    setSubtaskPriority(task.priority || 'Normal');
+    setSubtaskDueDate(task.dueDate || '');
+    setSubtaskAssignee(task.assignedToId ? task.assignedToId.toString() : '');
+    setShowSubtasksModal(true);
+  };
+
+  const handleAddAdditionalTask = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!selectedTaskForSubtasks || !subtaskTitle.trim()) {
+      showToast('Please enter a title for the additional task.', 'warning');
+      return;
+    }
+    setSubtaskLoading(true);
+    try {
+      const res = await fetch(`/api/tasks/${selectedTaskForSubtasks.id}/subtasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: subtaskTitle.trim(),
+          description: subtaskDesc.trim(),
+          priority: subtaskPriority,
+          dueDate: subtaskDueDate || undefined,
+          assignedToId: subtaskAssignee ? parseInt(subtaskAssignee) : selectedTaskForSubtasks.assignedToId
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Failed to add additional task.', 'error');
+        setSubtaskLoading(false);
+        return;
+      }
+
+      showToast(`Additional task added to "${selectedTaskForSubtasks.title}"!`);
+      setSubtaskTitle('');
+      setSubtaskDesc('');
+      if (data.task) {
+        setSelectedTaskForSubtasks(data.task);
+      }
+      await refreshData();
+    } catch (err) {
+      showToast('Error adding additional task.', 'error');
+    } finally {
+      setSubtaskLoading(false);
+    }
+  };
+
+  const handleToggleSubtaskStatus = async (taskId, subtaskId, currentStatus) => {
+    const nextStatus = currentStatus === 'DONE' ? 'TODO' : 'DONE';
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/subtasks`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subtaskId,
+          status: nextStatus
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`Subtask marked as ${nextStatus === 'DONE' ? 'Completed' : 'To Do'}.`);
+        if (selectedTaskForSubtasks && selectedTaskForSubtasks.id === taskId && data.task) {
+          setSelectedTaskForSubtasks(data.task);
+        }
+        await refreshData();
+      } else {
+        showToast(data.error || 'Failed to update subtask.', 'error');
+      }
+    } catch (err) {
+      showToast('Connection error.', 'error');
+    }
+  };
+
+  const handleDeleteSubtask = async (taskId, subtaskId) => {
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/subtasks?subtaskId=${subtaskId}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast('Additional task deleted.');
+        if (selectedTaskForSubtasks && selectedTaskForSubtasks.id === taskId && data.task) {
+          setSelectedTaskForSubtasks(data.task);
+        }
+        await refreshData();
+      } else {
+        showToast(data.error || 'Failed to delete additional task.', 'error');
+      }
+    } catch (err) {
+      showToast('Connection error.', 'error');
     }
   };
 
@@ -2757,8 +2884,12 @@ export default function AdminDashboard() {
       (u.designation && u.designation.toLowerCase().includes(q)) ||
       (u.role && u.role.toLowerCase().includes(q));
     if (!matchesSearch) return false;
-    if (employeeStatusFilter === 'ACTIVE') return u.status === 'ACTIVE';
-    if (employeeStatusFilter === 'INACTIVE') return u.status === 'INACTIVE';
+    if (employeeStatusFilter === 'ACTIVE' && u.status !== 'ACTIVE') return false;
+    if (employeeStatusFilter === 'INACTIVE' && u.status !== 'INACTIVE') return false;
+    if (employeeDeptFilter !== 'ALL') {
+      const uDept = ((u.department || '') + ' ' + (u.designation || '')).toLowerCase();
+      if (!uDept.includes(employeeDeptFilter.toLowerCase())) return false;
+    }
     return true;
   });
 
@@ -3057,6 +3188,18 @@ export default function AdminDashboard() {
             </button>
 
             <button
+              onClick={() => handleSelectTab('dev-dashboard')}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
+                activeTab === 'dev-dashboard'
+                  ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 font-bold'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Code className="w-4 h-4 text-indigo-500" />
+              Dev Dashboard
+            </button>
+
+            <button
               onClick={() => handleSelectTab('leaves')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === 'leaves'
@@ -3136,6 +3279,8 @@ export default function AdminDashboard() {
                 ? 'Administration Console'
                 : activeTab === 'remarks-sales'
                 ? 'Remarks Sales Person'
+                : activeTab === 'dev-dashboard'
+                ? '⚡ Dev Task Board'
                 : activeTab.replace('-', ' ')}
             </h2>
           </div>
@@ -3228,6 +3373,15 @@ export default function AdminDashboard() {
               usersList={usersList}
               refreshData={refreshData}
               initialLeadFilter={remarksLeadFilter || ''}
+            />
+          )}
+
+          {/* TAB: DEV DASHBOARD */}
+          {activeTab === 'dev-dashboard' && (
+            <DevDashboard
+              usersList={usersList}
+              tasksList={tasksList}
+              refreshData={refreshData}
             />
           )}
 
@@ -3502,6 +3656,23 @@ export default function AdminDashboard() {
                       Inactive ({inactiveEmployeesCount})
                     </button>
                   </div>
+
+                  {/* Department Filter for Employees */}
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={employeeDeptFilter}
+                      onChange={(e) => setEmployeeDeptFilter(e.target.value)}
+                      className="p-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer shadow-sm"
+                    >
+                      <option value="ALL">All Departments</option>
+                      <option value="Software Development">💻 Software Development</option>
+                      <option value="Social Media Marketing">📱 Social Media Marketing</option>
+                      <option value="Video Editing">🎬 Video Editing / Content</option>
+                      <option value="Graphic">🎨 Graphics / Design</option>
+                      <option value="Sales">💼 Sales</option>
+                      <option value="HR">👥 HR / Admin</option>
+                    </select>
+                  </div>
                 </div>
 
                 <button
@@ -3632,27 +3803,166 @@ export default function AdminDashboard() {
               if (taskStartDate || taskEndDate) {
                 if (!isDateInRange(t.dueDate || t.createdAt, taskStartDate, taskEndDate)) return false;
               }
+              if (taskDeptFilter !== 'ALL') {
+                const tDept = ((t.department || '') + ' ' + (t.assignedTo?.department || '')).toLowerCase();
+                if (!tDept.includes(taskDeptFilter.toLowerCase())) return false;
+              }
               if (taskStaffFilter === 'ALL') return true;
               const worker = ((t.workingOn || '') + ' ' + (t.assignedTo?.name || '') + ' ' + (t.assignTo || '')).toLowerCase();
               if (taskStaffFilter === 'SANMEET') return worker.includes('sanmeet');
               if (taskStaffFilter === 'AI_VIDEO') return worker.includes('ai video') || worker.includes('video editor') || worker.includes('reel');
-              return worker.includes(taskStaffFilter.toLowerCase());
+              if (taskStaffFilter === 'SOFTWARE_DEV') return worker.includes('developer') || worker.includes('software') || worker.includes('engineer') || (t.department && t.department.toLowerCase().includes('software'));
+              return true;
             });
 
-            const todoTasks = filteredTasks.filter(t => t.status === 'TODO');
-            const inProgressTasks = filteredTasks.filter(t => t.status === 'IN_PROGRESS');
-            const pendingTasks = filteredTasks.filter(t => t.status === 'PENDING' || t.status === 'OVERDUE');
-            const doneTasks = filteredTasks.filter(t => t.status === 'DONE' || t.status === 'COMPLETED');
+            const renderTaskCard = (task, columnType) => {
+              const subtasks = Array.isArray(task.subtasks) ? task.subtasks : [];
+              const totalSubtasks = subtasks.length;
+              const completedSubtasks = subtasks.filter(st => st.status === 'DONE').length;
+              const pctSubtasks = totalSubtasks > 0 ? Math.round((completedSubtasks / totalSubtasks) * 100) : 0;
+              const deptDisplay = task.department || task.assignedTo?.department || 'Software Development';
+
+              return (
+                <div key={task.id} className={`bg-white dark:bg-slate-900 p-4 border rounded-xl shadow-sm flex flex-col gap-2 transition hover:shadow-md ${
+                  columnType === 'PENDING' ? 'border-red-200 dark:border-red-900' : 'border-slate-200 dark:border-slate-800'
+                } ${columnType === 'DONE' ? 'opacity-90' : ''}`}>
+                  <div className="flex justify-between items-start">
+                    <div className="flex flex-col gap-1 w-full pr-2">
+                      <p className="text-xs font-bold text-slate-900 dark:text-white leading-snug">{task.title}</p>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
+                          💻 {deptDisplay}
+                        </span>
+                        <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase w-max
+                          ${task.priority === 'Urgent' ? 'bg-red-500 text-white' 
+                            : task.priority === 'High' ? 'bg-orange-400 text-white' 
+                            : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>
+                          {task.priority || 'Normal'}
+                        </span>
+                      </div>
+                    </div>
+                    <button onClick={() => handleDeleteTask(task.id)} className="text-slate-300 hover:text-red-600 transition shrink-0" title="Delete task">✕</button>
+                  </div>
+
+                  <p className="text-[10px] text-slate-500 line-clamp-2">{task.description}</p>
+
+                  {task.reason && (
+                    <div className="bg-red-50 dark:bg-red-950/30 p-2 rounded-lg border border-red-100 dark:border-red-900/30 mt-1">
+                      <span className="text-[9px] font-bold text-red-600 dark:text-red-400 uppercase tracking-wider block mb-0.5">Reason:</span>
+                      <p className="text-[10px] text-red-700 dark:text-red-300 italic">{task.reason}</p>
+                    </div>
+                  )}
+
+                  {task.workSampleUrl && (
+                    <div className="bg-emerald-50 dark:bg-emerald-950/20 p-2 rounded-lg border border-emerald-100 dark:border-emerald-900/30 mt-1">
+                      <a 
+                        href={task.workSampleUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 hover:underline"
+                      >
+                        📁 View Work Sample
+                      </a>
+                    </div>
+                  )}
+
+                  {/* Additional Tasks Progress & Action */}
+                  <div className="mt-1 pt-2 border-t border-slate-100 dark:border-slate-800/80 space-y-1.5">
+                    {totalSubtasks > 0 && (
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-[9px] font-bold text-slate-500">
+                          <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400">
+                            <ListTodo className="w-3 h-3" />
+                            {completedSubtasks}/{totalSubtasks} Additional Tasks Done
+                          </span>
+                          <span>{pctSubtasks}%</span>
+                        </div>
+                        <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full transition-all duration-300 ${pctSubtasks === 100 ? 'bg-emerald-500' : 'bg-indigo-600'}`} 
+                            style={{ width: `${pctSubtasks}%` }} 
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => handleOpenSubtasksModal(task)}
+                      className="w-full py-1.5 px-2 bg-indigo-50/70 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 rounded-md text-[9px] font-bold flex items-center justify-center gap-1.5 transition border border-indigo-200/50 dark:border-indigo-800/50 cursor-pointer shadow-xs"
+                    >
+                      <ListPlus className="w-3.5 h-3.5" />
+                      {totalSubtasks > 0 ? `Give / Manage Additional Tasks (${totalSubtasks})` : '+ Give Additional Task Through This'}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-2 mt-1">
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-bold text-slate-400">Due: {task.dueDate || 'No Limit'}</span>
+                      <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400 mt-0.5">👤 {task.workingOn || task.assignedTo?.name || 'Unassigned'}</span>
+                    </div>
+                    {columnType === 'TODO' && (
+                      <button 
+                        onClick={() => handleUpdateTaskStatus(task.id, 'TODO')}
+                        className="py-1 px-2.5 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400 rounded-md text-[9px] font-bold hover:bg-blue-100 transition cursor-pointer"
+                      >
+                        Start Work →
+                      </button>
+                    )}
+                    {columnType === 'IN_PROGRESS' && (
+                      <button 
+                        onClick={() => handleUpdateTaskStatus(task.id, 'IN_PROGRESS')}
+                        className="py-1 px-2.5 bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400 rounded-md text-[9px] font-bold hover:bg-indigo-100 transition cursor-pointer"
+                      >
+                        Mark Completed →
+                      </button>
+                    )}
+                    {columnType === 'PENDING' && (
+                      <span className="py-1 px-2.5 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-400 rounded-md text-[9px] font-bold">{task.status}</span>
+                    )}
+                    {columnType === 'DONE' && (
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => handleUpdateTaskStatus(task.id, 'IN_PROGRESS')}
+                          className="text-[9px] font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30 px-2 py-1 rounded-md hover:bg-orange-100 transition cursor-pointer"
+                        >
+                          Undo
+                        </button>
+                        <span className="w-5 h-5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 rounded-full flex items-center justify-center font-bold text-[10px]">✓</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            };
 
             return (
               <div className="space-y-6 animate-fade-in">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
                   <div>
                     <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">Department Duties Allocation</h4>
-                    <p className="text-xs text-slate-400 mt-1">Filter and track tasks for Sanmeet, AI Video Leads, and Executives.</p>
+                    <p className="text-xs text-slate-400 mt-1">Assign, track, and provide additional tasks across Software Development and all departments.</p>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3">
+                    {/* Department Filter Dropdown */}
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase shrink-0">Department:</label>
+                      <select
+                        value={taskDeptFilter}
+                        onChange={(e) => setTaskDeptFilter(e.target.value)}
+                        className="p-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-xl text-xs font-bold text-indigo-600 dark:text-indigo-400 focus:outline-none cursor-pointer"
+                      >
+                        <option value="ALL">All Departments</option>
+                        <option value="Software Development">💻 Software Development</option>
+                        <option value="Social Media Marketing">📱 Social Media Marketing</option>
+                        <option value="Video Editing">🎬 Video Editing / Content</option>
+                        <option value="Graphic">🎨 Graphics / Design</option>
+                        <option value="Sales">💼 Sales</option>
+                        <option value="HR">👥 HR / Admin</option>
+                      </select>
+                    </div>
+
                     {/* Staff Filter Dropdown */}
                     <div className="flex items-center gap-2">
                       <label className="text-xs font-bold text-slate-500 uppercase shrink-0">Filter Employee:</label>
@@ -3662,6 +3972,7 @@ export default function AdminDashboard() {
                         className="p-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 focus:outline-none"
                       >
                         <option value="ALL">All Staff & Employees ({tasksList.length})</option>
+                        <option value="SOFTWARE_DEV">💻 Software Developers</option>
                         <option value="SANMEET">★ Sanmeet (Reels & Social Media Lead)</option>
                         <option value="AI_VIDEO">🎬 AI Video Team (Video Editors)</option>
                         {usersList.filter(u => u.role === 'EMPLOYEE' || u.role === 'TL' || u.role === 'SALES').map(emp => (
@@ -3835,35 +4146,11 @@ export default function AdminDashboard() {
                   </div>
                   
                   <div className="flex flex-col gap-3">
-                    {todoTasks.map(task => (
-                      <div key={task.id} className="bg-white dark:bg-slate-900 p-4 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm flex flex-col gap-2">
-                        <div className="flex justify-between items-start">
-                          <div className="flex flex-col gap-1">
-                            <p className="text-xs font-bold text-slate-900 dark:text-white leading-snug">{task.title}</p>
-                            <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase w-max
-                              ${task.priority === 'Urgent' ? 'bg-red-500 text-white' 
-                                : task.priority === 'High' ? 'bg-orange-400 text-white' 
-                                : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>
-                              {task.priority || 'Normal'}
-                            </span>
-                          </div>
-                          <button onClick={() => handleDeleteTask(task.id)} className="text-slate-300 hover:text-red-600 transition">✕</button>
-                        </div>
-                        <p className="text-[10px] text-slate-500 line-clamp-2">{task.description}</p>
-                        <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-2 mt-1">
-                          <div className="flex flex-col">
-                            <span className="text-[9px] font-bold text-slate-400">Due: {task.dueDate || 'No Limit'}</span>
-                            <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400 mt-0.5">👤 {task.workingOn || task.assignedTo?.name || 'Unassigned'}</span>
-                          </div>
-                          <button 
-                            onClick={() => handleUpdateTaskStatus(task.id, 'TODO')}
-                            className="py-1 px-2.5 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400 rounded-md text-[9px] font-bold hover:bg-blue-100 transition"
-                          >
-                            Start Work →
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                    {todoTasks.length === 0 ? (
+                      <p className="text-[11px] text-slate-400 text-center py-8 italic">No To-Do tasks</p>
+                    ) : (
+                      todoTasks.map(task => renderTaskCard(task, 'TODO'))
+                    )}
                   </div>
                 </div>
                 )}
@@ -3879,35 +4166,11 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="flex flex-col gap-3">
-                    {inProgressTasks.map(task => (
-                      <div key={task.id} className="bg-white dark:bg-slate-900 p-4 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm flex flex-col gap-2">
-                        <div className="flex justify-between items-start">
-                          <div className="flex flex-col gap-1">
-                            <p className="text-xs font-bold text-slate-900 dark:text-white leading-snug">{task.title}</p>
-                            <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase w-max
-                              ${task.priority === 'Urgent' ? 'bg-red-500 text-white' 
-                                : task.priority === 'High' ? 'bg-orange-400 text-white' 
-                                : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>
-                              {task.priority || 'Normal'}
-                            </span>
-                          </div>
-                          <button onClick={() => handleDeleteTask(task.id)} className="text-slate-300 hover:text-red-600 transition">✕</button>
-                        </div>
-                        <p className="text-[10px] text-slate-500 line-clamp-2">{task.description}</p>
-                        <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-2 mt-1">
-                          <div className="flex flex-col">
-                            <span className="text-[9px] font-bold text-slate-400">Due: {task.dueDate || 'No Limit'}</span>
-                            <span className="text-[9px] font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">👤 {task.workingOn || task.assignedTo?.name || 'Unassigned'}</span>
-                          </div>
-                          <button 
-                            onClick={() => handleUpdateTaskStatus(task.id, 'IN_PROGRESS')}
-                            className="py-1 px-2.5 bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400 rounded-md text-[9px] font-bold hover:bg-indigo-100 transition"
-                          >
-                            Mark Completed →
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                    {inProgressTasks.length === 0 ? (
+                      <p className="text-[11px] text-slate-400 text-center py-8 italic">No tasks in progress</p>
+                    ) : (
+                      inProgressTasks.map(task => renderTaskCard(task, 'IN_PROGRESS'))
+                    )}
                   </div>
                 </div>
                 )}
@@ -3923,33 +4186,11 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="flex flex-col gap-3">
-                    {pendingTasks.map(task => (
-                      <div key={task.id} className="bg-white dark:bg-slate-900 p-4 border border-red-200 dark:border-red-900 rounded-xl shadow-sm flex flex-col gap-2">
-                        <div className="flex justify-between items-start">
-                          <div className="flex flex-col gap-1">
-                            <p className="text-xs font-bold text-slate-900 dark:text-white leading-snug">{task.title}</p>
-                            <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase w-max
-                              ${task.priority === 'Urgent' ? 'bg-red-500 text-white' 
-                                : task.priority === 'High' ? 'bg-orange-400 text-white' 
-                                : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>
-                              {task.priority || 'Normal'}
-                            </span>
-                          </div>
-                          <button onClick={() => handleDeleteTask(task.id)} className="text-slate-300 hover:text-red-600 transition">✕</button>
-                        </div>
-                        <p className="text-[10px] text-slate-500 line-clamp-2">{task.description}</p>
-                        {task.reason && (
-                          <div className="bg-red-50 dark:bg-red-950/30 p-2 rounded-lg border border-red-100 dark:border-red-900/30 mt-1">
-                            <span className="text-[9px] font-bold text-red-600 dark:text-red-400 uppercase tracking-wider block mb-0.5">Reason:</span>
-                            <p className="text-[10px] text-red-700 dark:text-red-300 italic">{task.reason}</p>
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-2 mt-1">
-                          <span className="text-[9px] font-bold text-slate-400">Assigned: {task.workingOn || task.assignedTo?.name || 'Unknown'}</span>
-                          <span className="py-1 px-2.5 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-400 rounded-md text-[9px] font-bold">{task.status}</span>
-                        </div>
-                      </div>
-                    ))}
+                    {pendingTasks.length === 0 ? (
+                      <p className="text-[11px] text-slate-400 text-center py-8 italic">No delayed tasks</p>
+                    ) : (
+                      pendingTasks.map(task => renderTaskCard(task, 'PENDING'))
+                    )}
                   </div>
                 </div>
                 )}
@@ -3965,50 +4206,11 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="flex flex-col gap-3">
-                    {doneTasks.map(task => (
-                      <div key={task.id} className="bg-white dark:bg-slate-900 p-4 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm flex flex-col gap-2 opacity-90">
-                        <div className="flex justify-between items-start">
-                          <div className="flex flex-col gap-1">
-                            <p className="text-xs font-bold text-slate-950 dark:text-slate-200 leading-snug">{task.title}</p>
-                            <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase w-max
-                              ${task.priority === 'Urgent' ? 'bg-red-500 text-white' 
-                                : task.priority === 'High' ? 'bg-orange-400 text-white' 
-                                : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>
-                              {task.priority || 'Normal'}
-                            </span>
-                          </div>
-                          <button onClick={() => handleDeleteTask(task.id)} className="text-slate-300 hover:text-red-600 transition">✕</button>
-                        </div>
-                        <p className="text-[10px] text-slate-500">{task.description}</p>
-                        {task.workSampleUrl && (
-                          <div className="bg-emerald-50 dark:bg-emerald-950/20 p-2 rounded-lg border border-emerald-100 dark:border-emerald-900/30 mt-1">
-                            <a 
-                              href={task.workSampleUrl} 
-                              target="_blank" 
-                              rel="noopener noreferrer" 
-                              className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 hover:underline"
-                            >
-                              📁 View Work Sample
-                            </a>
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-2 mt-1">
-                          <div className="flex flex-col">
-                            <span className="text-[9px] font-bold text-slate-400">Completed Task</span>
-                            <span className="text-[9px] font-bold text-slate-500 mt-0.5">👤 By: {task.workingOn || task.assignedTo?.name || 'Unassigned'}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button 
-                              onClick={() => handleUpdateTaskStatus(task.id, 'IN_PROGRESS')}
-                              className="text-[9px] font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30 px-2 py-1 rounded-md hover:bg-orange-100 transition"
-                            >
-                              Undo
-                            </button>
-                            <span className="w-5 h-5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 rounded-full flex items-center justify-center font-bold text-[10px]">✓</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                    {doneTasks.length === 0 ? (
+                      <p className="text-[11px] text-slate-400 text-center py-8 italic">No completed tasks</p>
+                    ) : (
+                      doneTasks.map(task => renderTaskCard(task, 'DONE'))
+                    )}
                   </div>
                 </div>
                 )}
@@ -4127,7 +4329,27 @@ export default function AdminDashboard() {
                           <td className="p-4 font-bold text-slate-900 dark:text-white">{log.user.name}</td>
                           <td className="p-4 text-slate-500 font-semibold">{new Date(log.clockIn).toLocaleTimeString()}</td>
                           <td className="p-4 text-slate-500 font-semibold">
-                            {log.clockOut ? new Date(log.clockOut).toLocaleTimeString() : <span className="text-orange-500 italic font-bold">On Duty</span>}
+                            {log.clockOut ? (
+                              <span className="inline-flex items-center gap-1.5">
+                                <span>{new Date(log.clockOut).toLocaleTimeString()}</span>
+                                {(() => {
+                                  try {
+                                    const outDate = new Date(log.clockOut);
+                                    const istOut = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', hour12: false, hour: '2-digit', minute: '2-digit' }).format(outDate);
+                                    if (istOut === '18:30') {
+                                      return (
+                                        <span className="text-[9px] bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 px-1.5 py-0.5 rounded font-extrabold" title="Auto clocked out at 6:30 PM shift end">
+                                          Auto 6:30 PM
+                                        </span>
+                                      );
+                                    }
+                                  } catch (e) {}
+                                  return null;
+                                })()}
+                              </span>
+                            ) : (
+                              <span className="text-orange-500 italic font-bold">On Duty</span>
+                            )}
                           </td>
                           <td className="p-4">
                             {log.location && log.location.startsWith('http') ? (
@@ -7032,46 +7254,6 @@ export default function AdminDashboard() {
                         );
                       })}
                     </div>
-
-                    {/* Scope Selector: All Clients (Global) vs Selected Month */}
-                    <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px] font-bold">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setClientFilterScope('all_clients');
-                          setClientMonthFilter('all');
-                          setClientStartDate('');
-                          setClientEndDate('');
-                        }}
-                        className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
-                          clientFilterScope === 'all_clients'
-                            ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs font-black'
-                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                        }`}
-                        title="Search and filter across entire client base (all months)"
-                      >
-                        🌐 All Clients (Global)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setClientFilterScope('month');
-                          if (clientMonthFilter === 'all') {
-                            setClientMonthFilter(currentLiveMonthKey);
-                            setClientStartDate(currentLiveMonthStart);
-                            setClientEndDate(currentLiveMonthEnd);
-                          }
-                        }}
-                        className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
-                          clientFilterScope === 'month'
-                            ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs font-black'
-                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                        }`}
-                        title="Filter within the selected calendar month"
-                      >
-                        📅 Month Specific
-                      </button>
-                    </div>
                   </div>
 
                   {/* Active filter informational breadcrumb */}
@@ -7980,19 +8162,65 @@ export default function AdminDashboard() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="font-bold text-slate-700 dark:text-slate-300">Assign To</label>
+                    <label className="font-bold text-slate-700 dark:text-slate-300">Target Department</label>
                     <select
-                      value={taskAssignee}
-                      onChange={(e) => setTaskAssignee(e.target.value)}
-                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none"
+                      value={taskDepartment}
+                      onChange={(e) => {
+                        const newDept = e.target.value;
+                        setTaskDepartment(newDept);
+                        if (newDept !== 'ALL') {
+                          const match = employeesList.find(emp => (emp.department || '').toLowerCase().includes(newDept.toLowerCase()));
+                          if (match) setTaskAssignee(match.id.toString());
+                        }
+                      }}
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none cursor-pointer"
                     >
-                      {employeesList.map(emp => (
-                        <option key={emp.id} value={emp.id}>{emp.name} ({emp.department})</option>
-                      ))}
+                      <option value="Software Development">💻 Software Development</option>
+                      <option value="Social Media Marketing">📱 Social Media Marketing</option>
+                      <option value="Video Editing / Content Creator">🎬 Video Editing / Content Creator</option>
+                      <option value="Graphics">🎨 Graphics / Design</option>
+                      <option value="Sales">💼 Sales</option>
+                      <option value="HR">👥 HR / Operations</option>
+                      <option value="ALL">All Departments</option>
                     </select>
                   </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-700 dark:text-slate-300">Assign To Staff *</label>
+                    <select
+                      value={taskAssignee}
+                      onChange={(e) => {
+                        setTaskAssignee(e.target.value);
+                        const chosen = employeesList.find(emp => emp.id.toString() === e.target.value);
+                        if (chosen && chosen.department) {
+                          setTaskDepartment(chosen.department);
+                        }
+                      }}
+                      required
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                    >
+                      <option value="">Select Employee...</option>
+                      {employeesList
+                        .filter(emp => {
+                          if (!taskDepartment || taskDepartment === 'ALL') return true;
+                          return (emp.department || '').toLowerCase().includes(taskDepartment.toLowerCase());
+                        })
+                        .map(emp => (
+                          <option key={emp.id} value={emp.id}>{emp.name} ({emp.department} - {emp.designation || 'Staff'})</option>
+                        ))}
+                      {/* Fallback to show all employees if none in this department */}
+                      {employeesList.filter(emp => !taskDepartment || taskDepartment === 'ALL' || (emp.department || '').toLowerCase().includes(taskDepartment.toLowerCase())).length === 0 && (
+                        employeesList.map(emp => (
+                          <option key={emp.id} value={emp.id}>{emp.name} ({emp.department})</option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-300">Due Date</label>
                     <input
@@ -8007,7 +8235,7 @@ export default function AdminDashboard() {
                     <select
                       value={taskPriority}
                       onChange={(e) => setTaskPriority(e.target.value)}
-                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none"
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none cursor-pointer"
                     >
                       <option value="Normal">Normal</option>
                       <option value="High">High</option>
@@ -8022,19 +8250,286 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setShowAddTaskModal(false)}
-                  className="py-2 px-4 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+                  className="py-2 px-4 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={formLoading}
-                  className="py-2 px-4 bg-blue-800 hover:bg-blue-900 text-white rounded-lg transition disabled:opacity-50"
+                  className="py-2 px-4 bg-blue-800 hover:bg-blue-900 text-white rounded-lg transition disabled:opacity-50 cursor-pointer font-bold"
                 >
                   {formLoading ? 'Assigning...' : 'Assign Task'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MANAGE & ADD ADDITIONAL TASKS MODAL --- */}
+      {showSubtasksModal && selectedTaskForSubtasks && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden animate-scale-up max-h-[90vh] flex flex-col">
+            
+            {/* Modal Header */}
+            <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/70 dark:bg-slate-850">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md">
+                  <ListTodo className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm text-slate-900 dark:text-white">Additional Tasks & Requirements</h3>
+                  <p className="text-[11px] text-slate-500 line-clamp-1">Parent: <b>{selectedTaskForSubtasks.title}</b></p>
+                </div>
+              </div>
+              <button 
+                onClick={() => { setShowSubtasksModal(false); setSelectedTaskForSubtasks(null); }} 
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition text-sm p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div className="p-6 overflow-y-auto space-y-5 text-xs">
+              
+              {/* Task Overview Card */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm">
+                      {selectedTaskForSubtasks.title}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                      💻 {selectedTaskForSubtasks.department || selectedTaskForSubtasks.assignedTo?.department || 'Software Development'}
+                    </span>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase ${
+                    selectedTaskForSubtasks.status === 'DONE' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' :
+                    selectedTaskForSubtasks.status === 'IN_PROGRESS' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' :
+                    'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
+                  }`}>
+                    {selectedTaskForSubtasks.status}
+                  </span>
+                </div>
+                {selectedTaskForSubtasks.description && (
+                  <p className="text-slate-600 dark:text-slate-300 text-xs italic">{selectedTaskForSubtasks.description}</p>
+                )}
+                <div className="flex flex-wrap items-center gap-4 text-[10px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                  <span>👤 Assignee: <b>{selectedTaskForSubtasks.workingOn || selectedTaskForSubtasks.assignedTo?.name || 'Staff'}</b></span>
+                  <span>📅 Due: <b>{selectedTaskForSubtasks.dueDate || 'No Limit'}</b></span>
+                  <span>⚡ Priority: <b>{selectedTaskForSubtasks.priority || 'Normal'}</b></span>
+                </div>
+              </div>
+
+              {/* Progress Bar of Subtasks */}
+              {(() => {
+                const subtasks = Array.isArray(selectedTaskForSubtasks.subtasks) ? selectedTaskForSubtasks.subtasks : [];
+                const total = subtasks.length;
+                const completed = subtasks.filter(st => st.status === 'DONE').length;
+                const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+                return (
+                  <div className="p-4 bg-white dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold">
+                      <span className="text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                        <CheckSquare className="w-4 h-4 text-indigo-600" />
+                        Additional Tasks Progress ({completed}/{total} Completed)
+                      </span>
+                      <span className="text-indigo-600 dark:text-indigo-400 font-extrabold">{pct}% Done</span>
+                    </div>
+                    <div className="w-full bg-slate-100 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full transition-all duration-500 rounded-full ${pct === 100 ? 'bg-emerald-500' : 'bg-indigo-600'}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* List of Existing Subtasks */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-extrabold text-xs text-slate-900 dark:text-white uppercase tracking-wider">
+                    Assigned Additional Tasks ({Array.isArray(selectedTaskForSubtasks.subtasks) ? selectedTaskForSubtasks.subtasks.length : 0})
+                  </h4>
+                  <span className="text-[10px] text-slate-400">Click checkbox to toggle completion</span>
+                </div>
+
+                {(!selectedTaskForSubtasks.subtasks || selectedTaskForSubtasks.subtasks.length === 0) ? (
+                  <div className="p-6 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl text-slate-400 space-y-1">
+                    <p className="font-bold text-xs">No additional tasks yet.</p>
+                    <p className="text-[11px]">Give an additional task below to expand this task's scope or break it down into deliverables.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {selectedTaskForSubtasks.subtasks.map((st, idx) => (
+                      <div 
+                        key={st.id || idx}
+                        className={`p-3.5 rounded-xl border transition flex items-start justify-between gap-3 ${
+                          st.status === 'DONE'
+                            ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/50'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-xs'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3 min-w-0">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleSubtaskStatus(selectedTaskForSubtasks.id, st.id, st.status)}
+                            className={`w-5 h-5 rounded-md mt-0.5 flex items-center justify-center transition shrink-0 cursor-pointer ${
+                              st.status === 'DONE'
+                                ? 'bg-emerald-600 text-white'
+                                : 'border-2 border-slate-300 dark:border-slate-600 hover:border-indigo-600'
+                            }`}
+                            title="Toggle status"
+                          >
+                            {st.status === 'DONE' && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                          </button>
+
+                          <div className="space-y-1 min-w-0">
+                            <p className={`text-xs font-bold leading-tight ${
+                              st.status === 'DONE' ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-900 dark:text-white'
+                            }`}>
+                              {st.title}
+                            </p>
+                            {st.description && (
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 whitespace-pre-wrap">{st.description}</p>
+                            )}
+                            <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[9px]">
+                              <span className={`px-1.5 py-0.5 rounded font-extrabold uppercase ${
+                                st.priority === 'Urgent' ? 'bg-red-500 text-white' :
+                                st.priority === 'High' ? 'bg-orange-400 text-white' :
+                                'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                              }`}>
+                                {st.priority || 'Normal'}
+                              </span>
+                              {st.dueDate && (
+                                <span className="text-slate-400">📅 Due: {st.dueDate}</span>
+                              )}
+                              <span className="text-slate-400">👤 {st.assignedToName || 'Assignee'}</span>
+                              {st.completedAt && (
+                                <span className="text-emerald-600 dark:text-emerald-400 font-bold">✓ Done</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSubtask(selectedTaskForSubtasks.id, st.id)}
+                          className="text-slate-300 hover:text-red-600 transition p-1 rounded shrink-0 cursor-pointer"
+                          title="Delete additional task"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Form to Give Additional Task Through This Task */}
+              <div className="p-4 bg-indigo-50/40 dark:bg-slate-800/90 rounded-2xl border border-indigo-100 dark:border-indigo-950/60 space-y-3">
+                <div className="flex items-center gap-2 text-indigo-700 dark:text-indigo-400 font-extrabold text-xs">
+                  <ListPlus className="w-4 h-4" />
+                  <span>Give Additional Task Through This Task</span>
+                </div>
+
+                <form onSubmit={handleAddAdditionalTask} className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-700 dark:text-slate-300 text-[11px]">Additional Task Title *</label>
+                    <input
+                      type="text"
+                      required
+                      value={subtaskTitle}
+                      onChange={(e) => setSubtaskTitle(e.target.value)}
+                      placeholder="e.g. Implement Webhook signature authentication / Build CSS grid"
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-600 text-xs"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-700 dark:text-slate-300 text-[11px]">Instructions / Specifications (Optional)</label>
+                    <textarea
+                      value={subtaskDesc}
+                      onChange={(e) => setSubtaskDesc(e.target.value)}
+                      placeholder="Provide specific technical guidance, API contract, endpoints, or requirements..."
+                      rows="2"
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-600 text-xs"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <label className="font-bold text-slate-700 dark:text-slate-300 text-[11px]">Assignee</label>
+                      <select
+                        value={subtaskAssignee}
+                        onChange={(e) => setSubtaskAssignee(e.target.value)}
+                        className="w-full p-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none text-xs"
+                      >
+                        <option value={selectedTaskForSubtasks.assignedToId}>
+                          {selectedTaskForSubtasks.workingOn || selectedTaskForSubtasks.assignedTo?.name || 'Primary Assignee'} (Current)
+                        </option>
+                        {employeesList
+                          .filter(e => e.id !== selectedTaskForSubtasks.assignedToId)
+                          .map(emp => (
+                            <option key={emp.id} value={emp.id}>{emp.name} ({emp.department})</option>
+                          ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="font-bold text-slate-700 dark:text-slate-300 text-[11px]">Due Date</label>
+                      <input
+                        type="date"
+                        value={subtaskDueDate}
+                        onChange={(e) => setSubtaskDueDate(e.target.value)}
+                        className="w-full p-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none text-xs"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="font-bold text-slate-700 dark:text-slate-300 text-[11px]">Priority</label>
+                      <select
+                        value={subtaskPriority}
+                        onChange={(e) => setSubtaskPriority(e.target.value)}
+                        className="w-full p-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none text-xs"
+                      >
+                        <option value="Normal">Normal</option>
+                        <option value="High">High</option>
+                        <option value="Urgent">Urgent</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="submit"
+                      disabled={subtaskLoading || !subtaskTitle.trim()}
+                      className="py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center gap-1.5 transition disabled:opacity-50 text-xs shadow-md shadow-indigo-600/20 cursor-pointer"
+                    >
+                      <ListPlus className="w-4 h-4" />
+                      {subtaskLoading ? 'Adding...' : 'Add Additional Task To This Task'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex justify-end text-xs">
+              <button
+                type="button"
+                onClick={() => { setShowSubtasksModal(false); setSelectedTaskForSubtasks(null); }}
+                className="py-2 px-5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold transition cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+
           </div>
         </div>
       )}

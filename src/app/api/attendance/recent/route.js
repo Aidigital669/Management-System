@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { autoCloseExpiredAttendance } from '@/lib/attendanceService';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +12,9 @@ export async function GET(request) {
     if (!since) {
       return NextResponse.json({ error: 'Missing since parameter' }, { status: 400 });
     }
+
+    // Auto-close expired sessions
+    await autoCloseExpiredAttendance();
 
     const recentLogs = await prisma.attendance.findMany({
       where: {
