@@ -28,7 +28,7 @@ export async function POST(request) {
     // We do sequential creation to leverage existing logic, 
     // or we could use prisma.task.createMany if supported, but createMany doesn't return created records in sqlite usually.
     for (const taskData of tasks) {
-      const { title, description, assignedToId, dueDate, priority, department, subtasks, module, dependency, expectedOutput } = taskData;
+      const { title, description, assignedToId, dueDate, priority, department, subtasks, module, dependency, expectedOutput, taskDate } = taskData;
       
       if (!title || !assignedToId) continue;
       
@@ -53,7 +53,8 @@ export async function POST(request) {
           subtasks: resolvedSubtasks,
           module,
           dependency,
-          expectedOutput
+          expectedOutput,
+          taskDate
         }
       });
       successCount++;

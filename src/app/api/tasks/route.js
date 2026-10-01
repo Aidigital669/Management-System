@@ -80,7 +80,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const { title, description, assignedToId, dueDate, priority, department, subtasks, module, dependency, expectedOutput } = await request.json();
+    const { title, description, assignedToId, dueDate, priority, department, subtasks, module, dependency, expectedOutput, taskDate } = await request.json();
 
     if (!title || !assignedToId) {
       return NextResponse.json({ error: 'Title and Assignee are required' }, { status: 400 });
@@ -109,7 +109,8 @@ export async function POST(request) {
         subtasks: resolvedSubtasks,
         module,
         dependency,
-        expectedOutput
+        expectedOutput,
+        taskDate
       },
       include: {
         assignedTo: { select: { name: true, avatar: true, department: true } },

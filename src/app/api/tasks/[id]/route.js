@@ -74,7 +74,7 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const { title, description, status, assignedToId, dueDate, reason, workSampleUrl, priority, department, subtasks, module, dependency, expectedOutput } = await request.json();
+    const { title, description, status, assignedToId, dueDate, reason, workSampleUrl, priority, department, subtasks, module, dependency, expectedOutput, taskDate } = await request.json();
 
     const task = await prisma.task.findUnique({ where: { id } });
     if (!task) {
@@ -108,6 +108,7 @@ export async function PUT(request, { params }) {
       if (module !== undefined) updateData.module = module;
       if (dependency !== undefined) updateData.dependency = dependency;
       if (expectedOutput !== undefined) updateData.expectedOutput = expectedOutput;
+      if (taskDate !== undefined) updateData.taskDate = taskDate;
 
       if (checkPosted) {
         updateData.workSampleUrl = null;
@@ -146,6 +147,7 @@ export async function PUT(request, { params }) {
     if (module !== undefined) data.module = module;
     if (dependency !== undefined) data.dependency = dependency;
     if (expectedOutput !== undefined) data.expectedOutput = expectedOutput;
+    if (taskDate !== undefined) data.taskDate = taskDate;
 
     if (checkPosted) {
       data.workSampleUrl = null;

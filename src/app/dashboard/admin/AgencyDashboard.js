@@ -24,7 +24,7 @@ import { isDoneStatus, getDistinctDeliveries } from '@/lib/taskStatusUtils';
 import { exportMonthlyReport } from '@/lib/monthlyReportExport';
 import EmployeeTasksModal from './EmployeeTasksModal';
 
-export default function AgencyDashboard({ deliveries = [], clients = [], tasks = [], employees = [], attendance = [], feedbacks = [], calls = [], onSelectTab, onOpenCollectionReport, refreshData }) {
+export default function AgencyDashboard({ deliveries = [], clients = [], tasks = [], devTasks = [], employees = [], attendance = [], feedbacks = [], calls = [], onSelectTab, onOpenCollectionReport, refreshData }) {
   const [selectedEmployeeForTasks, setSelectedEmployeeForTasks] = useState(null);
   const [internalCalls, setInternalCalls] = useState(calls || []);
 
@@ -122,11 +122,12 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
   };
 
   // Calculate task stats (all-time, used for yearly donut)
-  const taskCompleted = tasks.filter(t => isDoneStatus(t.status)).length;
-  const taskPending = tasks.filter(t => !isDoneStatus(t.status)).length;
+  const allCombinedTasks = [...tasks, ...devTasks];
+  const taskCompleted = allCombinedTasks.filter(t => isDoneStatus(t.status)).length;
+  const taskPending = allCombinedTasks.filter(t => !isDoneStatus(t.status)).length;
 
   // --- DATASET 1: OVERALL/ALL-TIME ITEMS (Includes ALL employee tasks & deliverables) ---
-  const overallTasks = tasks;
+  const overallTasks = [...tasks, ...devTasks];
   const overallDeliveries = distinctDeliveries;
 
   const normalizedOverallTasks = overallTasks.map(t => ({
@@ -202,8 +203,8 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
   // Cutoff date for overdue carry-forwards: do not carry forward any tasks before 3 September 2026
   const OVERDUE_CUTOFF_DATE = '2026-09-03';
 
-  const todayTasks = tasks.filter(t => {
-    const iso = parseToISO(t.date);
+  const todayTasks = allCombinedTasks.filter(t => {
+    const iso = parseToISO(t.date || t.taskDate || t.dueDate);
     if (!iso) return false;
     if (iso === todayStr) return true;
     // Only include overdue tasks if they are dated on or after September 3, 2026
@@ -221,11 +222,11 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
   });
 
   const normalizedTodayTasks = todayTasks.map(t => {
-    const iso = parseToISO(t.date);
+    const iso = parseToISO(t.date || t.taskDate || t.dueDate);
     return {
       ...t,
       _type: 'task',
-      assignTo: (t.workingOn || 'Unassigned').trim(),
+      assignTo: (t.workingOn || t.assignedTo?.name || 'Unassigned').trim(),
       _isOverdue: iso ? iso < todayStr : false,
       _isoDate: iso
     };
@@ -536,8 +537,8 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
   // Dynamically calculate employee data from both tasks and deliveries
   const empMap = {};
 
-  // Process tasks
-  tasks.forEach(t => {
+  // Process all tasks (client tasks + dev tasks)
+  allCombinedTasks.forEach(t => {
     const rawName = t.workingOn && t.workingOn.toLowerCase() !== 'auto' ? t.workingOn : (t.assignedTo?.name || t.assignTo || '');
     if (!rawName) return;
     const name = rawName.trim();
@@ -584,7 +585,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
 
   const performanceOverview = calculateEmployeePerformance({
     employees: employeesToEvaluate,
-    clientTasks: tasks,
+    clientTasks: allCombinedTasks,
     clientDeliveries: distinctDeliveries,
     attendanceLogs: attendance,
     feedbacks,
@@ -755,7 +756,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
                 endDate: revenueEndDate,
                 periodLabel: label,
                 clients,
-                tasks,
+                tasks: allCombinedTasks,
                 deliveries: distinctDeliveries,
                 employeeData,
                 calls: internalCalls

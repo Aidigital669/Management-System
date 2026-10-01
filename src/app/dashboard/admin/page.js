@@ -3328,6 +3328,7 @@ export default function AdminDashboard() {
               deliveries={allClientDeliveries}
               clients={clientsList}
               tasks={allClientTasks}
+              devTasks={tasksList}
               employees={employeesList}
               attendance={attendanceLogs}
               feedbacks={feedbacksList}

@@ -79,6 +79,7 @@ model Task {
   module         String?
   dependency     String?
   expectedOutput String?
+  taskDate       String?
   assignedTo    User     @relation("AssignedTasks", fields: [assignedToId], references: [id], onDelete: Cascade)
   createdBy     User     @relation("CreatedTasks", fields: [createdById], references: [id], onDelete: Cascade)
 }

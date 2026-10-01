@@ -340,6 +340,7 @@ function TaskFormModal({ isOpen, onClose, onSubmit, devs, editTask, loading }) {
   const [module, setModule] = useState('');
   const [dependency, setDependency] = useState('');
   const [expectedOutput, setExpectedOutput] = useState('');
+  const [taskDate, setTaskDate] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -353,8 +354,9 @@ function TaskFormModal({ isOpen, onClose, onSubmit, devs, editTask, loading }) {
       setModule(editTask.module || '');
       setDependency(editTask.dependency || '');
       setExpectedOutput(editTask.expectedOutput || '');
+      setTaskDate(editTask.taskDate || '');
     } else {
-      setTitle(''); setDesc(''); setDev(''); setPri('Normal'); setDue(''); setTags([]); setModule(''); setDependency(''); setExpectedOutput('');
+      setTitle(''); setDesc(''); setDev(''); setPri('Normal'); setDue(''); setTags([]); setModule(''); setDependency(''); setExpectedOutput(''); setTaskDate('');
     }
   }, [isOpen, editTask]);
 
@@ -374,7 +376,8 @@ function TaskFormModal({ isOpen, onClose, onSubmit, devs, editTask, loading }) {
       department: 'Software Development',
       module,
       dependency,
-      expectedOutput
+      expectedOutput,
+      taskDate
     });
   };
 
@@ -450,6 +453,14 @@ function TaskFormModal({ isOpen, onClose, onSubmit, devs, editTask, loading }) {
               value={module} onChange={e => setModule(e.target.value)}
               placeholder="e.g. Authentication, Dashboard"
               className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">Date</label>
+            <input
+              type="date" value={taskDate} onChange={e => setTaskDate(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
             />
           </div>
 
@@ -678,6 +689,7 @@ export default function DevDashboard({ usersList = [], tasksList = [], refreshDa
         const moduleVal = row['Module'] || '';
         const dependency = row['Dependency'] || '';
         const expectedOutput = row['Expected Output'] || '';
+        const taskDate = row['Date'] || row['Task Date'] || '';
 
         if (assignedToId) {
           tasksToCreate.push({
@@ -689,7 +701,8 @@ export default function DevDashboard({ usersList = [], tasksList = [], refreshDa
             department: 'Software Development',
             module: String(moduleVal),
             dependency: String(dependency),
-            expectedOutput: String(expectedOutput)
+            expectedOutput: String(expectedOutput),
+            taskDate: String(taskDate)
           });
         }
       }
@@ -874,6 +887,7 @@ export default function DevDashboard({ usersList = [], tasksList = [], refreshDa
             <table className="w-full text-left border-collapse min-w-[1200px]">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800">
+                  <th className="px-4 py-3 text-[9px] font-extrabold uppercase tracking-wider text-slate-400">Date</th>
                   <th className="px-4 py-3 text-[9px] font-extrabold uppercase tracking-wider text-slate-400">Title</th>
                   <th className="px-4 py-3 text-[9px] font-extrabold uppercase tracking-wider text-slate-400">Assignee</th>
                   <th className="px-4 py-3 text-[9px] font-extrabold uppercase tracking-wider text-slate-400">Day</th>
@@ -890,7 +904,7 @@ export default function DevDashboard({ usersList = [], tasksList = [], refreshDa
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan="11">
+                    <td colSpan="12">
                       <div className="flex flex-col items-center justify-center py-16 text-slate-400">
                         <Terminal className="w-10 h-10 mb-3 opacity-25" />
                         <p className="font-bold text-sm">No dev tasks found</p>
@@ -907,6 +921,9 @@ export default function DevDashboard({ usersList = [], tasksList = [], refreshDa
                     
                     return (
                       <tr key={task.id} className={`border-b border-slate-50 dark:border-slate-800/40 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition group ${i % 2 === 0 ? '' : 'bg-slate-50/20 dark:bg-slate-800/10'}`}>
+                        <td className="px-4 py-3 align-top whitespace-nowrap">
+                          <span className="text-[10px] font-medium text-slate-600 dark:text-slate-300">{task.taskDate || '—'}</span>
+                        </td>
                         <td className="px-4 py-3 align-top">
                           <p className="text-xs font-bold text-slate-900 dark:text-white line-clamp-2" title={task.title}>{task.title}</p>
                         </td>
