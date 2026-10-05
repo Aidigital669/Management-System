@@ -391,13 +391,28 @@ export function calculateEmployeePerformance({
 
     if (userAttendance.length > 0) {
       userAttendance.forEach(log => {
-        if (log.status === 'PRESENT') {
+        if (log.status === 'PRESENT' || log.status === 'LATE') {
           presentDays += 1;
-          if (log.clockIn) {
-            const clockInHour = new Date(log.clockIn).getHours();
-            const clockInMinute = new Date(log.clockIn).getMinutes();
-            if (clockInHour > 10 || (clockInHour === 10 && clockInMinute > 15)) {
-              lateDays += 1;
+          if (log.status === 'LATE') {
+            lateDays += 1;
+          } else if (log.clockIn) {
+            try {
+              const istTimeStr = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'Asia/Kolkata',
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit'
+              }).format(new Date(log.clockIn));
+              const [h, m] = istTimeStr.split(':').map(Number);
+              if (h > 10 || (h === 10 && m > 15)) {
+                lateDays += 1;
+              }
+            } catch (e) {
+              const clockInHour = new Date(log.clockIn).getHours();
+              const clockInMinute = new Date(log.clockIn).getMinutes();
+              if (clockInHour > 10 || (clockInHour === 10 && clockInMinute > 15)) {
+                lateDays += 1;
+              }
             }
           }
         } else if (log.status === 'HALF_DAY') {

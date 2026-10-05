@@ -115,7 +115,7 @@ export async function POST(request) {
       }
 
       let status = 'PRESENT';
-      if (curHour > 9 || (curHour === 9 && curMinute > 15)) {
+      if (curHour > 10 || (curHour === 10 && curMinute > 15)) {
         status = 'LATE';
       }
 
