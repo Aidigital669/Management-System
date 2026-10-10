@@ -32,7 +32,7 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    if (requester.role === 'EMPLOYEE' && task.assignedToId !== requester.id) {
+    if (requester.role === 'EMPLOYEE' && task.assignedToId !== requester.id && task.createdById !== requester.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
@@ -211,13 +211,18 @@ export async function DELETE(request, { params }) {
     const cookieStore = await cookies();
     const requester = await getRequester(cookieStore);
 
-    if (!requester || (requester.role !== 'CEO' && requester.role !== 'ADMIN')) {
+    if (!requester) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
     const task = await prisma.task.findUnique({ where: { id } });
     if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+
+    const canDelete = requester.role === 'CEO' || requester.role === 'ADMIN' || (requester.role === 'TL' && task.createdById === requester.id) || task.createdById === requester.id;
+    if (!canDelete) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
     // If description contains a taskId reference (e.g. "Task ID: CT-xxx"), delete matching ClientTask/ClientDelivery

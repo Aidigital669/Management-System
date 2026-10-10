@@ -20,18 +20,23 @@ export async function GET() {
     let tasks;
     if (requester.role === 'EMPLOYEE') {
       tasks = await prisma.task.findMany({
-        where: { assignedToId: requester.id },
+        where: {
+          OR: [
+            { assignedToId: requester.id },
+            { createdById: requester.id }
+          ]
+        },
         include: {
-          assignedTo: { select: { name: true, avatar: true } },
-          createdBy: { select: { name: true, role: true } }
+          assignedTo: { select: { id: true, name: true, avatar: true, department: true } },
+          createdBy: { select: { id: true, name: true, role: true } }
         },
         orderBy: { id: 'desc' }
       });
     } else {
       tasks = await prisma.task.findMany({
         include: {
-          assignedTo: { select: { name: true, avatar: true } },
-          createdBy: { select: { name: true, role: true } }
+          assignedTo: { select: { id: true, name: true, avatar: true, department: true } },
+          createdBy: { select: { id: true, name: true, role: true } }
         },
         orderBy: { id: 'desc' }
       });
@@ -76,51 +81,59 @@ export async function POST(request) {
     const cookieStore = await cookies();
     const requester = await getRequester(cookieStore);
 
-    if (!requester || (requester.role !== 'CEO' && requester.role !== 'ADMIN' && requester.role !== 'TL')) {
+    if (!requester || (!['CEO', 'ADMIN', 'TL', 'EMPLOYEE'].includes(requester.role))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
     const { title, description, assignedToId, dueDate, priority, department, subtasks, module, dependency, expectedOutput, taskDate } = await request.json();
 
-    if (!title || !assignedToId) {
-      return NextResponse.json({ error: 'Title and Assignee are required' }, { status: 400 });
+    if (!title || !title.trim()) {
+      return NextResponse.json({ error: 'Title is required' }, { status: 400 });
     }
 
-    const assignee = await prisma.user.findUnique({ where: { id: parseInt(assignedToId) } });
+    // Employees can create tasks assigned to themselves
+    let targetAssigneeId = requester.role === 'EMPLOYEE' ? requester.id : (assignedToId ? parseInt(assignedToId) : null);
+    if (!targetAssigneeId) {
+      return NextResponse.json({ error: 'Assignee is required' }, { status: 400 });
+    }
+
+    const assignee = await prisma.user.findUnique({ where: { id: targetAssigneeId } });
     if (!assignee) {
       return NextResponse.json({ error: 'Assignee not found' }, { status: 404 });
     }
 
-    const resolvedDept = department || assignee.department || 'Software Development';
+    const resolvedDept = department || assignee.department || requester.department || 'Software Development';
     const resolvedSubtasks = Array.isArray(subtasks)
       ? JSON.stringify(subtasks)
       : (typeof subtasks === 'string' ? subtasks : '[]');
 
     const task = await prisma.task.create({
       data: {
-        title,
-        description,
-        assignedToId: parseInt(assignedToId),
+        title: title.trim(),
+        description: description || '',
+        assignedToId: targetAssigneeId,
         createdById: requester.id,
-        dueDate,
+        dueDate: dueDate || null,
         status: 'TODO',
         priority: priority || 'Normal',
         department: resolvedDept,
         subtasks: resolvedSubtasks,
-        module,
-        dependency,
-        expectedOutput,
-        taskDate
+        module: module || null,
+        dependency: dependency || null,
+        expectedOutput: expectedOutput || null,
+        taskDate: taskDate || null
       },
       include: {
-        assignedTo: { select: { name: true, avatar: true, department: true } },
-        createdBy: { select: { name: true, role: true } }
+        assignedTo: { select: { id: true, name: true, avatar: true, department: true } },
+        createdBy: { select: { id: true, name: true, role: true } }
       }
     });
 
     await prisma.auditLog.create({
       data: {
-        action: `Created task "${title}" for ${assignee.name} (${resolvedDept})`,
+        action: requester.role === 'EMPLOYEE'
+          ? `Created self task "${title.trim()}"`
+          : `Created task "${title.trim()}" for ${assignee.name} (${resolvedDept})`,
         performedByName: requester.name,
         performedByRole: requester.role
       }

@@ -217,7 +217,7 @@ export async function DELETE(request, { params }) {
     const cookieStore = await cookies();
     const requester = await getRequester(cookieStore);
 
-    if (!requester || (requester.role !== 'CEO' && requester.role !== 'ADMIN' && requester.role !== 'TL')) {
+    if (!requester) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
@@ -231,6 +231,11 @@ export async function DELETE(request, { params }) {
     const task = await prisma.task.findUnique({ where: { id } });
     if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+
+    const canDelete = requester.role === 'CEO' || requester.role === 'ADMIN' || requester.role === 'TL' || task.createdById === requester.id;
+    if (!canDelete) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
     const currentSubtasks = parseSubtasks(task.subtasks);
