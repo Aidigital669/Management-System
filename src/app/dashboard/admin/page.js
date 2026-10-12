@@ -4379,9 +4379,31 @@ export default function AdminDashboard() {
 
           {/* TAB 7: GLOBAL DELIVERABLES BOARD */}
           {activeTab === 'deliverables' && (() => {
+            const normalizedInternalTasks = tasksList.map(t => {
+              const dStr = t.dueDate || t.taskDate || (t.createdAt ? new Date(t.createdAt).toISOString().slice(0, 10) : '');
+              return {
+                ...t,
+                _isInternal: true,
+                id: t.id,
+                taskId: `INT-${t.id}`,
+                date: dStr,
+                businessName: t.department || 'Internal Task',
+                clientId: 'INTERNAL',
+                taskTitle: t.title || t.taskTitle || 'Task',
+                postType: 'Internal Task',
+                assignTo: t.department || 'Staff',
+                workingOn: (t.workingOn || t.assignedTo?.name || 'Unassigned').trim(),
+                status: t.status === 'TODO' ? 'Not Started' : t.status,
+                priority: t.priority || 'Normal',
+                notes: t.description
+              };
+            });
+
+            const allUnifiedDeliverables = [...allClientTasks, ...normalizedInternalTasks];
+
             const availableDeliverableMonths = (() => {
               const monthMap = new Map();
-              allClientTasks.forEach(t => {
+              allUnifiedDeliverables.forEach(t => {
                 const d = parseDbDate(t.date);
                 if (d) {
                   const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -4397,35 +4419,34 @@ export default function AdminDashboard() {
 
             const activeClientIdsInScope = new Set(
               clientsList
-                .filter(c => (deliverableMonthFilter !== 'all' || deliverableStartDate || deliverableEndDate)
+                .filter(c => (deliverableMonthFilter !== 'all')
                   ? isClientSubscriptionCoveringMonth(c, deliverableMonthFilter, deliverableStartDate, deliverableEndDate)
                   : isClientPlanActive(c)
                 )
                 .map(c => c.clientId)
             );
 
-            const baseDeliverables = allClientTasks.filter(t => {
-              if (deliverableMonthFilter !== 'all' || deliverableStartDate || deliverableEndDate) {
-                if (t.clientId && !activeClientIdsInScope.has(t.clientId)) return false;
-              }
-              const query = searchQuery.toLowerCase();
-              const matchesQuery = !query || (
-                t.businessName.toLowerCase().includes(query) ||
-                t.taskId.toLowerCase().includes(query) ||
-                t.taskTitle.toLowerCase().includes(query) ||
-                (t.workingOn && t.workingOn.toLowerCase().includes(query)) ||
-                (t.assignTo && t.assignTo.toLowerCase().includes(query))
-              );
-              if (!matchesQuery) return false;
-
+            const baseDeliverables = allUnifiedDeliverables.filter(t => {
               if (deliverableStartDate || deliverableEndDate) {
                 if (!isDateInRange(t.date, deliverableStartDate, deliverableEndDate)) return false;
               } else if (deliverableMonthFilter !== 'all') {
+                if (t.clientId && t.clientId !== 'INTERNAL' && !activeClientIdsInScope.has(t.clientId)) return false;
                 const d = parseDbDate(t.date);
                 if (!d) return false;
                 const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
                 if (mk !== deliverableMonthFilter) return false;
               }
+
+              const query = searchQuery.toLowerCase();
+              const matchesQuery = !query || (
+                (t.businessName && t.businessName.toLowerCase().includes(query)) ||
+                (t.taskId && t.taskId.toLowerCase().includes(query)) ||
+                (t.taskTitle && t.taskTitle.toLowerCase().includes(query)) ||
+                (t.workingOn && t.workingOn.toLowerCase().includes(query)) ||
+                (t.assignTo && t.assignTo.toLowerCase().includes(query))
+              );
+              if (!matchesQuery) return false;
+
               return true;
             });
 
@@ -4678,19 +4699,23 @@ export default function AdminDashboard() {
                             <td className="p-4 text-right">
                               <button
                                 onClick={() => {
-                                  const client = clientsList.find(c => c.clientId === task.clientId);
-                                  if (client) {
-                                    setSelectedClient(client);
-                                    setShowClientDetailModal(true);
-                                    refreshClientTasks(client.id);
-                                    resetClientTaskForm(task);
+                                  if (task._isInternal) {
+                                    handleSelectTab('tasks');
                                   } else {
-                                    showToast('Client details not found.', 'error');
+                                    const client = clientsList.find(c => c.clientId === task.clientId);
+                                    if (client) {
+                                      setSelectedClient(client);
+                                      setShowClientDetailModal(true);
+                                      refreshClientTasks(client.id);
+                                      resetClientTaskForm(task);
+                                    } else {
+                                      showToast('Client details not found.', 'error');
+                                    }
                                   }
                                 }}
                                 className="py-1 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-855 dark:hover:bg-slate-800 border border-slate-205 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-lg transition"
                               >
-                                Manage
+                                {task._isInternal ? 'View in Dept' : 'Manage'}
                               </button>
                             </td>
                           </tr>

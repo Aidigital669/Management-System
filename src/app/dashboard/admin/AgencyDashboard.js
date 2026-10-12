@@ -133,6 +133,8 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
   const normalizedOverallTasks = overallTasks.map(t => ({
     ...t,
     _type: 'task',
+    taskTitle: t.taskTitle || t.title || 'Task',
+    businessName: t.businessName || t.department || 'Internal Task',
     assignTo: (t.workingOn && t.workingOn.toLowerCase() !== 'auto' ? t.workingOn : (t.assignedTo?.name || t.assignTo || 'Unassigned Staff')).trim(),
   }));
 
@@ -226,7 +228,9 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
     return {
       ...t,
       _type: 'task',
-      assignTo: (t.workingOn || t.assignedTo?.name || 'Unassigned').trim(),
+      taskTitle: t.taskTitle || t.title || 'Task',
+      businessName: t.businessName || t.department || 'Internal Task',
+      assignTo: (t.workingOn && t.workingOn.toLowerCase() !== 'auto' ? t.workingOn : (t.assignedTo?.name || t.assignTo || 'Unassigned')).trim(),
       _isOverdue: iso ? iso < todayStr : false,
       _isoDate: iso
     };
@@ -585,8 +589,9 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
 
   const performanceOverview = calculateEmployeePerformance({
     employees: employeesToEvaluate,
-    clientTasks: allCombinedTasks,
+    clientTasks: tasks,
     clientDeliveries: distinctDeliveries,
+    internalTasks: devTasks,
     attendanceLogs: attendance,
     feedbacks,
     timeRange: 'this_month'
@@ -1562,7 +1567,7 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
                 emp={emp}
                 onOpenTasksModal={(employeeCard) => {
                   const matched = performanceOverview.employees.find(e => e.name.toLowerCase() === employeeCard.name.toLowerCase());
-                  if (matched) {
+                  if (matched && matched.allTasksList && matched.allTasksList.length > 0) {
                     setSelectedEmployeeForTasks(matched);
                   } else {
                     setSelectedEmployeeForTasks({
@@ -1572,13 +1577,13 @@ export default function AgencyDashboard({ deliveries = [], clients = [], tasks =
                       allTasksList: employeeCard.tasks.map(t => ({
                         id: t.id || t.taskId || t.deliveryId,
                         taskId: t.taskId || t.deliveryId || `T-${t.id}`,
-                        title: t.taskTitle || t.postType || 'Task',
-                        client: t.businessName || t.clientName || t.clientId,
-                        date: t.date || t.postDate || t.dueDate,
-                        type: t._type === 'delivery' ? 'Delivery' : 'Client Task',
-                        category: t.postType || t.service || 'Creative Work',
+                        title: t.taskTitle || t.title || t.postType || 'Task',
+                        client: t.businessName || t.clientName || t.department || t.clientId || 'Internal Task',
+                        date: t.date || t.postDate || t.dueDate || t.taskDate,
+                        type: t._type === 'delivery' ? 'Delivery' : (t._type === 'task' && !t.clientId ? 'Internal Task' : 'Client Task'),
+                        category: t.postType || t.service || t.department || 'Work Item',
                         priority: t.priority || 'Normal',
-                        status: t.status === 'DONE' || t.status === 'Delivered' || t.status === 'Completed' ? 'Completed' : (t.overdue ? 'Overdue' : 'Working On It'),
+                        status: isDoneStatus(t.status) ? 'Completed' : (t._isOverdue ? 'Overdue' : (t.status === 'TODO' ? 'Not Started' : (t.status || 'Working On It'))),
                         workSampleUrl: t.workSampleUrl
                       }))
                     });
@@ -1608,8 +1613,10 @@ const STATUS_CONFIG = {
   'DONE':        { label: 'Done',        color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300', dot: 'bg-emerald-500' },
   'Completed':   { label: 'Completed',   color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300', dot: 'bg-emerald-500' },
   'In Progress': { label: 'In Progress', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',           dot: 'bg-blue-500'   },
+  'TODO':        { label: 'To Do',       color: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',          dot: 'bg-slate-400'  },
   'Not Started': { label: 'Not Started', color: 'bg-slate-100 text-slate-650 dark:bg-slate-800 dark:text-slate-400',          dot: 'bg-slate-400'  },
   'Pending':     { label: 'Pending',     color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',   dot: 'bg-orange-400' },
+  'Assigned':    { label: 'Assigned',    color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',   dot: 'bg-indigo-500' },
   'On Hold':     { label: 'On Hold',     color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',  dot: 'bg-yellow-400' },
   'Processing':  { label: 'Processing',  color: 'bg-blue-100 text-blue-750 dark:bg-blue-900/40 dark:text-blue-300',           dot: 'bg-blue-500'   },
   'Client Review':{ label: 'Client Review',color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',      dot: 'bg-amber-500'  },
@@ -1703,7 +1710,11 @@ function EmployeeTaskCard({ emp, onOpenTasksModal }) {
       {expanded && (
         <div className="border-t border-slate-100 dark:border-slate-800 divide-y divide-slate-50 dark:divide-slate-800/50 max-h-72 overflow-y-auto">
           {emp.tasks.map((task, idx) => {
-            const sCfg = STATUS_CONFIG[task.status] || STATUS_CONFIG['Not Started'];
+            const sCfg = STATUS_CONFIG[task.status] || (
+              isDoneStatus(task.status) ? STATUS_CONFIG['Completed'] :
+              isInProgressStatus(task.status) ? STATUS_CONFIG['In Progress'] :
+              (task.status === 'TODO' ? STATUS_CONFIG['TODO'] : STATUS_CONFIG['Not Started'])
+            );
             const pCfg = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG['Normal'];
             const isDelivery = task._type === 'delivery';
             return (
@@ -1717,15 +1728,15 @@ function EmployeeTaskCard({ emp, onOpenTasksModal }) {
                       </span>
                       {task._isOverdue && (
                         <span className="text-[8px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
-                          ⚠️ Overdue / Yesterday ({task.date || task.postDate})
+                          ⚠️ Overdue / Yesterday ({task.date || task.postDate || task.dueDate})
                         </span>
                       )}
                     </div>
-                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate" title={task.taskTitle}>
-                      {task.taskTitle || '—'}
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate" title={task.taskTitle || task.title}>
+                      {task.taskTitle || task.title || '—'}
                     </p>
                     <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
-                      {task.businessName || task.clientId || '—'}
+                      {task.businessName || task.clientId || task.department || 'Internal Task'}
                       {task.postType ? ` · ${task.postType}` : ''}
                     </p>
                   </div>

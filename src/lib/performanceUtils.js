@@ -173,8 +173,10 @@ export function calculateEmployeePerformance({
     // 3. Gather Internal Tasks for this employee
     const assignedInternalTasks = internalTasks.filter(t => {
       const assignedId = t.assignedToId ? t.assignedToId.toString() : '';
-      if (assignedId !== empIdStr) return false;
-      return isDateInTimeRange(t.dueDate || t.createdAt, timeRange);
+      const assignedName = (t.assignedTo?.name || t.workingOn || t.assignTo || '').trim().toLowerCase();
+      const matches = (empIdStr && assignedId === empIdStr) || (assignedName && assignedName === empNameLower);
+      if (!matches) return false;
+      return isDateInTimeRange(t.dueDate || t.taskDate || t.createdAt, timeRange);
     });
 
     // Track detailed task stats
@@ -323,14 +325,14 @@ export function calculateEmployeePerformance({
         rawId: t.id,
         taskId: `INT-${t.id}`,
         rawType: 'Task',
-        workingOn: t.workingOn || t.assignedTo?.name,
+        workingOn: t.workingOn || t.assignedTo?.name || empName,
         assignedToId: t.assignedToId,
-        title: t.title,
-        client: 'Internal Duties',
+        title: t.title || t.taskTitle || 'Internal Task',
+        client: t.department || 'Internal Duties',
         clientId: 'INTERNAL',
-        date: t.dueDate,
+        date: t.dueDate || t.taskDate,
         type: 'Internal Task',
-        category: 'Staff Assignment',
+        category: t.department || 'Staff Assignment',
         priority: t.priority || 'Normal',
         status: normalizedStatus,
         rawStatus: t.status,
