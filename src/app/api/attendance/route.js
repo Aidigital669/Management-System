@@ -21,7 +21,7 @@ export async function GET() {
     // Auto-close any expired sessions from past dates or today after 6:30 PM shift end
     await autoCloseExpiredAttendance();
 
-    const { dateStr: todayStr } = getISTDateTime();
+    const { dateStr: todayStr} = getISTDateTime();
 
     const todayLog = await prisma.attendance.findFirst({
       where: {
@@ -86,7 +86,7 @@ export async function POST(request) {
         where: { id: activeLog.id },
         data: { clockOut: now }
       });
-
+           
       await prisma.auditLog.create({
         data: {
           action: `Clocked out`,
@@ -94,7 +94,7 @@ export async function POST(request) {
           performedByRole: requester.role
         }
       });
-
+          
       return NextResponse.json({ message: 'Clocked out successfully', log: updated });
     } else {
       // Check if trying to clock in after 6:30 PM (18:30)
