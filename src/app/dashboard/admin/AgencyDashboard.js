@@ -20,7 +20,7 @@ import {
   isClientPlanActive
 } from '@/lib/planUtils';
 import { calculateEmployeePerformance } from '@/lib/performanceUtils';
-import { isDoneStatus, getDistinctDeliveries } from '@/lib/taskStatusUtils';
+import { isDoneStatus, isInProgressStatus, getDistinctDeliveries } from '@/lib/taskStatusUtils';
 import { exportMonthlyReport } from '@/lib/monthlyReportExport';
 import EmployeeTasksModal from './EmployeeTasksModal';
 
