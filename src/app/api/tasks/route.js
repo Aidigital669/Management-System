@@ -18,7 +18,7 @@ export async function GET() {
     }
 
     let tasks;
-    if (requester.role === 'EMPLOYEE') {
+    if (requester.role === 'EMPLOYEE' || requester.role === 'SALES') {
       tasks = await prisma.task.findMany({
         where: {
           OR: [
@@ -81,7 +81,7 @@ export async function POST(request) {
     const cookieStore = await cookies();
     const requester = await getRequester(cookieStore);
 
-    if (!requester || (!['CEO', 'ADMIN', 'TL', 'EMPLOYEE'].includes(requester.role))) {
+    if (!requester || (!['CEO', 'ADMIN', 'TL', 'EMPLOYEE', 'SALES'].includes(requester.role))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
@@ -91,8 +91,8 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 });
     }
 
-    // Employees can create tasks assigned to themselves
-    let targetAssigneeId = requester.role === 'EMPLOYEE' ? requester.id : (assignedToId ? parseInt(assignedToId) : null);
+    // Employees and Sales can create tasks assigned to themselves
+    let targetAssigneeId = (requester.role === 'EMPLOYEE' || requester.role === 'SALES') ? requester.id : (assignedToId ? parseInt(assignedToId) : null);
     if (!targetAssigneeId) {
       return NextResponse.json({ error: 'Assignee is required' }, { status: 400 });
     }
@@ -102,7 +102,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Assignee not found' }, { status: 404 });
     }
 
-    const resolvedDept = department || assignee.department || requester.department || 'Software Development';
+    const resolvedDept = department || assignee.department || requester.department || 'Sales Executive';
     const resolvedSubtasks = Array.isArray(subtasks)
       ? JSON.stringify(subtasks)
       : (typeof subtasks === 'string' ? subtasks : '[]');
@@ -131,7 +131,7 @@ export async function POST(request) {
 
     await prisma.auditLog.create({
       data: {
-        action: requester.role === 'EMPLOYEE'
+        action: (requester.role === 'EMPLOYEE' || requester.role === 'SALES')
           ? `Created self task "${title.trim()}"`
           : `Created task "${title.trim()}" for ${assignee.name} (${resolvedDept})`,
         performedByName: requester.name,

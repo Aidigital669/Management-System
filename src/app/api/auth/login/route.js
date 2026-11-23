@@ -93,7 +93,8 @@ export async function POST(request) {
           { name: 'Pujan', department: 'Digital Marketing Executive', password: 'Pujan@Ai879', email: 'pujan@aidigital.com', role: 'EMPLOYEE' },
           { name: 'Preet', department: 'Digital Marketing Executive', password: 'Preet@Ai978', email: 'preet@aidigital.com', role: 'EMPLOYEE' },
           { name: 'Sanmeet', department: 'Video Editor', password: 'Sanmeet@Ai901', email: 'sanmeet@aidigital.com', role: 'EMPLOYEE' },
-          { name: 'Jennifer', department: 'Sales Executive', password: 'Jennifer@Ai123', email: 'jennifer@aidigital.com', role: 'SALES' }
+          { name: 'Jennifer', department: 'Sales Executive', password: 'Jennifer@Ai123', email: 'jennifer@aidigital.com', role: 'SALES' },
+          { name: 'Muskan', department: 'Sales Executive', password: 'Muskan@Ai123', email: 'muskan@aidigital.com', role: 'SALES' }
         ];
 
         const emp = employeesList.find(e => e.email === email);
@@ -115,8 +116,8 @@ export async function POST(request) {
         }
       }
     } else {
-      // If user exists, ensure Jennifer has the SALES role
-      if (email === 'jennifer@aidigital.com' && user.role !== 'SALES') {
+      // If user exists, ensure salespersons have the SALES role
+      if ((email === 'jennifer@aidigital.com' || email === 'muskan@aidigital.com') && user.role !== 'SALES') {
         user = await prisma.user.update({
           where: { email },
           data: { role: 'SALES' }

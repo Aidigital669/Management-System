@@ -20,6 +20,12 @@ This file contains the email IDs and passwords for all user accounts configured 
 
 ---
 
+## 3. Developer Account
+- **Role:** EMPLOYEE
+- **Department:** Software Development
+- **Name:** `Prem Sharma`
+- **Email:** `developer@aidigital.com`
+- **Password:** `Prem@#123`
 
 ---
 
@@ -74,10 +80,18 @@ Use the email addresses and passwords below to log in as specific members of the
   - **Email:** `sanmeet@aidigital.com`
   - **Password:** `Sanmeet@Ai901`
 
+### Software Development / Engineering
+- **Prem Sharma** (EMPLOYEE)
+  - **Email:** `developer@aidigital.com`
+  - **Password:** `Prem@#123`
+
 ### Sales Executive
 - **Jennifer** (SALES)
   - **Email:** `jennifer@aidigital.com`
   - **Password:** `Jennifer@Ai123`
+- **Muskan** (SALES)
+  - **Email:** `muskan@aidigital.com`
+  - **Password:** `Muskan@Ai123`
 
 ---
 

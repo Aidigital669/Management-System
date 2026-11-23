@@ -32,7 +32,7 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    if (requester.role === 'EMPLOYEE' && task.assignedToId !== requester.id && task.createdById !== requester.id) {
+    if ((requester.role === 'EMPLOYEE' || requester.role === 'SALES') && task.assignedToId !== requester.id && task.createdById !== requester.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
@@ -91,7 +91,7 @@ export async function PUT(request, { params }) {
       : undefined;
 
     if (!isPowerUser) {
-      if (task.assignedToId !== requester.id) {
+      if (task.assignedToId !== requester.id && task.createdById !== requester.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
       }
 
